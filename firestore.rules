@@ -1,0 +1,210 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ==========================================
+    // دالات التحقق والمصادقة المساعدة (Helper Functions)
+    // ==========================================
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // فحص صلاحية المدير (Admin Verification)
+    // يدعم بريد الإدارة المؤسس المعتمد أو دور admin المسجل في قاعدة البيانات
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'admin@asira-research.org' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    // فحص صلاحية المدرس
+    function isInstructor() {
+      return isSignedIn() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'instructor';
+    }
+
+    // فحص إسناد المدرس للدورة المحددة
+    function isCourseInstructor(courseId) {
+      return isInstructor() && 
+        exists(/databases/$(database)/documents/courses/$(courseId)) &&
+        request.auth.uid in get(/databases/$(database)/documents/courses/$(courseId)).data.instructorIds;
+    }
+
+    // فحص تسجيل الطالب المعتمد في الدورة
+    function isApprovedStudent(courseId) {
+      return isSignedIn() && 
+        exists(/databases/$(database)/documents/courses/$(courseId)/enrollments/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/courses/$(courseId)/enrollments/$(request.auth.uid)).data.status == 'approved';
+    }
+
+    // ==========================================
+    // 1. المستخدمون (Users) - منع تصعيد الصلاحيات الصارم
+    // ==========================================
+    match /users/{uid} {
+      // الطالب يقرأ ملفه الشخصي، والمدير والمدرس يقرؤون لأغراض أكاديمية
+      allow read: if isSignedIn();
+
+      // إنشاء الحساب: إجباري دور student وحالة active
+      allow create: if isOwner(uid) && 
+        request.resource.data.role == 'student' &&
+        request.resource.data.accountStatus == 'active';
+
+      // التعديل: الطالب لا يستطيع تعديل دوره أو حالة حسابه
+      allow update: if isAdmin() || (
+        isOwner(uid) && 
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'accountStatus', 'createdAt'])
+      );
+
+      // الحذف المباشر محظور لحماية النزاهة الأكاديمية
+      allow delete: if false;
+    }
+
+    // ==========================================
+    // 2. الكورسات (Courses) والمحتوى التعليمي
+    // ==========================================
+    match /courses/{courseId} {
+      // الكورسات المنشورة عامة، والمسودات فقط للمدير والمدرس
+      allow read: if resource.data.status == 'published' || isAdmin() || isCourseInstructor(courseId);
+      allow write: if isAdmin() || isCourseInstructor(courseId);
+
+      // أ. الوحدات (Modules)
+      match /modules/{moduleId} {
+        allow read: if isApprovedStudent(courseId) || isAdmin() || isCourseInstructor(courseId);
+        allow write: if isAdmin() || isCourseInstructor(courseId);
+      }
+
+      // ب. العناصر والدروس (Items & Lessons)
+      match /items/{itemId} {
+        allow read: if isApprovedStudent(courseId) || isAdmin() || isCourseInstructor(courseId);
+        allow write: if isAdmin() || isCourseInstructor(courseId);
+      }
+
+      match /lessons/{lessonId} {
+        allow read: if isApprovedStudent(courseId) || isAdmin() || isCourseInstructor(courseId);
+        allow write: if isAdmin() || isCourseInstructor(courseId);
+      }
+
+      // ج. طلبات الالتحاق (Enrollments)
+      match /enrollments/{studentUid} {
+        allow read: if isOwner(studentUid) || isAdmin() || isCourseInstructor(courseId);
+        
+        // الطالب يطلب الالتحاق بحالة pending فقط
+        allow create: if isOwner(studentUid) && request.resource.data.status == 'pending';
+        
+        // فقط المدير أو مدرس الدورة يعتمد أو يرفض الطلب
+        allow update: if isAdmin() || isCourseInstructor(courseId);
+        allow delete: if false;
+      }
+
+      // د. تقدم الدروس (Lesson Progress)
+      match /lessonProgress/{progressDoc} {
+        allow read: if isSignedIn() && (
+          request.auth.uid == resource.data.studentUid || isAdmin() || isCourseInstructor(courseId)
+        );
+        allow write: if isSignedIn() && (
+          request.auth.uid == request.resource.data.studentUid || isAdmin()
+        );
+      }
+
+      // هـ. التكليفات والتسليمات (Assignments & Submissions)
+      match /assignments/{assignmentId} {
+        allow read: if isApprovedStudent(courseId) || isAdmin() || isCourseInstructor(courseId);
+        allow write: if isAdmin() || isCourseInstructor(courseId);
+
+        match /submissions/{studentUid} {
+          allow read: if isOwner(studentUid) || isAdmin() || isCourseInstructor(courseId);
+          // الطالب يسلم الرابط، ولا يملك وضع الدرجة
+          allow create, update: if (isOwner(studentUid) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['grade', 'gradedBy', 'gradedAt'])) ||
+                                isAdmin() || isCourseInstructor(courseId);
+          allow delete: if false;
+        }
+      }
+
+      // و. الاختبارات ومحرك الأمان (Exams Engine)
+      match /exams/{examId} {
+        // بيانات الاختبار العامة متاحة للطالب المسجل بدون مفتاح الإجابات
+        allow read: if isApprovedStudent(courseId) || isAdmin() || isCourseInstructor(courseId);
+        allow write: if isAdmin() || isCourseInstructor(courseId);
+
+        // 🔒 مفتاح الإجابات السري (Answer Key Isolation) - محظور على الطالب نهائياً
+        match /answerKey/{secretDoc=**} {
+          allow read, write: if isAdmin() || isCourseInstructor(courseId);
+        }
+
+        // محاولات الطلاب (Attempts)
+        match /attempts/{attemptDoc} {
+          allow read: if (isSignedIn() && request.auth.uid == resource.data.studentUid) || isAdmin() || isCourseInstructor(courseId);
+          allow create: if isOwner(request.resource.data.studentUid);
+          allow update: if (isOwner(resource.data.studentUid) && resource.data.status == 'in_progress') || isAdmin() || isCourseInstructor(courseId);
+          allow delete: if false;
+        }
+      }
+
+      // ز. الدرجات الرسمية المعتمدة (Official Grades) - محظور كتابة الطالب
+      match /officialGrades/{gradeDoc} {
+        allow read: if (isSignedIn() && request.auth.uid == resource.data.studentUid) || isAdmin() || isCourseInstructor(courseId);
+        allow write: if isAdmin() || isCourseInstructor(courseId);
+      }
+
+      // ح. درجات الامتحان العملي (Practical Grades)
+      match /practicalGrades/{practicalDoc} {
+        allow read: if (isSignedIn() && request.auth.uid == resource.data.studentUid) || isAdmin() || isCourseInstructor(courseId);
+        allow write: if isAdmin() || isCourseInstructor(courseId);
+      }
+    }
+
+    // ==========================================
+    // 3. الشهادات والتحقق العام (Certificates)
+    // ==========================================
+    match /certificates/{certId} {
+      // القراءة متاحة للجميع للتحقق من كود الشهادة الأكاديمي
+      allow read: if true;
+      allow create, update: if isAdmin();
+      allow delete: if false;
+    }
+
+    // ==========================================
+    // 4. معرض الأبحاث والصفحات العامة (Showcase)
+    // ==========================================
+    match /researches/{researchId} {
+      allow read: if resource.data.status == 'published' || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /testimonials/{testId} {
+      allow read: if resource.data.status == 'published' || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /contactMessages/{msgId} {
+      allow create: if true; // إرسال استفسار من زوار الموقع
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /platformSettings/{settingDoc} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ==========================================
+    // 5. سجل العمليات والتدقيق (Audit Logs) - إضافة فقط وممنوع الحذف
+    // ==========================================
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn();
+      allow update, delete: if false; // سجل تاريخي غير قابل للتلاعب
+    }
+
+    // إغلاق أي مسارات أخرى غير معرفة
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

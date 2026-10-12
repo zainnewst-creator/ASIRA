@@ -1,0 +1,421 @@
+/* ========================================================
+   منتدى أسيرا لتعليم البحث العلمي - نظام التصميم الأكاديمي
+   ASIRA Academic Design System & Token Architecture
+   ======================================================== */
+
+:root {
+  /* الألوان الأكاديمية الملكية (Academic Prestige Palette) */
+  --primary-950: #070d1e;
+  --primary-900: #0d1b3e;
+  --primary-800: #142a5d;
+  --primary-700: #1b3b82;
+  --primary-600: #254fab;
+  --primary-500: #3b6bd6;
+  --primary-400: #608cf0;
+  --primary-100: #dbe6fe;
+  --primary-50:  #eff4ff;
+
+  /* لمسات التميز والبحث العلمي (Emerald & Gold Accents) */
+  --accent-emerald: #10b981;
+  --accent-emerald-dark: #059669;
+  --accent-emerald-light: #d1fae5;
+  --accent-gold: #f59e0b;
+  --accent-gold-dark: #d97706;
+  --accent-gold-light: #fef3c7;
+
+  /* ألوان التنبيه والحالات الأكاديمية */
+  --status-pending: #f59e0b;
+  --status-approved: #10b981;
+  --status-rejected: #ef4444;
+  --status-archived: #64748b;
+
+  /* الخلفيات والأسطح (Surface & Background Tokens) */
+  --bg-main: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-subtle: #f1f5f9;
+  --border-color: #e2e8f0;
+  --border-focus: #3b6bd6;
+
+  /* النصوص والظلال */
+  --text-main: #0f172a;
+  --text-muted: #475569;
+  --text-subtle: #94a3b8;
+  --text-inverse: #ffffff;
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.04);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.04);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  --font-arabic: 'Cairo', system-ui, -apple-system, sans-serif;
+  --font-num: 'Outfit', 'Cairo', sans-serif;
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.25s ease;
+}
+
+/* الوضع الداكن (Dark Academic Mode) */
+[data-theme='dark'] {
+  --bg-main: #0b1120;
+  --bg-card: #131c31;
+  --bg-subtle: #1a2642;
+  --border-color: #243354;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-subtle: #64748b;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.6);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-arabic);
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  direction: rtl;
+  text-align: right;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+/* شريط التمرير المخصص */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-subtle);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--primary-700);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-600);
+}
+
+/* الحاوية العامة */
+.container {
+  width: 100%;
+  max-width: 1240px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+/* الأزرار الأكاديمية (Buttons) */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  font-family: var(--font-arabic);
+  font-size: 0.95rem;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary-700), var(--primary-800));
+  color: var(--text-inverse);
+  box-shadow: 0 2px 4px rgba(27, 59, 130, 0.25);
+}
+.btn-primary:hover {
+  background: linear-gradient(135deg, var(--primary-600), var(--primary-700));
+  box-shadow: 0 4px 10px rgba(27, 59, 130, 0.35);
+  transform: translateY(-1px);
+}
+
+.btn-accent {
+  background: linear-gradient(135deg, var(--accent-emerald), var(--accent-emerald-dark));
+  color: var(--text-inverse);
+  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.25);
+}
+.btn-accent:hover {
+  background: linear-gradient(135deg, #10b981, #047857);
+  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.35);
+  transform: translateY(-1px);
+}
+
+.btn-outline {
+  background: transparent;
+  border-color: var(--border-color);
+  color: var(--text-main);
+}
+.btn-outline:hover {
+  background: var(--bg-subtle);
+  border-color: var(--primary-500);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-muted);
+}
+.btn-ghost:hover {
+  background: var(--bg-subtle);
+  color: var(--text-main);
+}
+
+/* الشارات والوسوم (Badges) */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+}
+.badge-primary {
+  background: var(--primary-50);
+  color: var(--primary-700);
+  border: 1px solid var(--primary-100);
+}
+.badge-emerald {
+  background: var(--accent-emerald-light);
+  color: var(--accent-emerald-dark);
+}
+.badge-gold {
+  background: var(--accent-gold-light);
+  color: var(--accent-gold-dark);
+}
+
+/* بطاقات المنصة (Cards) */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-normal);
+}
+.card:hover {
+  border-color: rgba(59, 107, 214, 0.3);
+  box-shadow: var(--shadow-md);
+}
+
+/* تأثير التدرج الملكي في الترويسات (Gradients) */
+.gradient-text {
+  background: linear-gradient(135deg, var(--primary-700), var(--primary-500), var(--accent-emerald));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* شعار أسيرا المؤطر (Brand Badge Placeholder) */
+.brand-logo-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-decoration: none;
+  color: inherit;
+}
+.brand-logo-icon {
+  width: 44px;
+  height: 44px;
+  background: linear-gradient(135deg, var(--primary-900), var(--primary-700));
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(13, 27, 62, 0.25);
+  font-family: var(--font-num);
+  font-weight: 800;
+  font-size: 1.1rem;
+}
+.brand-logo-text {
+  display: flex;
+  flex-direction: column;
+}
+.brand-logo-title {
+  font-weight: 800;
+  font-size: 1.15rem;
+  color: var(--primary-900);
+  line-height: 1.2;
+}
+[data-theme='dark'] .brand-logo-title {
+  color: #ffffff;
+}
+.brand-logo-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* الهيدر وشريط التنقل العلوي */
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-color);
+  transition: all var(--transition-fast);
+}
+[data-theme='dark'] .navbar {
+  background: rgba(19, 28, 49, 0.92);
+}
+
+.nav-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 72px;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  list-style: none;
+}
+.nav-link {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: color var(--transition-fast);
+  padding: 0.4rem 0.2rem;
+  border-bottom: 2px solid transparent;
+}
+.nav-link:hover, .nav-link.active {
+  color: var(--primary-600);
+  border-color: var(--primary-600);
+}
+
+/* قسم البطل في الصفحة الرئيسية (Hero Section) */
+.hero-section {
+  position: relative;
+  overflow: hidden;
+  padding: 5rem 0 4rem;
+  background: radial-gradient(circle at 10% 20%, rgba(59, 107, 214, 0.08) 0%, transparent 40%),
+              radial-gradient(circle at 90% 80%, rgba(16, 185, 129, 0.06) 0%, transparent 40%);
+}
+
+.hero-content {
+  max-width: 800px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.hero-title {
+  font-size: 3rem;
+  font-weight: 900;
+  line-height: 1.25;
+  margin-bottom: 1.5rem;
+  color: var(--primary-950);
+}
+[data-theme='dark'] .hero-title {
+  color: #ffffff;
+}
+
+.hero-subtitle {
+  font-size: 1.25rem;
+  color: var(--text-muted);
+  line-height: 1.8;
+  margin-bottom: 2rem;
+}
+
+.hero-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* إحصائيات الأثر (Stats Banner) */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+  margin: 3.5rem 0 2rem;
+}
+.stat-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+}
+.stat-number {
+  font-family: var(--font-num);
+  font-size: 2.25rem;
+  font-weight: 800;
+  color: var(--primary-700);
+  line-height: 1.2;
+}
+.stat-label {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-top: 0.35rem;
+  font-weight: 600;
+}
+
+/* الشبكات الأكاديمية (Grids) */
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.75rem;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+  gap: 1.75rem;
+}
+
+/* التذييل (Footer) */
+.footer {
+  background: var(--primary-950);
+  color: #94a3b8;
+  padding: 4rem 0 2rem;
+  margin-top: 6rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+.footer a {
+  color: #cbd5e1;
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+.footer a:hover {
+  color: var(--accent-emerald);
+}
+
+/* التجاوب مع مختلف الشاشات (Responsive) */
+@media (max-width: 768px) {
+  .hero-title {
+    font-size: 2.15rem;
+  }
+  .hero-subtitle {
+    font-size: 1.05rem;
+  }
+  .nav-links {
+    display: none;
+  }
+  .grid-3, .grid-2 {
+    grid-template-columns: 1fr;
+  }
+}

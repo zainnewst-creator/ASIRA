@@ -1,0 +1,162 @@
+import React, { useState, useEffect } from 'react';
+import { Navbar } from './components/Navbar';
+import { Footer } from './components/Footer';
+import { HomePage } from './pages/HomePage';
+import { CoursesPage } from './pages/CoursesPage';
+import { ResearchPage } from './pages/ResearchPage';
+import { AboutPage } from './pages/AboutPage';
+import { TestimonialsPage } from './pages/TestimonialsPage';
+import { ContactPage } from './pages/ContactPage';
+import { PoliciesPage } from './pages/PoliciesPage';
+import { LmsDashboardPreview } from './pages/LmsDashboardPreview';
+import { AuthModal } from './components/AuthModal';
+import { Course, UserRole } from './types';
+import { CheckCircle2, ShieldAlert } from 'lucide-react';
+
+export const App: React.FC = () => {
+  const [currentTab, setCurrentTab] = useState<string>('home');
+  const [isDark, setIsDark] = useState<boolean>(false);
+  const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
+  const [currentUser, setCurrentUser] = useState<{ name: string; role: UserRole; email: string } | null>(null);
+  const [enrollSuccessCourse, setEnrollSuccessCourse] = useState<Course | null>(null);
+
+  // إدارة الوضع الليلي
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('asira_theme');
+    if (savedTheme === 'dark') {
+      setIsDark(true);
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const nextDark = !isDark;
+    setIsDark(nextDark);
+    if (nextDark) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      localStorage.setItem('asira_theme', 'dark');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+      localStorage.setItem('asira_theme', 'light');
+    }
+  };
+
+  const handleEnrollRequest = (course: Course) => {
+    if (!currentUser) {
+      setIsAuthOpen(true);
+    } else {
+      setEnrollSuccessCourse(course);
+    }
+  };
+
+  const handleSelectCourse = (_course: Course) => {
+    setCurrentTab('courses');
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      {/* شريط الإشعار الإداري السريع لاختبار المنصة */}
+      <div style={{ background: 'var(--primary-900)', color: '#cbd5e1', fontSize: '0.8rem', padding: '0.4rem 1rem', textAlign: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+        <span>مرحباً بك في منصة <strong>منتدى أسيرا لتعليم البحث العلمي (ASIRA)</strong> — واجهة رسمية وبوابة أكاديمية LMS متكاملة بتكلفة صفرية.</span>
+      </div>
+
+      {/* الهيدر العلوي */}
+      <Navbar
+        currentTab={currentTab}
+        setCurrentTab={setCurrentTab}
+        isDark={isDark}
+        toggleTheme={toggleTheme}
+        onOpenAuth={() => setIsAuthOpen(true)}
+        currentUser={currentUser}
+      />
+
+      {/* محتوى الصفحة النشطة */}
+      <main style={{ flex: 1 }}>
+        {currentTab === 'home' && (
+          <HomePage
+            onNavigate={(tab) => setCurrentTab(tab)}
+            onEnroll={handleEnrollRequest}
+            onSelectCourse={handleSelectCourse}
+          />
+        )}
+
+        {currentTab === 'courses' && (
+          <CoursesPage
+            onEnroll={handleEnrollRequest}
+            onSelectCourse={handleSelectCourse}
+          />
+        )}
+
+        {currentTab === 'research' && <ResearchPage />}
+
+        {currentTab === 'about' && <AboutPage />}
+
+        {currentTab === 'testimonials' && <TestimonialsPage />}
+
+        {currentTab === 'contact' && <ContactPage />}
+
+        {currentTab === 'policies' && <PoliciesPage />}
+
+        {currentTab === 'lms_dashboard' && (
+          <LmsDashboardPreview
+            userRole={currentUser?.role || 'student'}
+            userName={currentUser?.name || 'أحمد الصالح'}
+            onLogout={() => {
+              setCurrentUser(null);
+              setCurrentTab('home');
+            }}
+            onBackToPortal={() => setCurrentTab('home')}
+          />
+        )}
+      </main>
+
+      {/* التذييل */}
+      <Footer onNavigate={(tab) => setCurrentTab(tab)} />
+
+      {/* نافذة تسجيل الدخول وحماية الصلاحيات */}
+      <AuthModal
+        isOpen={isAuthOpen}
+        onClose={() => setIsAuthOpen(false)}
+        onLogin={(user) => {
+          setCurrentUser(user);
+          setCurrentTab('lms_dashboard');
+        }}
+      />
+
+      {/* نافذة تأكيد طلب الالتحاق */}
+      {enrollSuccessCourse && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.7)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 110,
+          padding: '1.5rem',
+        }}>
+          <div className="card" style={{ maxWidth: '480px', width: '100%', textAlign: 'center' }}>
+            <CheckCircle2 size={54} color="#10b981" style={{ margin: '0 auto 1rem' }} />
+            <h3 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '0.5rem', color: 'var(--text-main)' }}>
+              تم استلام طلب الالتحاق بنجاح!
+            </h3>
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: '1.6', marginBottom: '1.5rem' }}>
+              تم تسجيل طلب التحاقك بدورة <strong>"{enrollSuccessCourse.title}"</strong> بحالة <code>pending</code>. ستتم مراجعة الطلب والموافقة عليه من قبل إدارة المنتدى لتفعيل صلاحية الوصول لكافة الدروس.
+            </p>
+            <button
+              onClick={() => {
+                setEnrollSuccessCourse(null);
+                setCurrentTab('lms_dashboard');
+              }}
+              className="btn btn-primary"
+              style={{ width: '100%' }}
+            >
+              الانتقال إلى لوحة تحكم الطالب
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+export default App;
