@@ -10,9 +10,9 @@ interface AuthModalProps {
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }) => {
   const [isRegister, setIsRegister] = useState(false);
-  const [email, setEmail] = useState('');
-  const [name, setName] = useState('');
-  const [university, setUniversity] = useState('');
+  const [email, setEmail] = useState('student@asira-research.org');
+  const [name, setName] = useState('أحمد الصالح');
+  const [password, setPassword] = useState('••••••••');
   const [demoRole, setDemoRole] = useState<UserRole>('student');
 
   if (!isOpen) return null;
@@ -44,6 +44,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
           onClick={onClose}
           className="btn btn-ghost"
           style={{ position: 'absolute', top: '12px', left: '12px', padding: '0.25rem 0.5rem', fontSize: '1.1rem' }}
+          id="close-auth-modal-btn"
         >
           ✕
         </button>
@@ -76,7 +77,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
               </label>
               <input
                 type="text"
-                required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="أحمد محمد الصالح"
@@ -91,7 +91,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
             </label>
             <input
               type="email"
-              required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="user@example.com"
@@ -105,7 +104,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
             </label>
             <input
               type="password"
-              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)', fontFamily: 'var(--font-arabic)' }}
             />
@@ -125,6 +125,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
                     onClick={() => setDemoRole(r)}
                     className={`btn ${demoRole === r ? 'btn-primary' : 'btn-outline'}`}
                     style={{ flex: 1, padding: '0.35rem', fontSize: '0.75rem' }}
+                    id={`role-btn-${r}`}
                   >
                     {r === 'student' ? 'طالب' : r === 'instructor' ? 'مدرس' : 'مدير'}
                   </button>
@@ -133,7 +134,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
             </div>
           )}
 
-          <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem', marginTop: '0.5rem' }}>
+          <button 
+            type="submit" 
+            className="btn btn-primary" 
+            style={{ padding: '0.75rem', marginTop: '0.5rem' }}
+            id="auth-submit-btn"
+          >
             {isRegister ? 'إنشاء حساب طالب' : 'تسجيل الدخول'}
           </button>
         </form>

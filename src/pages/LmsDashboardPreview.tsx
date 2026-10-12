@@ -33,7 +33,13 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
   onLogout,
   onBackToPortal,
 }) => {
-  const [activeTab, setActiveTab] = useState<'my_courses' | 'learn' | 'assignment' | 'exam' | 'grades' | 'instructor_hub' | 'admin_control'>('my_courses');
+  const [activeTab, setActiveTab] = useState<'my_courses' | 'learn' | 'assignment' | 'exam' | 'grades' | 'instructor_hub' | 'admin_control'>(
+    userRole === 'admin' ? 'admin_control' : userRole === 'instructor' ? 'instructor_hub' : 'my_courses'
+  );
+
+  React.useEffect(() => {
+    setActiveTab(userRole === 'admin' ? 'admin_control' : userRole === 'instructor' ? 'instructor_hub' : 'my_courses');
+  }, [userRole]);
   
   // حالات تفاعلية لمحاكاة الطالب والمدرس والمدير
   const [lessonCompleted, setLessonCompleted] = useState(false);
