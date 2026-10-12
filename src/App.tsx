@@ -10,7 +10,8 @@ import { ContactPage } from './pages/ContactPage';
 import { PoliciesPage } from './pages/PoliciesPage';
 import { LmsDashboardPreview } from './pages/LmsDashboardPreview';
 import { AuthModal } from './components/AuthModal';
-import { Course, UserRole } from './types';
+import { Course, ResearchPaper, UserRole } from './types';
+import { INITIAL_COURSES, INITIAL_RESEARCHES } from './data/mockData';
 import { CheckCircle2, ShieldAlert } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -19,6 +20,18 @@ export const App: React.FC = () => {
   const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
   const [currentUser, setCurrentUser] = useState<{ name: string; role: UserRole; email: string } | null>(null);
   const [enrollSuccessCourse, setEnrollSuccessCourse] = useState<Course | null>(null);
+
+  // الحالة المركزية للكورسات والأبحاث (Central Dynamic Courses & Researches)
+  const [courses, setCourses] = useState<Course[]>(INITIAL_COURSES);
+  const [researches, setResearches] = useState<ResearchPaper[]>(INITIAL_RESEARCHES);
+
+  const handleAddCourse = (newCourse: Course) => {
+    setCourses((prev) => [newCourse, ...prev]);
+  };
+
+  const handleAddResearch = (newPaper: ResearchPaper) => {
+    setResearches((prev) => [newPaper, ...prev]);
+  };
 
   // إدارة الوضع الليلي
   useEffect(() => {
@@ -74,6 +87,8 @@ export const App: React.FC = () => {
       <main style={{ flex: 1 }}>
         {currentTab === 'home' && (
           <HomePage
+            courses={courses}
+            researches={researches}
             onNavigate={(tab) => setCurrentTab(tab)}
             onEnroll={handleEnrollRequest}
             onSelectCourse={handleSelectCourse}
@@ -82,12 +97,19 @@ export const App: React.FC = () => {
 
         {currentTab === 'courses' && (
           <CoursesPage
+            courses={courses}
+            onAddCourse={handleAddCourse}
             onEnroll={handleEnrollRequest}
             onSelectCourse={handleSelectCourse}
           />
         )}
 
-        {currentTab === 'research' && <ResearchPage />}
+        {currentTab === 'research' && (
+          <ResearchPage
+            researches={researches}
+            onAddResearch={handleAddResearch}
+          />
+        )}
 
         {currentTab === 'about' && <AboutPage />}
 
@@ -99,6 +121,10 @@ export const App: React.FC = () => {
 
         {currentTab === 'lms_dashboard' && (
           <LmsDashboardPreview
+            courses={courses}
+            onAddCourse={handleAddCourse}
+            researches={researches}
+            onAddResearch={handleAddResearch}
             userRole={currentUser?.role || 'student'}
             userName={currentUser?.name || 'أحمد الصالح'}
             onLogout={() => {

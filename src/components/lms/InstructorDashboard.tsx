@@ -16,18 +16,29 @@ import {
   Eye,
   Check,
   X,
-  PlayCircle
+  PlayCircle,
+  HelpCircle,
+  Award
 } from 'lucide-react';
 import { 
   INITIAL_STUDENT_SUBMISSIONS, 
   INITIAL_EXAM_ATTEMPTS, 
   INITIAL_CURRICULUM,
+  INITIAL_COURSES,
   MockStudentSubmission,
   MockExamAttemptForInstructor,
   MockCourseCurriculum
 } from '../../data/mockData';
+import { Course, ResearchPaper } from '../../types';
+import { AddCourseModal } from '../AddCourseModal';
+import { AddResearchModal } from '../AddResearchModal';
 
 export interface InstructorDashboardProps {
+  courses?: Course[];
+  activeCourseId?: string;
+  onSelectCourseId?: (courseId: string) => void;
+  onAddCourse?: (newCourse: Course) => void;
+  onAddResearch?: (newPaper: ResearchPaper) => void;
   submissions?: MockStudentSubmission[];
   onUpdateSubmission?: (updated: MockStudentSubmission) => void;
   examAttempts?: MockExamAttemptForInstructor[];
@@ -40,6 +51,11 @@ export interface InstructorDashboardProps {
 }
 
 export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
+  courses = INITIAL_COURSES,
+  activeCourseId: propActiveCourseId,
+  onSelectCourseId,
+  onAddCourse,
+  onAddResearch,
   submissions: propSubmissions,
   onUpdateSubmission,
   examAttempts: propExamAttempts,
@@ -51,8 +67,12 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
   onLogAudit,
 }) => {
   const [activeTab, setActiveTab] = useState<'assignments' | 'exams' | 'curriculum' | 'practical'>('assignments');
-  
-  // بيانات التكليفات (تفضيل props مع الرجوع للبيانات الافتراضية)
+  const [selectedCourseId, setSelectedCourseId] = useState<string>(propActiveCourseId || courses[0]?.id || 'course-1');
+
+  // الكورس النشط حالياً
+  const currentCourse = courses.find((c) => c.id === selectedCourseId) || courses[0];
+
+  // بيانات التكليفات
   const [localSubmissions, setLocalSubmissions] = useState<MockStudentSubmission[]>(INITIAL_STUDENT_SUBMISSIONS);
   const submissions = propSubmissions || localSubmissions;
 
@@ -74,11 +94,49 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
   const [localCurriculum, setLocalCurriculum] = useState(INITIAL_CURRICULUM);
   const curriculum = propCurriculum || localCurriculum;
 
+  // نوافذ الإضافة العامة
+  const [isAddCourseModalOpen, setIsAddCourseModalOpen] = useState(false);
+  const [isAddResearchModalOpen, setIsAddResearchModalOpen] = useState(false);
+
+  // نافذة إضافة درس
   const [isAddLessonModalOpen, setIsAddLessonModalOpen] = useState(false);
   const [previewLesson, setPreviewLesson] = useState<{ id: string; title: string; youtubeId: string; durationMinutes: number; drivePdfUrl?: string } | null>(null);
   const [newLessonTitle, setNewLessonTitle] = useState('');
   const [newLessonYoutube, setNewLessonYoutube] = useState('');
   const [newLessonDrive, setNewLessonDrive] = useState('');
+
+  // نافذة إضافة تكليف جديد
+  const [isAddAssignmentModalOpen, setIsAddAssignmentModalOpen] = useState(false);
+  const [assignmentTitle, setAssignmentTitle] = useState('');
+  const [assignmentInstructions, setAssignmentInstructions] = useState('');
+  const [assignmentDriveTemplate, setAssignmentDriveTemplate] = useState('');
+  const [assignmentMaxScore, setAssignmentMaxScore] = useState(20);
+  const [assignmentDeadline, setAssignmentDeadline] = useState('2026-11-25');
+
+  // نافذة إضافة اختبار جديد
+  const [isAddExamModalOpen, setIsAddExamModalOpen] = useState(false);
+  const [examType, setExamType] = useState<'theory' | 'final' | 'quiz' | 'practical'>('theory');
+  const [examTitle, setExamTitle] = useState('');
+  const [examDuration, setExamDuration] = useState(30);
+  const [examMaxScore, setExamMaxScore] = useState(30);
+  const [examQuestions, setExamQuestions] = useState<Array<{ qText: string; optA: string; optB: string; optC: string; optD: string; correctOpt: string; points: number }>>([
+    {
+      qText: 'أي من البرمجيات التالية تستخدم في التحليل الإحصائي التلوي Meta-Analysis؟',
+      optA: 'RevMan & R',
+      optB: 'Photoshop',
+      optC: 'Microsoft Word',
+      optD: 'Google Sheets فقط',
+      correctOpt: 'A',
+      points: 5,
+    }
+  ]);
+  const [newQText, setNewQText] = useState('');
+  const [newOptA, setNewOptA] = useState('');
+  const [newOptB, setNewOptB] = useState('');
+  const [newOptC, setNewOptC] = useState('');
+  const [newOptD, setNewOptD] = useState('');
+  const [newCorrectOpt, setNewCorrectOpt] = useState('A');
+  const [newQPoints, setNewQPoints] = useState(5);
 
   // بيانات الامتحان العملي الحضوري
   const [localPracticalGrades, setLocalPracticalGrades] = useState<Record<string, { score: number; notes: string }>>({
@@ -87,6 +145,12 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
   });
   const practicalGrades = propPracticalGrades || localPracticalGrades;
   const [selectedPracticalStudent, setSelectedPracticalStudent] = useState<{ id: string; name: string; score: number; notes: string } | null>(null);
+
+  // تبديل الكورس
+  const handleSelectCourse = (id: string) => {
+    setSelectedCourseId(id);
+    if (onSelectCourseId) onSelectCourseId(id);
+  };
 
   // حفظ تصحيح وتعديل درجة التكليف
   const handleSaveAssignmentGrading = () => {
@@ -109,7 +173,7 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
     if (onLogAudit) {
       const details = requestRevisionToggle 
         ? `طلب إعادة تسليم وتعديل من الطالب (${selectedSubmission.studentName}): ${revisionNotesInput}`
-        : `رصد وتعديل درجة التكليف للطالب (${selectedSubmission.studentName}): ${gradeInput}/${selectedSubmission.maxScore} مع كتابة الملاحظات الأكاديمية`;
+        : `رصد وتعديل درجة التكليف للطالب (${selectedSubmission.studentName}): ${gradeInput}/${selectedSubmission.maxScore} مع الملاحظات الأكاديمية`;
       onLogAudit(requestRevisionToggle ? 'طلب إعادة تسليم تكليف' : 'رصد/تعديل درجة تكليف', details);
     }
 
@@ -171,7 +235,7 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
     }
 
     if (onLogAudit) {
-      onLogAudit('إضافة درس ومحاضرة', `إضافة درس جديد: "${newLessonTitle}" مع تضمين مقطع YouTube ومرفقات Google Drive`);
+      onLogAudit('إضافة درس ومحاضرة', `إضافة درس جديد: "${newLessonTitle}" بكورس ${currentCourse?.code}`);
     }
 
     setIsAddLessonModalOpen(false);
@@ -180,76 +244,242 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
     setNewLessonDrive('');
   };
 
+  // إضافة تكليف جديد
+  const handleAddAssignment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assignmentTitle.trim()) return;
+
+    // إضافة تكليف جديد لقائمة تسليمات الطلاب
+    const newSubmissionEntry: MockStudentSubmission = {
+      id: `sub-new-${Date.now()}`,
+      studentUid: 'student-1',
+      studentName: 'أحمد محمد الصالح',
+      university: 'جامعة الملك سعود - كلية الطب',
+      assignmentTitle: assignmentTitle.trim(),
+      version: 1,
+      driveFileUrl: assignmentDriveTemplate || 'https://drive.google.com/file/d/SampleTemplate/view',
+      submittedAt: 'تم الإنشاء حديثاً',
+      status: 'submitted',
+      grade: undefined,
+      maxScore: Number(assignmentMaxScore) || 20,
+      instructorFeedback: undefined,
+    };
+
+    if (onUpdateSubmission) {
+      onUpdateSubmission(newSubmissionEntry);
+    } else {
+      setLocalSubmissions((prev) => [newSubmissionEntry, ...prev]);
+    }
+
+    if (onLogAudit) {
+      onLogAudit('إضافة تكليف أكاديمي جديد', `تم إنشاء ونشر تكليف: "${assignmentTitle}" بدرجة كلية ${assignmentMaxScore}`);
+    }
+
+    setIsAddAssignmentModalOpen(false);
+    setAssignmentTitle('');
+    setAssignmentInstructions('');
+    setAssignmentDriveTemplate('');
+  };
+
+  // إضافة سؤال لمصفوفة أسئلة الاختبار
+  const handleAddQuestionToExam = () => {
+    if (!newQText.trim() || !newOptA.trim() || !newOptB.trim()) {
+      alert('يرجى ملء نص السؤال وخيارين على الأقل');
+      return;
+    }
+
+    setExamQuestions((prev) => [
+      ...prev,
+      {
+        qText: newQText.trim(),
+        optA: newOptA.trim(),
+        optB: newOptB.trim(),
+        optC: newOptC.trim() || 'لا شيء مما ذكر',
+        optD: newOptD.trim() || 'جميع ما ذكر',
+        correctOpt: newCorrectOpt,
+        points: Number(newQPoints) || 5,
+      }
+    ]);
+
+    setNewQText('');
+    setNewOptA('');
+    setNewOptB('');
+    setNewOptC('');
+    setNewOptD('');
+  };
+
+  // حفظ ونشر الاختبار الجديد
+  const handleSaveExam = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!examTitle.trim()) return;
+
+    const newAttemptEntry: MockExamAttemptForInstructor = {
+      id: `attempt-new-${Date.now()}`,
+      studentUid: 'student-1',
+      studentName: 'أحمد محمد الصالح',
+      university: 'جامعة الملك سعود - كلية الطب',
+      examTitle: examTitle.trim(),
+      submittedAt: 'تم النشر الآن',
+      calculatedScore: examQuestions.reduce((sum, q) => sum + q.points, 0),
+      officialGrade: undefined,
+      maxScore: Number(examMaxScore) || 30,
+      status: 'pending_review',
+      instructorRemarks: undefined,
+      studentAnswers: examQuestions.map((q, idx) => ({
+        qId: `q-${idx}`,
+        questionText: q.qText,
+        studentAnswer: q[`opt${q.correctOpt}` as keyof typeof q] as string,
+        correctAnswer: q[`opt${q.correctOpt}` as keyof typeof q] as string,
+        points: q.points,
+        maxPoints: q.points,
+        isCorrect: true,
+      }))
+    };
+
+    if (onUpdateExamAttempt) {
+      onUpdateExamAttempt(newAttemptEntry);
+    } else {
+      setLocalExamAttempts((prev) => [newAttemptEntry, ...prev]);
+    }
+
+    if (onLogAudit) {
+      onLogAudit('إضافة اختبار أكاديمي جديد', `تم إنشاء ونشر اختبار: "${examTitle}" (${examQuestions.length} أسئلة)`);
+    }
+
+    setIsAddExamModalOpen(false);
+    setExamTitle('');
+  };
+
   return (
     <div>
-      {/* شريط تبويبات المدرس */}
-      <div style={{ display: 'flex', gap: '0.6rem', borderBottom: '2px solid var(--border-color)', marginBottom: '2rem', paddingBottom: '0.5rem', overflowX: 'auto' }}>
+      {/* شريط اختيار الكورس المدار وأزرار الإنشاء السريعة */}
+      <div style={{
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border-color)',
+        borderRadius: 'var(--radius-md)',
+        padding: '0.85rem 1.25rem',
+        marginBottom: '1.5rem',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '1rem',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-main)' }}>
+            الكورس المدار حالياً:
+          </span>
+          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+            {courses.map((course) => (
+              <button
+                key={course.id}
+                onClick={() => handleSelectCourse(course.id)}
+                className={`btn ${selectedCourseId === course.id ? 'btn-primary' : 'btn-outline'}`}
+                style={{ fontSize: '0.82rem', padding: '0.35rem 0.85rem', borderRadius: 'var(--radius-full)' }}
+              >
+                <span>{course.code}</span>
+              </button>
+            ))}
+          </div>
+          <span className="badge badge-emerald" style={{ fontSize: '0.82rem' }}>
+            {currentCourse?.title}
+          </span>
+        </div>
+
+        {/* أزرار إضافة كورس وبحث عامة */}
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          {onAddCourse && (
+            <button
+              onClick={() => setIsAddCourseModalOpen(true)}
+              className="btn btn-outline"
+              style={{ fontSize: '0.82rem', padding: '0.4rem 0.85rem' }}
+            >
+              <Plus size={14} />
+              <span>إضافة كورس جديد</span>
+            </button>
+          )}
+
+          {onAddResearch && (
+            <button
+              onClick={() => setIsAddResearchModalOpen(true)}
+              className="btn btn-outline"
+              style={{ fontSize: '0.82rem', padding: '0.4rem 0.85rem' }}
+            >
+              <Plus size={14} />
+              <span>إضافة بحث منشور</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* تبويبات المدرس الأكاديمية المبسطة */}
+      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '2px solid var(--border-color)', marginBottom: '1.75rem', paddingBottom: '0.5rem', overflowX: 'auto' }}>
         <button
           onClick={() => setActiveTab('assignments')}
           className={`btn ${activeTab === 'assignments' ? 'btn-primary' : 'btn-ghost'}`}
-          style={{ fontSize: '0.92rem' }}
+          style={{ fontSize: '0.9rem' }}
         >
           <FileText size={16} />
-          <span>قائمة تسليمات الطلاب وتصحيح التكليفات ({submissions.length})</span>
+          <span>تصحيح التكليفات ({submissions.length})</span>
         </button>
 
         <button
           onClick={() => setActiveTab('exams')}
           className={`btn ${activeTab === 'exams' ? 'btn-primary' : 'btn-ghost'}`}
-          style={{ fontSize: '0.92rem' }}
+          style={{ fontSize: '0.9rem' }}
         >
           <CheckCircle2 size={16} />
-          <span>مراجعة وتعديل درجات الاختبارات ({examAttempts.length})</span>
+          <span>مراجعة درجات الاختبارات ({examAttempts.length})</span>
         </button>
 
         <button
           onClick={() => setActiveTab('curriculum')}
           className={`btn ${activeTab === 'curriculum' ? 'btn-primary' : 'btn-ghost'}`}
-          style={{ fontSize: '0.92rem' }}
+          style={{ fontSize: '0.9rem' }}
         >
           <Layers size={16} />
-          <span>مراجعة وبناء المنهج والدروس (Course Builder)</span>
+          <span>منشئ المحتوى والتقييمات (Builder)</span>
         </button>
 
         <button
           onClick={() => setActiveTab('practical')}
           className={`btn ${activeTab === 'practical' ? 'btn-primary' : 'btn-ghost'}`}
-          style={{ fontSize: '0.92rem' }}
+          style={{ fontSize: '0.9rem' }}
         >
           <GraduationCap size={16} />
-          <span>رصد وتعديل الامتحان العملي الحضوري</span>
+          <span>الامتحان العملي الحضوري</span>
         </button>
       </div>
 
-      {/* 1. تبويب قائمة تسليمات الطلاب وتصحيح التكليفات (Assignments Hub) */}
+      {/* 1. تبويب تصحيح التكليفات (Assignments Hub) */}
       {activeTab === 'assignments' && (
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div>
               <h2 style={{ fontSize: '1.3rem', fontWeight: 800, margin: 0 }}>
-                قائمة الطلاب الذين قاموا بتسليم التكليف
+                قائمة تسليمات الطلاب للتكليفات
               </h2>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                افتح رابط Google Drive المرفوع من الطالب، وقم برصد الدرجة أو تعديلها في أي وقت، واكتب تعليقك التقييمي ليظهر في لوحة الطالب.
+                افتح رابط Google Drive المرفوع من الطالب، ورصد الدرجة أو تعديلها مع كتابة الملاحظات لتظهر فوراً للطالب.
               </p>
             </div>
             <span className="badge badge-primary">
-              كورس: RES-101 (أساسيات البحث العلمي)
+              كود الكورس: {currentCourse?.code}
             </span>
           </div>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: '0.9rem' }}>
+          <div className="table-responsive">
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: '0.88rem' }}>
               <thead>
                 <tr style={{ background: 'var(--bg-subtle)', borderBottom: '2px solid var(--border-color)' }}>
-                  <th style={{ padding: '0.85rem' }}>اسم الطالب والجامعة</th>
+                  <th style={{ padding: '0.85rem' }}>الطالب والجامعة</th>
+                  <th style={{ padding: '0.85rem' }}>اسم التكليف</th>
                   <th style={{ padding: '0.85rem' }}>النسخة</th>
-                  <th style={{ padding: '0.85rem' }}>تاريخ التسليم</th>
-                  <th style={{ padding: '0.85rem' }}>الملف المرفوع من الطالب</th>
+                  <th style={{ padding: '0.85rem' }}>ملف الطالب المرفوع</th>
                   <th style={{ padding: '0.85rem' }}>الحالة</th>
                   <th style={{ padding: '0.85rem' }}>الدرجة المرصودة</th>
-                  <th style={{ padding: '0.85rem' }}>تعليق وملاحظات المدرس</th>
-                  <th style={{ padding: '0.85rem' }}>الإجراء الأكاديمي</th>
+                  <th style={{ padding: '0.85rem' }}>الملاحظات المرصودة</th>
+                  <th style={{ padding: '0.85rem' }}>الإجراء</th>
                 </tr>
               </thead>
               <tbody>
@@ -257,13 +487,11 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                   <tr key={sub.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                     <td style={{ padding: '0.85rem' }}>
                       <strong style={{ display: 'block', color: 'var(--text-main)' }}>{sub.studentName}</strong>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{sub.university}</span>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{sub.university}</span>
                     </td>
+                    <td style={{ padding: '0.85rem', fontWeight: 600 }}>{sub.assignmentTitle}</td>
                     <td style={{ padding: '0.85rem' }}>
-                      <span className="badge badge-primary" style={{ fontFamily: 'var(--font-num)' }}>v{sub.version}</span>
-                    </td>
-                    <td style={{ padding: '0.85rem', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                      {sub.submittedAt}
+                      <span className="badge badge-primary">v{sub.version}</span>
                     </td>
                     <td style={{ padding: '0.85rem' }}>
                       <a
@@ -271,35 +499,27 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                         target="_blank"
                         rel="noreferrer"
                         className="btn btn-outline"
-                        style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                        style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem' }}
                       >
                         <ExternalLink size={13} />
-                        <span>فتح ملف الطالب (Drive)</span>
+                        <span>فتح ملف Drive</span>
                       </a>
                     </td>
                     <td style={{ padding: '0.85rem' }}>
-                      {sub.status === 'graded' && <span className="badge badge-emerald">تم الرصد والاعتماد</span>}
+                      {sub.status === 'graded' && <span className="badge badge-emerald">تم الرصد</span>}
                       {sub.status === 'submitted' && <span className="badge badge-gold">بانتظار التصحيح</span>}
-                      {sub.status === 'revision_required' && <span className="badge" style={{ background: '#fee2e2', color: '#b91c1c' }}>مطلوب تعديل وإعادة تسليم</span>}
+                      {sub.status === 'revision_required' && <span className="badge" style={{ background: '#fee2e2', color: '#b91c1c' }}>مطلوب تعديل</span>}
                     </td>
-                    <td style={{ padding: '0.85rem', fontWeight: 800, fontSize: '1rem', color: sub.grade !== undefined ? 'var(--primary-700)' : 'var(--text-muted)' }}>
+                    <td style={{ padding: '0.85rem', fontWeight: 800, fontSize: '0.95rem' }}>
                       {sub.grade !== undefined ? `${sub.grade} / ${sub.maxScore}` : '—'}
                     </td>
-                    <td style={{ padding: '0.85rem', fontSize: '0.82rem', maxWidth: '240px', color: 'var(--text-muted)' }}>
+                    <td style={{ padding: '0.85rem', fontSize: '0.8rem', maxWidth: '220px', color: 'var(--text-muted)' }}>
                       {sub.instructorFeedback ? (
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.3rem' }}>
-                          <MessageSquare size={13} color="var(--primary-600)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={sub.instructorFeedback}>
-                            {sub.instructorFeedback}
-                          </span>
-                        </div>
-                      ) : sub.revisionNotes ? (
-                        <div style={{ color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                          <RotateCcw size={12} />
-                          <span>{sub.revisionNotes}</span>
-                        </div>
+                        <span title={sub.instructorFeedback} style={{ display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                          "{sub.instructorFeedback}"
+                        </span>
                       ) : (
-                        <span style={{ color: 'var(--text-subtle)' }}>لم يتم إرسال تعليق بعد</span>
+                        <span style={{ color: 'var(--text-subtle)' }}>لا يوجد تعليق</span>
                       )}
                     </td>
                     <td style={{ padding: '0.85rem' }}>
@@ -312,10 +532,10 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                           setRevisionNotesInput(sub.revisionNotes || '');
                         }}
                         className="btn btn-primary"
-                        style={{ fontSize: '0.82rem', padding: '0.4rem 0.8rem' }}
+                        style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }}
                       >
                         <Edit3 size={13} />
-                        <span>{sub.grade !== undefined ? 'تعديل الدرجة والتعليق' : 'رصد الدرجة وإرسال التعليق'}</span>
+                        <span>{sub.grade !== undefined ? 'تعديل الدرجة' : 'تصحيح التكليف'}</span>
                       </button>
                     </td>
                   </tr>
@@ -326,73 +546,57 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
 
           {/* نافذة تصحيح وإرسال التعليق للطالب (Modal) */}
           {selectedSubmission && (
-            <div style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(7, 13, 30, 0.75)',
-              backdropFilter: 'blur(6px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 100,
-              padding: '1.5rem',
-            }}>
-              <div className="card" style={{ maxWidth: '640px', width: '100%', position: 'relative' }}>
+            <div className="modal-overlay">
+              <div className="modal-content">
                 <button
                   onClick={() => setSelectedSubmission(null)}
                   className="btn btn-ghost"
-                  style={{ position: 'absolute', top: '12px', left: '12px' }}
+                  style={{ position: 'absolute', top: '16px', left: '16px', padding: '0.4rem' }}
                 >
                   ✕
                 </button>
 
                 <h3 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '0.35rem', color: 'var(--text-main)' }}>
-                  تصحيح وتعديل تكليف الطالب: {selectedSubmission.studentName}
+                  تصحيح وتعديل تكليف: {selectedSubmission.studentName}
                 </h3>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
-                  الجامعة: {selectedSubmission.university} | النسخة المسلّمة: <strong>v{selectedSubmission.version}</strong>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
+                  التكليف: <strong>{selectedSubmission.assignmentTitle}</strong> (النسخة: v{selectedSubmission.version})
                 </p>
 
                 {/* زر مباشر لفتح ملف الطالب في Google Drive */}
-                <div style={{ padding: '0.85rem 1rem', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'block' }}>رابط الملف المرفوع من الطالب:</span>
-                    <strong style={{ fontSize: '0.88rem' }}>ملف حل التكليف على Google Drive</strong>
-                  </div>
+                <div style={{ padding: '0.85rem', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>ملف حل التكليف على Google Drive:</span>
                   <a
                     href={selectedSubmission.driveFileUrl}
                     target="_blank"
                     rel="noreferrer"
                     className="btn btn-outline"
-                    style={{ fontSize: '0.85rem', padding: '0.4rem 0.85rem' }}
+                    style={{ fontSize: '0.82rem', padding: '0.35rem 0.75rem' }}
                   >
-                    <ExternalLink size={14} />
+                    <ExternalLink size={13} />
                     <span>فتح الملف في نافذة جديدة</span>
                   </a>
                 </div>
 
                 {/* خيار طلب إعادة التسليم والتعديل */}
                 <div style={{ padding: '0.85rem', background: requestRevisionToggle ? 'rgba(239, 68, 68, 0.08)' : 'var(--bg-subtle)', border: requestRevisionToggle ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', marginBottom: '1.25rem' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.88rem' }}>
                     <input
                       type="checkbox"
                       checked={requestRevisionToggle}
                       onChange={(e) => setRequestRevisionToggle(e.target.checked)}
                     />
-                    <RotateCcw size={16} color={requestRevisionToggle ? '#ef4444' : 'var(--primary-600)'} />
+                    <RotateCcw size={15} color={requestRevisionToggle ? '#ef4444' : 'var(--primary-600)'} />
                     <span>طلب إعادة تسليم وتعديل العمل من الطالب (Request Revision)</span>
                   </label>
                   {requestRevisionToggle && (
-                    <div style={{ marginTop: '0.75rem' }}>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#b91c1c', marginBottom: '0.25rem' }}>
-                        التعليمات المحددة للطالب لإعادة التسليم (ستظهر له فوراً):
-                      </label>
+                    <div style={{ marginTop: '0.65rem' }}>
                       <input
                         type="text"
                         value={revisionNotesInput}
                         onChange={(e) => setRevisionNotesInput(e.target.value)}
-                        placeholder="مثال: يرجى استكمال معايير الاستبعاد في الصفحة 3 قبل اعتماد الدرجة..."
-                        style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid #f87171', background: 'var(--bg-card)', color: 'var(--text-main)' }}
+                        placeholder="أسباب طلب التعديل والتعليمات للطالب..."
+                        style={{ width: '100%', padding: '0.55rem', borderRadius: 'var(--radius-md)', border: '1px solid #f87171', background: 'var(--bg-card)', color: 'var(--text-main)', fontSize: '0.85rem' }}
                       />
                     </div>
                   )}
@@ -401,37 +605,31 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                 {/* حقل رصد وتعديل الدرجة */}
                 {!requestRevisionToggle && (
                   <div style={{ marginBottom: '1.25rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                      <label style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                        درجة التكليف المرصودة (من {selectedSubmission.maxScore}):
-                      </label>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>يمكنك تعديل هذه الدرجة في أي وقت</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <input
-                        type="number"
-                        min={0}
-                        max={selectedSubmission.maxScore}
-                        value={gradeInput}
-                        onChange={(e) => setGradeInput(Number(e.target.value))}
-                        style={{ width: '130px', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '2px solid var(--primary-600)', fontSize: '1.2rem', fontWeight: 800, textAlign: 'center' }}
-                      />
-                      <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>/ {selectedSubmission.maxScore} درجة</span>
-                    </div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                      الدرجة المرصودة (من {selectedSubmission.maxScore}):
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={selectedSubmission.maxScore}
+                      value={gradeInput}
+                      onChange={(e) => setGradeInput(Number(e.target.value))}
+                      style={{ width: '120px', padding: '0.55rem', borderRadius: 'var(--radius-md)', border: '2px solid var(--primary-600)', fontSize: '1.15rem', fontWeight: 800, textAlign: 'center' }}
+                    />
                   </div>
                 )}
 
                 {/* مربع كتابة تعليق وملاحظات المدرس للطالب */}
                 <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 700, marginBottom: '0.4rem', color: 'var(--text-main)' }}>
-                    تعليق وملاحظات المدرس للطالب (Feedback) — ستظهر للطالب داخل صفحته:
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                    تعليق وملاحظات المدرس للطالب (Feedback) — ستظهر للطالب فوراً:
                   </label>
                   <textarea
-                    rows={4}
+                    rows={3}
                     value={feedbackInput}
                     onChange={(e) => setFeedbackInput(e.target.value)}
-                    placeholder="اكتب تعليقك الأكاديمي، نقاط القوة ونقاط التحسين، وسيرى الطالب هذا التعليق في لوحة التحكم الخاصة به..."
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', fontFamily: 'var(--font-arabic)', fontSize: '0.9rem', color: 'var(--text-main)' }}
+                    placeholder="اكتب تعليقك الأكاديمي ونقاط القوة والتحسين..."
+                    style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', fontFamily: 'var(--font-arabic)', fontSize: '0.88rem' }}
                   />
                 </div>
 
@@ -450,29 +648,31 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
         </div>
       )}
 
-      {/* 2. تبويب محاولات الاختبارات ومراجعة وتعديل الدرجات (Exams Review & Override) */}
+      {/* 2. تبويب مراجعة وتعديل درجات الاختبارات */}
       {activeTab === 'exams' && (
         <div className="card">
-          <div style={{ marginBottom: '1.5rem' }}>
-            <h2 style={{ fontSize: '1.3rem', fontWeight: 800, margin: 0 }}>
-              محاولات الطلاب في الاختبارات وتعديل الدرجات
-            </h2>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-              يحسب المتصفح الدرجة تلقائياً بناءً على مفتاح الإجابات السري. تستطيع كمدرس مراجعة إجابات كل طالب، وتعديل الدرجة يدوياً (Manual Override) في أي وقت قبل أو بعد الاعتماد!
-            </p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div>
+              <h2 style={{ fontSize: '1.3rem', fontWeight: 800, margin: 0 }}>
+                محاولات الاختبارات وتعديل الدرجات
+              </h2>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                مراجعة إجابات كل طالب، مع إمكانية تعديل الدرجة يدوياً (Manual Score Override) في أي وقت.
+              </p>
+            </div>
           </div>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: '0.9rem' }}>
+          <div className="table-responsive">
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: '0.88rem' }}>
               <thead>
                 <tr style={{ background: 'var(--bg-subtle)', borderBottom: '2px solid var(--border-color)' }}>
-                  <th style={{ padding: '0.85rem' }}>اسم الطالب والجامعة</th>
+                  <th style={{ padding: '0.85rem' }}>اسم الطالب</th>
                   <th style={{ padding: '0.85rem' }}>اسم الاختبار</th>
                   <th style={{ padding: '0.85rem' }}>تاريخ التسليم</th>
-                  <th style={{ padding: '0.85rem' }}>الدرجة المحسوبة تلقائياً</th>
-                  <th style={{ padding: '0.85rem' }}>الدرجة الرسمية المعتمدة</th>
+                  <th style={{ padding: '0.85rem' }}>الدرجة المحسوبة</th>
+                  <th style={{ padding: '0.85rem' }}>الدرجة الرسمية</th>
                   <th style={{ padding: '0.85rem' }}>الحالة</th>
-                  <th style={{ padding: '0.85rem' }}>الإجراء الأكاديمي</th>
+                  <th style={{ padding: '0.85rem' }}>الإجراء</th>
                 </tr>
               </thead>
               <tbody>
@@ -480,14 +680,14 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                   <tr key={att.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                     <td style={{ padding: '0.85rem' }}>
                       <strong style={{ display: 'block', color: 'var(--text-main)' }}>{att.studentName}</strong>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{att.university}</span>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{att.university}</span>
                     </td>
                     <td style={{ padding: '0.85rem' }}>{att.examTitle}</td>
-                    <td style={{ padding: '0.85rem', fontSize: '0.82rem', color: 'var(--text-muted)' }}>{att.submittedAt}</td>
+                    <td style={{ padding: '0.85rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{att.submittedAt}</td>
                     <td style={{ padding: '0.85rem', color: 'var(--primary-700)', fontWeight: 700 }}>
-                      {att.calculatedScore} / {att.maxScore} (مسودة)
+                      {att.calculatedScore} / {att.maxScore}
                     </td>
-                    <td style={{ padding: '0.85rem', fontWeight: 800, fontSize: '1.05rem', color: att.officialGrade !== undefined ? 'var(--text-main)' : 'var(--text-muted)' }}>
+                    <td style={{ padding: '0.85rem', fontWeight: 800, fontSize: '0.95rem' }}>
                       {att.officialGrade !== undefined ? `${att.officialGrade} / ${att.maxScore}` : 'قيد الاعتماد'}
                     </td>
                     <td style={{ padding: '0.85rem' }}>
@@ -505,10 +705,10 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                           setOverrideReasonInput(att.instructorRemarks || '');
                         }}
                         className="btn btn-primary"
-                        style={{ fontSize: '0.82rem', padding: '0.4rem 0.8rem' }}
+                        style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }}
                       >
                         <Eye size={13} />
-                        <span>{att.officialGrade !== undefined ? 'مراجعة وتعديل الدرجة' : 'مراجعة الأسئلة والاعتماد'}</span>
+                        <span>{att.officialGrade !== undefined ? 'تعديل الدرجة' : 'مراجعة واعتماد'}</span>
                       </button>
                     </td>
                   </tr>
@@ -517,75 +717,54 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
             </table>
           </div>
 
-          {/* نافذة مراجعة إجابات الطالب وتعديل الدرجة المحسوبة */}
+          {/* نافذة مراجعة وتعديل درجة الاختبار */}
           {selectedAttempt && (
-            <div style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(7, 13, 30, 0.75)',
-              backdropFilter: 'blur(6px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 100,
-              padding: '1.5rem',
-            }}>
-              <div className="card" style={{ maxWidth: '820px', width: '100%', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
+            <div className="modal-overlay">
+              <div className="modal-content" style={{ maxWidth: '780px' }}>
                 <button
                   onClick={() => setSelectedAttempt(null)}
                   className="btn btn-ghost"
-                  style={{ position: 'absolute', top: '12px', left: '12px' }}
+                  style={{ position: 'absolute', top: '16px', left: '16px', padding: '0.4rem' }}
                 >
                   ✕
                 </button>
 
-                <h3 style={{ fontSize: '1.35rem', fontWeight: 800, marginBottom: '0.4rem' }}>
+                <h3 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '0.35rem' }}>
                   مراجعة اختبار: {selectedAttempt.studentName}
                 </h3>
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
-                  الدرجة المحسوبة برمجياً داخل واجهتك بناءً على مفتاح الحل: <strong>{selectedAttempt.calculatedScore} / {selectedAttempt.maxScore}</strong>
+                  الدرجة المحسوبة تلقائياً: <strong>{selectedAttempt.calculatedScore} / {selectedAttempt.maxScore}</strong>
                 </p>
 
-                {/* جدول تفاصيل الأسئلة والإجابات */}
-                <div style={{ overflowX: 'auto', marginBottom: '1.5rem' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: '0.85rem' }}>
+                <div className="table-responsive" style={{ marginBottom: '1.25rem' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: '0.82rem' }}>
                     <thead>
-                      <tr style={{ background: 'var(--bg-subtle)', borderBottom: '2px solid var(--border-color)' }}>
-                        <th style={{ padding: '0.6rem' }}>السؤال</th>
-                        <th style={{ padding: '0.6rem' }}>إجابة الطالب</th>
-                        <th style={{ padding: '0.6rem' }}>الإجابة الصحيحة</th>
-                        <th style={{ padding: '0.6rem' }}>النقاط</th>
-                        <th style={{ padding: '0.6rem' }}>التقييم</th>
+                      <tr style={{ background: 'var(--bg-subtle)' }}>
+                        <th style={{ padding: '0.5rem' }}>السؤال</th>
+                        <th style={{ padding: '0.5rem' }}>إجابة الطالب</th>
+                        <th style={{ padding: '0.5rem' }}>الإجابة الصحيحة</th>
+                        <th style={{ padding: '0.5rem' }}>النقاط</th>
                       </tr>
                     </thead>
                     <tbody>
                       {selectedAttempt.studentAnswers.map((ans, idx) => (
                         <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                          <td style={{ padding: '0.6rem' }}>{ans.questionText}</td>
-                          <td style={{ padding: '0.6rem' }}>{ans.studentAnswer}</td>
-                          <td style={{ padding: '0.6rem', color: 'var(--primary-600)', fontWeight: 700 }}>{ans.correctAnswer}</td>
-                          <td style={{ padding: '0.6rem' }}>{ans.points}/{ans.maxPoints}</td>
-                          <td style={{ padding: '0.6rem', fontWeight: 700, color: ans.isCorrect ? '#10b981' : '#ef4444' }}>
-                            {ans.isCorrect ? '✓ صحيح' : '✗ خطأ'}
-                          </td>
+                          <td style={{ padding: '0.5rem' }}>{ans.questionText}</td>
+                          <td style={{ padding: '0.5rem' }}>{ans.studentAnswer}</td>
+                          <td style={{ padding: '0.5rem', color: 'var(--primary-600)', fontWeight: 700 }}>{ans.correctAnswer}</td>
+                          <td style={{ padding: '0.5rem', fontWeight: 700 }}>{ans.points}/{ans.maxPoints}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
 
-                {/* حقل تعديل الدرجة يدوياً من المدرس (Override) */}
-                <div style={{ padding: '1.25rem', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', marginBottom: '1.5rem' }}>
-                  <h4 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: '0.5rem', color: 'var(--text-main)' }}>
-                    تعديل واعتماد الدرجة يدوياً (Manual Score Override):
-                  </h4>
-                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '0.85rem' }}>
-                    يمكنك تعديل الدرجة سواء بالزيادة أو النقصان وفق تقييمك التربوي، وسيتم حفظ التعديل في السجل الرسمي وسجل التدقيق.
-                  </p>
-                  <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: '1rem', alignItems: 'center' }}>
+                {/* حقل تعديل الدرجة */}
+                <div style={{ padding: '1rem', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', marginBottom: '1.25rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '1rem', alignItems: 'center' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.25rem' }}>
-                        الدرجة الرسمية المعتمدة:
+                        الدرجة المعتمدة:
                       </label>
                       <input
                         type="number"
@@ -593,19 +772,19 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                         max={selectedAttempt.maxScore}
                         value={overrideScoreInput}
                         onChange={(e) => setOverrideScoreInput(Number(e.target.value))}
-                        style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '2px solid var(--primary-600)', fontSize: '1.2rem', fontWeight: 800, textAlign: 'center' }}
+                        style={{ width: '100%', padding: '0.55rem', borderRadius: 'var(--radius-md)', border: '2px solid var(--primary-600)', fontSize: '1.15rem', fontWeight: 800, textAlign: 'center' }}
                       />
                     </div>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.25rem' }}>
-                        سبب التعديل أو ملاحظات الاعتماد (تُحفظ في سجل التدقيق):
+                        ملاحظات الاعتماد أو سبب التعديل:
                       </label>
                       <input
                         type="text"
                         value={overrideReasonInput}
                         onChange={(e) => setOverrideReasonInput(e.target.value)}
-                        placeholder="مثال: تم قبول الإجابة بناءً على توضيح الطالب في المحاضرة..."
-                        style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-card)' }}
+                        placeholder="سبب تعديل الدرجة..."
+                        style={{ width: '100%', padding: '0.55rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-card)' }}
                       />
                     </div>
                   </div>
@@ -616,8 +795,8 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                     إلغاء
                   </button>
                   <button onClick={handleCommitExamGrade} className="btn btn-primary">
-                    <CheckCircle2 size={16} />
-                    <span>تثبيت واعتماد الدرجة الرسمية للطالب</span>
+                    <CheckCircle2 size={15} />
+                    <span>تثبيت واعتماد الدرجة</span>
                   </button>
                 </div>
               </div>
@@ -626,259 +805,145 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
         </div>
       )}
 
-      {/* 3. تبويب مراجعة وبناء المنهج والدروس (Course Builder) */}
+      {/* 3. تبويب منشئ المحتوى والتقييمات (Course Builder & Assessments) */}
       {activeTab === 'curriculum' && (
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* شريط الإجراءات لإنشاء الدروس والتكاليف والامتحانات */}
+          <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
               <h2 style={{ fontSize: '1.3rem', fontWeight: 800, margin: 0 }}>
-                مراجعة تفاصيل الدروس ومحتوى الكورس
+                منشئ المحتوى والتقييمات الأكاديمية
               </h2>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                يمكن للمدرس مراجعة تفاصيل كل درس وسلايداته، وإضافة محاضرات جديدة وتعديل روابط YouTube و Google Drive في أي وقت.
+                أضف المحاضرات، أنشئ التكليفات العملية بروابط Drive، وابنِ الامتحانات الإلكترونية بأنواعها لكورس: <strong>{currentCourse?.title}</strong>
               </p>
             </div>
-            <button
-              onClick={() => setIsAddLessonModalOpen(true)}
-              className="btn btn-primary"
-            >
-              <Plus size={16} />
-              <span>إضافة درس ومحاضرة جديدة</span>
-            </button>
+
+            {/* الأزرار الثلاثة المباشرة للإضافة */}
+            <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setIsAddLessonModalOpen(true)}
+                className="btn btn-primary"
+                style={{ fontSize: '0.85rem' }}
+              >
+                <Plus size={15} />
+                <span>إضافة محاضرة / درس</span>
+              </button>
+
+              <button
+                onClick={() => setIsAddAssignmentModalOpen(true)}
+                className="btn btn-accent"
+                style={{ fontSize: '0.85rem' }}
+              >
+                <Plus size={15} />
+                <span>إضافة تكليف جديد</span>
+              </button>
+
+              <button
+                onClick={() => setIsAddExamModalOpen(true)}
+                className="btn btn-outline"
+                style={{ fontSize: '0.85rem' }}
+              >
+                <Plus size={15} />
+                <span>إضافة امتحان / اختبار</span>
+              </button>
+            </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            {curriculum.modules.map((mod) => (
-              <div key={mod.id} style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
-                <div style={{ padding: '0.85rem 1.25rem', background: 'var(--bg-subtle)', fontWeight: 800, fontSize: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>{mod.title}</span>
-                  <span className="badge badge-primary">{mod.lessons.length} دروس</span>
-                </div>
+          {/* قائمة الوحدات والدروس */}
+          <div className="card">
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <BookOpen size={18} color="var(--primary-600)" />
+              <span>فهرس المحاضرات والدروس المنشورة:</span>
+            </h3>
 
-                <div style={{ padding: '1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {mod.lessons.map((les) => (
-                    <div
-                      key={les.id}
-                      style={{
-                        padding: '0.85rem 1rem',
-                        background: 'var(--bg-card)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: 'var(--radius-md)',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        flexWrap: 'wrap',
-                        gap: '0.5rem',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                        <BookOpen size={18} color="var(--primary-600)" />
-                        <div>
-                          <strong style={{ fontSize: '0.95rem' }}>{les.title}</strong>
-                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', gap: '1rem', marginTop: '0.2rem' }}>
-                            <span>المدة: {les.durationMinutes} دقيقة</span>
-                            <span>إلزامي: {les.isMandatory ? 'نعم' : 'لا'}</span>
-                            <span>YouTube ID: <code>{les.youtubeId}</code></span>
-                          </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {curriculum.modules.map((mod) => (
+                <div key={mod.id} style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+                  <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-subtle)', fontWeight: 800, fontSize: '0.95rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>{mod.title}</span>
+                    <span className="badge badge-primary">{mod.lessons.length} دروس</span>
+                  </div>
+
+                  <div style={{ padding: '0.85rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {mod.lessons.map((les) => (
+                      <div
+                        key={les.id}
+                        style={{
+                          padding: '0.65rem 0.85rem',
+                          background: 'var(--bg-card)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: 'var(--radius-sm)',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          flexWrap: 'wrap',
+                          gap: '0.5rem',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <PlayCircle size={16} color="var(--primary-600)" />
+                          <strong style={{ fontSize: '0.88rem' }}>{les.title}</strong>
+                          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>({les.durationMinutes} دقيقة)</span>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '0.4rem' }}>
+                          <button
+                            onClick={() => setPreviewLesson(les)}
+                            className="btn btn-outline"
+                            style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem' }}
+                          >
+                            <span>معاينة</span>
+                          </button>
+                          {les.drivePdfUrl && (
+                            <a href={les.drivePdfUrl} target="_blank" rel="noreferrer" className="btn btn-outline" style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem' }}>
+                              <span>السلايدات</span>
+                            </a>
+                          )}
                         </div>
                       </div>
-
-                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                        <button
-                          onClick={() => setPreviewLesson(les)}
-                          className="btn btn-outline"
-                          style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem' }}
-                        >
-                          <PlayCircle size={13} />
-                          <span>معاينة الدرس</span>
-                        </button>
-                        {les.drivePdfUrl && (
-                          <a
-                            href={les.drivePdfUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="btn btn-outline"
-                            style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem' }}
-                          >
-                            <ExternalLink size={13} />
-                            <span>ملف السلايدات</span>
-                          </a>
-                        )}
-                        <span className="badge badge-emerald">منشور للطالب</span>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-
-          {/* نافذة معاينة الدرس للمدرس */}
-          {previewLesson && (
-            <div style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(7, 13, 30, 0.75)',
-              backdropFilter: 'blur(6px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 100,
-              padding: '1.5rem',
-            }}>
-              <div className="card" style={{ maxWidth: '650px', width: '100%', position: 'relative' }}>
-                <button
-                  onClick={() => setPreviewLesson(null)}
-                  className="btn btn-ghost"
-                  style={{ position: 'absolute', top: '12px', left: '12px' }}
-                >
-                  ✕
-                </button>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '0.5rem' }}>
-                  معاينة الدرس: {previewLesson.title}
-                </h3>
-                <div style={{ width: '100%', aspectRatio: '16/9', background: '#070d1e', borderRadius: 'var(--radius-md)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', marginBottom: '1.25rem', color: '#fff' }}>
-                  <div style={{ textAlign: 'center' }}>
-                    <PlayCircle size={52} color="#3b82f6" style={{ margin: '0 auto 0.75rem' }} />
-                    <p style={{ fontWeight: 700, margin: 0 }}>مقطع المحاضرة المضمّن عبر YouTube</p>
-                    <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>المعرف: {previewLesson.youtubeId} | المدة: {previewLesson.durationMinutes} دقيقة</p>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  {previewLesson.drivePdfUrl && (
-                    <a href={previewLesson.drivePdfUrl} target="_blank" rel="noreferrer" className="btn btn-outline" style={{ fontSize: '0.85rem' }}>
-                      <ExternalLink size={14} />
-                      <span>فتح ملف السلايدات (Drive PDF)</span>
-                    </a>
-                  )}
-                  <button onClick={() => setPreviewLesson(null)} className="btn btn-primary" style={{ fontSize: '0.85rem' }}>
-                    إغلاق المعاينة
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* نافذة إضافة درس جديد */}
-          {isAddLessonModalOpen && (
-            <div style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(7, 13, 30, 0.75)',
-              backdropFilter: 'blur(6px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 100,
-              padding: '1.5rem',
-            }}>
-              <div className="card" style={{ maxWidth: '550px', width: '100%', position: 'relative' }}>
-                <button
-                  onClick={() => setIsAddLessonModalOpen(false)}
-                  className="btn btn-ghost"
-                  style={{ position: 'absolute', top: '12px', left: '12px' }}
-                >
-                  ✕
-                </button>
-
-                <h3 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '1.25rem' }}>
-                  إضافة درس ومحاضرة إلى الوحدة الأولى
-                </h3>
-
-                <form onSubmit={handleAddLesson} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>
-                      عنوان الدرس
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={newLessonTitle}
-                      onChange={(e) => setNewLessonTitle(e.target.value)}
-                      placeholder="مثال: الدرس 3: أدوات التحليل الإحصائي المتقدم"
-                      style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>
-                      معرف فيديو المحاضرة (YouTube Video ID أو رابط كامل)
-                    </label>
-                    <input
-                      type="text"
-                      value={newLessonYoutube}
-                      onChange={(e) => setNewLessonYoutube(e.target.value)}
-                      placeholder="مثال: dQw4w9WgXcQ"
-                      style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>
-                      رابط سلايدات وملفات المحاضرة (Google Drive)
-                    </label>
-                    <input
-                      type="url"
-                      value={newLessonDrive}
-                      onChange={(e) => setNewLessonDrive(e.target.value)}
-                      placeholder="https://drive.google.com/file/d/..."
-                      style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }}
-                    />
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-                    <button type="button" onClick={() => setIsAddLessonModalOpen(false)} className="btn btn-outline">
-                      إلغاء
-                    </button>
-                    <button type="submit" className="btn btn-primary">
-                      <Plus size={15} />
-                      <span>حفظ ونشر الدرس للطلاب</span>
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
-      {/* 4. تبويب رصد الامتحان العملي الحضوري */}
+      {/* 4. تبويب الامتحان العملي الحضوري */}
       {activeTab === 'practical' && (
         <div className="card">
-          <div style={{ marginBottom: '1.5rem' }}>
+          <div style={{ marginBottom: '1.25rem' }}>
             <h2 style={{ fontSize: '1.3rem', fontWeight: 800, margin: 0 }}>
-              رصد وتعديل درجات الامتحان العملي الحضوري (بالجامعة)
+              رصد وتعديل الامتحان العملي الحضوري بالجامعة
             </h2>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-              يتم إجراء هذا الامتحان حضورياً في الجامعة، ويقوم المدرس برصد وتعديل الدرجة من 50 مباشرة عبر هذه اللوحة، وتنعكس فوراً في السجل الأكاديمي للطالب.
+              رصد درجات الامتحان العملي الحضوري المنعقد في المعمل المركزي (من 50 درجة).
             </p>
           </div>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: '0.9rem' }}>
+          <div className="table-responsive">
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: '0.88rem' }}>
               <thead>
                 <tr style={{ background: 'var(--bg-subtle)', borderBottom: '2px solid var(--border-color)' }}>
-                  <th style={{ padding: '0.85rem' }}>اسم الطالب والجامعة</th>
+                  <th style={{ padding: '0.85rem' }}>اسم الطالب</th>
                   <th style={{ padding: '0.85rem' }}>الدرجة المرصودة (من 50)</th>
-                  <th style={{ padding: '0.85rem' }}>الملاحظات الأكاديمية على الأداء</th>
-                  <th style={{ padding: '0.85rem' }}>الحالة</th>
-                  <th style={{ padding: '0.85rem' }}>الإجراء الأكاديمي</th>
+                  <th style={{ padding: '0.85rem' }}>الملاحظات الأكاديمية</th>
+                  <th style={{ padding: '0.85rem' }}>الإجراء</th>
                 </tr>
               </thead>
               <tbody>
                 <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
                   <td style={{ padding: '0.85rem' }}>
                     <strong>أحمد محمد الصالح</strong>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>جامعة الملك سعود - كلية الطب</div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>جامعة الملك سعود</div>
                   </td>
                   <td style={{ padding: '0.85rem', fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary-700)' }}>
                     {practicalGrades['student-1']?.score || 42} / 50
                   </td>
-                  <td style={{ padding: '0.85rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                    {practicalGrades['student-1']?.notes || 'أداء ممتاز في اختبار تحليل البيانات الإحصائية الحضوري'}
-                  </td>
-                  <td style={{ padding: '0.85rem' }}>
-                    <span className="badge badge-emerald">تم الرصد والاعتماد</span>
+                  <td style={{ padding: '0.85rem', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                    {practicalGrades['student-1']?.notes || 'أداء ممتاز'}
                   </td>
                   <td style={{ padding: '0.85rem' }}>
                     <button
@@ -886,143 +951,179 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                         id: 'student-1',
                         name: 'أحمد محمد الصالح',
                         score: practicalGrades['student-1']?.score || 42,
-                        notes: practicalGrades['student-1']?.notes || 'أداء ممتاز في اختبار تحليل البيانات الإحصائية الحضوري',
+                        notes: practicalGrades['student-1']?.notes || '',
                       })}
                       className="btn btn-outline"
-                      style={{ fontSize: '0.82rem', padding: '0.4rem 0.8rem' }}
+                      style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
                     >
-                      <Edit3 size={13} />
-                      <span>تعديل الدرجة والملاحظات</span>
-                    </button>
-                  </td>
-                </tr>
-
-                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '0.85rem' }}>
-                    <strong>سارة خالد الكيلاني</strong>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>جامعة العلوم والتكنولوجيا - دكتور صيدلة</div>
-                  </td>
-                  <td style={{ padding: '0.85rem', fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary-700)' }}>
-                    {practicalGrades['student-2']?.score || 38} / 50
-                  </td>
-                  <td style={{ padding: '0.85rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                    {practicalGrades['student-2']?.notes || 'جيد جداً مع ملاحظة طفيفة في صياغة الفرضية'}
-                  </td>
-                  <td style={{ padding: '0.85rem' }}>
-                    <span className="badge badge-emerald">تم الرصد والاعتماد</span>
-                  </td>
-                  <td style={{ padding: '0.85rem' }}>
-                    <button
-                      onClick={() => setSelectedPracticalStudent({
-                        id: 'student-2',
-                        name: 'سارة خالد الكيلاني',
-                        score: practicalGrades['student-2']?.score || 38,
-                        notes: practicalGrades['student-2']?.notes || 'جيد جداً مع ملاحظة طفيفة في صياغة الفرضية',
-                      })}
-                      className="btn btn-outline"
-                      style={{ fontSize: '0.82rem', padding: '0.4rem 0.8rem' }}
-                    >
-                      <Edit3 size={13} />
-                      <span>تعديل الدرجة والملاحظات</span>
+                      <span>تعديل الدرجة</span>
                     </button>
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
+        </div>
+      )}
 
-          {/* نافذة تعديل درجة العملي */}
-          {selectedPracticalStudent && (
-            <div style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(7, 13, 30, 0.75)',
-              backdropFilter: 'blur(6px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 100,
-              padding: '1.5rem',
-            }}>
-              <div className="card" style={{ maxWidth: '520px', width: '100%', position: 'relative' }}>
-                <button
-                  onClick={() => setSelectedPracticalStudent(null)}
-                  className="btn btn-ghost"
-                  style={{ position: 'absolute', top: '12px', left: '12px' }}
-                >
-                  ✕
-                </button>
+      {/* نافذة إضافة درس جديد */}
+      {isAddLessonModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <button onClick={() => setIsAddLessonModalOpen(false)} className="btn btn-ghost" style={{ position: 'absolute', top: '16px', left: '16px', padding: '0.4rem' }}>✕</button>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '1rem' }}>إضافة درس ومحاضرة إلى الكورس</h3>
+            <form onSubmit={handleAddLesson} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>عنوان الدرس *</label>
+                <input type="text" required value={newLessonTitle} onChange={(e) => setNewLessonTitle(e.target.value)} placeholder="مثال: الدرس 4: صياغة استراتيجية MeSH" style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>معرف فيديو YouTube أو الرابط</label>
+                <input type="text" value={newLessonYoutube} onChange={(e) => setNewLessonYoutube(e.target.value)} placeholder="dQw4w9WgXcQ" style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>رابط سلايدات Google Drive</label>
+                <input type="url" value={newLessonDrive} onChange={(e) => setNewLessonDrive(e.target.value)} placeholder="https://drive.google.com/..." style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }} />
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                <button type="button" onClick={() => setIsAddLessonModalOpen(false)} className="btn btn-outline">إلغاء</button>
+                <button type="submit" className="btn btn-primary"><Plus size={15} /><span>حفظ ونشر الدرس</span></button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
-                <h3 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '0.4rem' }}>
-                  رصد وتعديل درجة الامتحان العملي: {selectedPracticalStudent.name}
-                </h3>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
-                  الامتحان العملي الحضوري بكلية الطب
-                </p>
-
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 700, marginBottom: '0.35rem' }}>
-                    الدرجة المرصودة (من 50):
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={50}
-                    value={selectedPracticalStudent.score}
-                    onChange={(e) => setSelectedPracticalStudent({ ...selectedPracticalStudent, score: Number(e.target.value) })}
-                    style={{ width: '130px', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '2px solid var(--primary-600)', fontSize: '1.2rem', fontWeight: 800, textAlign: 'center' }}
-                  />
+      {/* نافذة إضافة تكليف جديد */}
+      {isAddAssignmentModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <button onClick={() => setIsAddAssignmentModalOpen(false)} className="btn btn-ghost" style={{ position: 'absolute', top: '16px', left: '16px', padding: '0.4rem' }}>✕</button>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '1rem' }}>إضافة تكليف جديد للكورس</h3>
+            <form onSubmit={handleAddAssignment} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>عنوان التكليف الأكاديمي *</label>
+                <input type="text" required value={assignmentTitle} onChange={(e) => setAssignmentTitle(e.target.value)} placeholder="مثال: التكليف 3: تحليل البيانات واستخلاص النتائج" style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>تعليمات وإرشادات الحل</label>
+                <textarea rows={2} value={assignmentInstructions} onChange={(e) => setAssignmentInstructions(e.target.value)} placeholder="تعليمات ومعايير التقييم..." style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', fontFamily: 'var(--font-arabic)' }} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>الدرجة القصوى</label>
+                  <input type="number" min={5} max={100} value={assignmentMaxScore} onChange={(e) => setAssignmentMaxScore(Number(e.target.value))} style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', fontWeight: 700 }} />
                 </div>
-
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 700, marginBottom: '0.35rem' }}>
-                    الملاحظات الأكاديمية على أداء الطالب:
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedPracticalStudent.notes}
-                    onChange={(e) => setSelectedPracticalStudent({ ...selectedPracticalStudent, notes: e.target.value })}
-                    style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }}
-                  />
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>الموعد النهائي</label>
+                  <input type="date" value={assignmentDeadline} onChange={(e) => setAssignmentDeadline(e.target.value)} style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }} />
                 </div>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>رابط نموذج التكليف (Google Drive Template)</label>
+                <input type="url" value={assignmentDriveTemplate} onChange={(e) => setAssignmentDriveTemplate(e.target.value)} placeholder="https://drive.google.com/..." style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }} />
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                <button type="button" onClick={() => setIsAddAssignmentModalOpen(false)} className="btn btn-outline">إلغاء</button>
+                <button type="submit" className="btn btn-accent"><Plus size={15} /><span>حفظ ونشر التكليف</span></button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
-                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-                  <button onClick={() => setSelectedPracticalStudent(null)} className="btn btn-outline">
-                    إلغاء
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (onUpdatePracticalGrade) {
-                        onUpdatePracticalGrade(selectedPracticalStudent.id, selectedPracticalStudent.score, selectedPracticalStudent.notes);
-                      } else {
-                        setLocalPracticalGrades({
-                          ...practicalGrades,
-                          [selectedPracticalStudent.id]: {
-                            score: selectedPracticalStudent.score,
-                            notes: selectedPracticalStudent.notes,
-                          }
-                        });
-                      }
+      {/* نافذة إضافة اختبار جديد بأنواعه */}
+      {isAddExamModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '720px' }}>
+            <button onClick={() => setIsAddExamModalOpen(false)} className="btn btn-ghost" style={{ position: 'absolute', top: '16px', left: '16px', padding: '0.4rem' }}>✕</button>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '0.5rem' }}>إنشاء ونشر اختبار أكاديمي جديد</h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+              حدد نوع الاختبار والأسئلة ومفتاح الحل السري المعزول.
+            </p>
 
-                      if (onLogAudit) {
-                        onLogAudit(
-                          'رصد/تعديل درجة الامتحان العملي الحضوري',
-                          `رصد درجة الطالب (${selectedPracticalStudent.name}): ${selectedPracticalStudent.score}/50. الملاحظات: ${selectedPracticalStudent.notes}`
-                        );
-                      }
+            <form onSubmit={handleSaveExam} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>نوع الاختبار *</label>
+                  <select value={examType} onChange={(e) => setExamType(e.target.value as any)} style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }}>
+                    <option value="theory">اختبار منتصف المسار النظري (Mid-term MCQ)</option>
+                    <option value="final">اختبار نهائي شامل (Final Exam)</option>
+                    <option value="quiz">كويز سريع أسبوعي (Quiz)</option>
+                    <option value="practical">متطلب امتحان عملي حضوري</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>عنوان الاختبار *</label>
+                  <input type="text" required value={examTitle} onChange={(e) => setExamTitle(e.target.value)} placeholder="مثال: كويز الوحدة الثانية" style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }} />
+                </div>
+              </div>
 
-                      setSelectedPracticalStudent(null);
-                    }}
-                    className="btn btn-primary"
-                  >
-                    <Save size={15} />
-                    <span>حفظ وتثبيت الدرجة</span>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>المدة بالدقائق</label>
+                  <input type="number" min={5} max={180} value={examDuration} onChange={(e) => setExamDuration(Number(e.target.value))} style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', fontWeight: 700 }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>الدرجة الكلية</label>
+                  <input type="number" min={5} max={100} value={examMaxScore} onChange={(e) => setExamMaxScore(Number(e.target.value))} style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', fontWeight: 700 }} />
+                </div>
+              </div>
+
+              {/* منشئ الأسئلة MCQ */}
+              <div style={{ padding: '0.85rem', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-color)' }}>
+                <strong style={{ fontSize: '0.88rem', display: 'block', marginBottom: '0.5rem' }}>
+                  إضافة سؤال جديد للاختبار ({examQuestions.length} أسئلة مضافة حالياً):
+                </strong>
+                <input type="text" value={newQText} onChange={(e) => setNewQText(e.target.value)} placeholder="نص السؤال..." style={{ width: '100%', padding: '0.55rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'var(--bg-card)', marginBottom: '0.5rem', fontSize: '0.85rem' }} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <input type="text" value={newOptA} onChange={(e) => setNewOptA(e.target.value)} placeholder="الخيار A" style={{ padding: '0.45rem', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--border-color)' }} />
+                  <input type="text" value={newOptB} onChange={(e) => setNewOptB(e.target.value)} placeholder="الخيار B" style={{ padding: '0.45rem', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--border-color)' }} />
+                  <input type="text" value={newOptC} onChange={(e) => setNewOptC(e.target.value)} placeholder="الخيار C" style={{ padding: '0.45rem', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--border-color)' }} />
+                  <input type="text" value={newOptD} onChange={(e) => setNewOptD(e.target.value)} placeholder="الخيار D" style={{ padding: '0.45rem', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--border-color)' }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem' }}>
+                    <span>الخيار الصحيح:</span>
+                    <select value={newCorrectOpt} onChange={(e) => setNewCorrectOpt(e.target.value)} style={{ padding: '0.3rem', borderRadius: '4px' }}>
+                      <option value="A">A</option>
+                      <option value="B">B</option>
+                      <option value="C">C</option>
+                      <option value="D">D</option>
+                    </select>
+                  </div>
+                  <button type="button" onClick={handleAddQuestionToExam} className="btn btn-outline" style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}>
+                    <Plus size={13} />
+                    <span>إدراج هذا السؤال في الاختبار</span>
                   </button>
                 </div>
               </div>
-            </div>
-          )}
+
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                <button type="button" onClick={() => setIsAddExamModalOpen(false)} className="btn btn-outline">إلغاء</button>
+                <button type="submit" className="btn btn-primary"><Save size={15} /><span>حفظ ونشر الاختبار للطلاب</span></button>
+              </div>
+            </form>
+          </div>
         </div>
+      )}
+
+      {/* نافذة إضافة كورس جديد */}
+      {onAddCourse && (
+        <AddCourseModal
+          isOpen={isAddCourseModalOpen}
+          onClose={() => setIsAddCourseModalOpen(false)}
+          onAddCourse={onAddCourse}
+        />
+      )}
+
+      {/* نافذة إضافة بحث جديد */}
+      {onAddResearch && (
+        <AddResearchModal
+          isOpen={isAddResearchModalOpen}
+          onClose={() => setIsAddResearchModalOpen(false)}
+          onAddResearch={onAddResearch}
+        />
       )}
     </div>
   );

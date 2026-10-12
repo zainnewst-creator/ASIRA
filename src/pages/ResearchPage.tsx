@@ -1,15 +1,26 @@
 import React, { useState } from 'react';
-import { Search, Filter, BookOpen, ExternalLink, Award, FileCheck } from 'lucide-react';
+import { Search, Filter, BookOpen, ExternalLink, Award, FileCheck, Plus } from 'lucide-react';
 import { INITIAL_RESEARCHES } from '../data/mockData';
 import { ResearchCard } from '../components/ResearchCard';
+import { ResearchPaper } from '../types';
+import { AddResearchModal } from '../components/AddResearchModal';
 
-export const ResearchPage: React.FC = () => {
+interface ResearchPageProps {
+  researches?: ResearchPaper[];
+  onAddResearch?: (research: ResearchPaper) => void;
+}
+
+export const ResearchPage: React.FC<ResearchPageProps> = ({ 
+  researches = INITIAL_RESEARCHES,
+  onAddResearch 
+}) => {
   const [selectedField, setSelectedField] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   const fields = ['all', 'طب بشري وباطنة', 'طب الأطفال والصيدلة السريرية', 'التعليم الطبي والمنهجية'];
 
-  const filteredPapers = INITIAL_RESEARCHES.filter((paper) => {
+  const filteredPapers = researches.filter((paper) => {
     const matchesField = selectedField === 'all' || paper.field === selectedField;
     const matchesSearch =
       paper.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -32,43 +43,56 @@ export const ResearchPage: React.FC = () => {
           أوراق بحثية أصلية ومراجعات منهجية أعدها طلاب وخريجو منتدى أسيرا تحت إشراف نخبة من الأكاديميين ونُشرت في مجلات عالمية مفهرسة في Web of Science و Scopus و PubMed.
         </p>
 
-        {/* فلاتر التخصص وشريط البحث */}
+        {/* فلاتر التخصص وشريط البحث وأزرار الإضافة */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '2.5rem' }}>
-          <div style={{ position: 'relative', maxWidth: '550px', margin: '0 auto', width: '100%' }}>
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="ابحث بالعنوان، اسم الباحث، أو المجلة العلمية..."
-              style={{
-                width: '100%',
-                padding: '0.85rem 3rem 0.85rem 1.25rem',
-                borderRadius: 'var(--radius-full)',
-                border: '1px solid var(--border-color)',
-                background: 'var(--bg-card)',
-                color: 'var(--text-main)',
-                fontFamily: 'var(--font-arabic)',
-                fontSize: '0.95rem',
-                boxShadow: 'var(--shadow-sm)',
-                outline: 'none',
-              }}
-            />
-            <Search
-              size={19}
-              color="var(--text-subtle)"
-              style={{ position: 'absolute', right: '1.25rem', top: '50%', transform: 'translateY(-50%)' }}
-            />
+          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', width: '100%', maxWidth: '440px' }}>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="ابحث بالعنوان، اسم الباحث، أو المجلة العلمية..."
+                style={{
+                  width: '100%',
+                  padding: '0.85rem 3rem 0.85rem 1.25rem',
+                  borderRadius: 'var(--radius-full)',
+                  border: '1px solid var(--border-color)',
+                  background: 'var(--bg-card)',
+                  color: 'var(--text-main)',
+                  fontFamily: 'var(--font-arabic)',
+                  fontSize: '0.95rem',
+                  boxShadow: 'var(--shadow-sm)',
+                  outline: 'none',
+                }}
+              />
+              <Search
+                size={19}
+                color="var(--text-subtle)"
+                style={{ position: 'absolute', right: '1.25rem', top: '50%', transform: 'translateY(-50%)' }}
+              />
+            </div>
+
+            {onAddResearch && (
+              <button
+                onClick={() => setIsAddModalOpen(true)}
+                className="btn btn-accent"
+                style={{ padding: '0.85rem 1.5rem', borderRadius: 'var(--radius-full)', fontSize: '0.92rem' }}
+              >
+                <Plus size={16} />
+                <span>إضافة بحث منشور</span>
+              </button>
+            )}
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {fields.map((f) => (
+            {fields.map((field) => (
               <button
-                key={f}
-                onClick={() => setSelectedField(f)}
-                className={`btn ${selectedField === f ? 'btn-primary' : 'btn-outline'}`}
-                style={{ fontSize: '0.85rem', padding: '0.45rem 1rem', borderRadius: 'var(--radius-full)' }}
+                key={field}
+                onClick={() => setSelectedField(field)}
+                className={`btn ${selectedField === field ? 'btn-primary' : 'btn-ghost'}`}
+                style={{ fontSize: '0.85rem', padding: '0.4rem 0.85rem' }}
               >
-                {f === 'all' ? 'جميع التخصصات' : f}
+                {field === 'all' ? 'جميع التخصصات' : field}
               </button>
             ))}
           </div>
@@ -76,16 +100,27 @@ export const ResearchPage: React.FC = () => {
       </div>
 
       {/* بطاقات الأبحاث */}
-      <div className="grid-3">
-        {filteredPapers.map((paper) => (
-          <ResearchCard key={paper.id} paper={paper} />
-        ))}
-      </div>
-
-      {filteredPapers.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '4rem 1rem', color: 'var(--text-muted)' }}>
-          <p style={{ fontSize: '1.1rem' }}>لا توجد أبحاث مطابقة لمعايير البحث في هذا التخصص حالياً.</p>
+      {filteredPapers.length > 0 ? (
+        <div className="grid-3">
+          {filteredPapers.map((paper) => (
+            <ResearchCard key={paper.id} paper={paper} />
+          ))}
         </div>
+      ) : (
+        <div style={{ textAlign: 'center', padding: '4rem 1rem', background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)' }}>
+          <FileCheck size={48} color="var(--text-subtle)" style={{ margin: '0 auto 1rem' }} />
+          <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '0.5rem' }}>لا توجد أبحاث منشورة مطابقة للبحث</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>جرب اختيار تخصص آخر أو البحث باسم باحث آخر.</p>
+        </div>
+      )}
+
+      {/* نافذة إضافة بحث منشور */}
+      {onAddResearch && (
+        <AddResearchModal
+          isOpen={isAddModalOpen}
+          onClose={() => setIsAddModalOpen(false)}
+          onAddResearch={onAddResearch}
+        />
       )}
     </div>
   );

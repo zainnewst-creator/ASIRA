@@ -14,15 +14,23 @@ import {
 import { INITIAL_STATS, INITIAL_COURSES, INITIAL_RESEARCHES, INITIAL_TESTIMONIALS } from '../data/mockData';
 import { CourseCard } from '../components/CourseCard';
 import { ResearchCard } from '../components/ResearchCard';
-import { Course } from '../types';
+import { Course, ResearchPaper } from '../types';
 
 interface HomePageProps {
+  courses?: Course[];
+  researches?: ResearchPaper[];
   onNavigate: (tab: string) => void;
   onEnroll: (course: Course) => void;
   onSelectCourse: (course: Course) => void;
 }
 
-export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onEnroll, onSelectCourse }) => {
+export const HomePage: React.FC<HomePageProps> = ({ 
+  courses = INITIAL_COURSES,
+  researches = INITIAL_RESEARCHES,
+  onNavigate, 
+  onEnroll, 
+  onSelectCourse 
+}) => {
   return (
     <div>
       {/* 1. قسم البطل (Hero Section) */}
@@ -179,7 +187,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onEnroll, onSele
           </div>
 
           <div className="grid-3">
-            {INITIAL_COURSES.map((course) => (
+            {courses.slice(0, 3).map((course) => (
               <CourseCard
                 key={course.id}
                 course={course}
@@ -213,7 +221,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onEnroll, onSele
           </div>
 
           <div className="grid-3">
-            {INITIAL_RESEARCHES.map((paper) => (
+            {researches.slice(0, 3).map((paper) => (
               <ResearchCard key={paper.id} paper={paper} />
             ))}
           </div>

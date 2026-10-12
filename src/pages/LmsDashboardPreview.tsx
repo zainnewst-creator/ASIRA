@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { 
+  Course,
+  ResearchPaper,
   UserRole 
 } from '../types';
 import { 
@@ -9,6 +11,8 @@ import {
   INITIAL_PENDING_ENROLLMENTS,
   INITIAL_CERT_REQUESTS,
   INITIAL_AUDIT_LOGS,
+  INITIAL_COURSES,
+  INITIAL_RESEARCHES,
   MockStudentSubmission,
   MockExamAttemptForInstructor,
   MockCourseCurriculum,
@@ -30,6 +34,10 @@ import {
 } from 'lucide-react';
 
 interface LmsDashboardPreviewProps {
+  courses?: Course[];
+  onAddCourse?: (newCourse: Course) => void;
+  researches?: ResearchPaper[];
+  onAddResearch?: (newPaper: ResearchPaper) => void;
   userRole: UserRole;
   userName: string;
   onLogout: () => void;
@@ -37,6 +45,10 @@ interface LmsDashboardPreviewProps {
 }
 
 export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
+  courses = INITIAL_COURSES,
+  onAddCourse,
+  researches = INITIAL_RESEARCHES,
+  onAddResearch,
   userRole: initialRole,
   userName: initialName,
   onLogout,
@@ -44,6 +56,7 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
 }) => {
   // الدور النشط للتجربة الحية (مع إمكانية التبديل السريع بين الأدوار)
   const [activeRole, setActiveRole] = useState<UserRole>(initialRole);
+  const [selectedCourseId, setSelectedCourseId] = useState<string>(courses[0]?.id || 'course-1');
 
   // الحالة المركزية المشتركة بين الأدوار (Real-Time Synchronized State)
   const [submissions, setSubmissions] = useState<MockStudentSubmission[]>(INITIAL_STUDENT_SUBMISSIONS);
@@ -221,6 +234,9 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
         {/* عرض اللوحة المناسبة حسب الدور النشط */}
         {activeRole === 'student' && (
           <StudentDashboard
+            courses={courses}
+            activeCourseId={selectedCourseId}
+            onSelectCourseId={setSelectedCourseId}
             studentName={initialName}
             studentUid="student-1"
             submissions={submissions}
@@ -234,6 +250,11 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
 
         {activeRole === 'instructor' && (
           <InstructorDashboard
+            courses={courses}
+            activeCourseId={selectedCourseId}
+            onSelectCourseId={setSelectedCourseId}
+            onAddCourse={onAddCourse}
+            onAddResearch={onAddResearch}
             submissions={submissions}
             onUpdateSubmission={handleUpdateSubmission}
             examAttempts={examAttempts}
