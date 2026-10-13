@@ -7,18 +7,18 @@ import {
 import { 
   INITIAL_STUDENT_SUBMISSIONS, 
   INITIAL_EXAM_ATTEMPTS, 
-  INITIAL_CURRICULUM,
-  INITIAL_PENDING_ENROLLMENTS,
-  INITIAL_CERT_REQUESTS,
-  INITIAL_AUDIT_LOGS,
-  INITIAL_COURSES,
-  INITIAL_RESEARCHES,
-  MockStudentSubmission,
-  MockExamAttemptForInstructor,
-  MockCourseCurriculum,
-  MockPendingEnrollment,
-  MockCertificateRequest,
-  MockAuditLogItem
+  INITIAL_PENDING_ENROLLMENTS, 
+  INITIAL_CERT_REQUESTS, 
+  INITIAL_AUDIT_LOGS, 
+  INITIAL_COURSES, 
+  INITIAL_RESEARCHES, 
+  MockStudentSubmission, 
+  MockExamAttemptForInstructor, 
+  MockCourseCurriculum, 
+  MockPendingEnrollment, 
+  MockCertificateRequest, 
+  MockAuditLogItem, 
+  INITIAL_CURRICULA
 } from '../data/mockData';
 import { StudentDashboard } from '../components/lms/StudentDashboard';
 import { InstructorDashboard } from '../components/lms/InstructorDashboard';
@@ -29,8 +29,7 @@ import {
   ShieldCheck, 
   ArrowRight, 
   LogOut, 
-  Sparkles,
-  Layers
+  Sparkles
 } from 'lucide-react';
 
 interface LmsDashboardPreviewProps {
@@ -39,6 +38,8 @@ interface LmsDashboardPreviewProps {
   onUpdateCourse?: (updatedCourse: Course) => void;
   researches?: ResearchPaper[];
   onAddResearch?: (newPaper: ResearchPaper) => void;
+  curricula?: Record<string, MockCourseCurriculum>;
+  onUpdateCurriculum?: (curriculum: MockCourseCurriculum) => void;
   userRole: UserRole;
   userName: string;
   onLogout: () => void;
@@ -49,8 +50,10 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
   courses = INITIAL_COURSES,
   onAddCourse,
   onUpdateCourse,
-  researches = INITIAL_RESEARCHES,
+  researches: _researches = INITIAL_RESEARCHES,
   onAddResearch,
+  curricula: propCurricula,
+  onUpdateCurriculum: propOnUpdateCurriculum,
   userRole: initialRole,
   userName: initialName,
   onLogout,
@@ -63,7 +66,13 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
   // الحالة المركزية المشتركة بين الأدوار (Real-Time Synchronized State)
   const [submissions, setSubmissions] = useState<MockStudentSubmission[]>(INITIAL_STUDENT_SUBMISSIONS);
   const [examAttempts, setExamAttempts] = useState<MockExamAttemptForInstructor[]>(INITIAL_EXAM_ATTEMPTS);
-  const [curriculum, setCurriculum] = useState<MockCourseCurriculum>(INITIAL_CURRICULUM);
+  const [localCurricula, setLocalCurricula] = useState<Record<string, MockCourseCurriculum>>(propCurricula || INITIAL_CURRICULA);
+  const activeCurricula = propCurricula || localCurricula;
+  const currentCurriculum = activeCurricula[selectedCourseId] || {
+    courseId: selectedCourseId,
+    modules: []
+  };
+
   const [enrollments, setEnrollments] = useState<MockPendingEnrollment[]>(INITIAL_PENDING_ENROLLMENTS);
   const [certRequests, setCertRequests] = useState<MockCertificateRequest[]>(INITIAL_CERT_REQUESTS);
   const [auditLogs, setAuditLogs] = useState<MockAuditLogItem[]>(INITIAL_AUDIT_LOGS);
@@ -117,9 +126,16 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
     setExamAttempts((prev) => prev.map((a) => a.id === updated.id ? updated : a));
   };
 
-  // 4. تعديل المنهج والدروس
+  // 4. تعديل المنهج والدروس لكل كورس على حدة
   const handleUpdateCurriculum = (updated: MockCourseCurriculum) => {
-    setCurriculum(updated);
+    if (propOnUpdateCurriculum) {
+      propOnUpdateCurriculum(updated);
+    } else {
+      setLocalCurricula((prev) => ({
+        ...prev,
+        [updated.courseId]: updated,
+      }));
+    }
   };
 
   // 5. تعديل درجة العملي الحضوري
@@ -295,7 +311,7 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
             submissions={submissions}
             onSubmitAssignment={handleSubmitAssignment}
             examAttempts={examAttempts}
-            curriculum={curriculum}
+            curriculum={currentCurriculum}
             practicalGrades={practicalGrades}
             certRequests={certRequests}
             onRequestCertificate={handleRequestCertificate}
@@ -315,7 +331,7 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
             onUpdateSubmission={handleUpdateSubmission}
             examAttempts={examAttempts}
             onUpdateExamAttempt={handleUpdateExamAttempt}
-            curriculum={curriculum}
+            curriculum={currentCurriculum}
             onUpdateCurriculum={handleUpdateCurriculum}
             practicalGrades={practicalGrades}
             onUpdatePracticalGrade={handleUpdatePracticalGrade}

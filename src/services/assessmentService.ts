@@ -2,7 +2,6 @@
 // محرك التكليفات والاختبارات والتصحيح الآمن (Assessment Engine)
 // ===================================================
 import { 
-  collection, 
   doc, 
   getDoc, 
   setDoc, 
@@ -13,7 +12,6 @@ import {
   AssignmentSubmission, 
   ExamAttempt, 
   OfficialGrade, 
-  ExamAnswerKey, 
   ExamQuestion 
 } from '../types';
 import { logAuditEvent } from './auditService';

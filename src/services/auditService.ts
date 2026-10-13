@@ -1,7 +1,7 @@
 // ===================================================
 // خدمة سجل التدقيق الأكاديمي (Audit Logging Service)
 // ===================================================
-import { collection, doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import { AuditLog, UserRole } from '../types';
 

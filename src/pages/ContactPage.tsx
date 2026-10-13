@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Send, MessageCircle, HelpCircle, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Mail, Send, MessageCircle, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
 
 export const ContactPage: React.FC = () => {
   const [formSent, setFormSent] = useState(false);

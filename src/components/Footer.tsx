@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookOpen, ExternalLink, ShieldCheck, Mail, Send, Award, Users } from 'lucide-react';
+import { ShieldCheck, Mail, Send, Award, Users } from 'lucide-react';
 
 interface FooterProps {
   onNavigate: (tab: string) => void;

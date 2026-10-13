@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Course } from '../types';
-import { BookOpen, Edit3, X, Upload, Image, Award, Users, Save, CheckCircle, Trash2 } from 'lucide-react';
+import { Course, CourseStatus } from '../types';
+import { Edit3, X, Upload, Image, Save, CheckCircle } from 'lucide-react';
 
 interface EditCourseModalProps {
   isOpen: boolean;
@@ -23,7 +23,7 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({
   const [coverUrl, setCoverUrl] = useState(course.coverUrl);
   const [passingScore, setPassingScore] = useState(course.passingScore || 70);
   const [totalLessonsCount, setTotalLessonsCount] = useState(course.totalLessonsCount || 10);
-  const [status, setStatus] = useState<'published' | 'draft' | 'archived'>(course.status || 'published');
+  const [status, setStatus] = useState<CourseStatus>(course.status || 'published');
   const [fileName, setFileName] = useState<string>('');
 
   useEffect(() => {
@@ -198,11 +198,11 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({
             />
           </div>
 
-          {/* درجة النجاح وعدد المحاضرات */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          {/* درجة النجاح وعدد المحاضرات وحالة الكورس */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.3fr', gap: '1rem' }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem', color: 'var(--text-main)' }}>
-                درجة النجاح والاجتياز للشهادة (%)
+                درجة النجاح (%)
               </label>
               <input
                 type="number"
@@ -215,7 +215,7 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem', color: 'var(--text-main)' }}>
-                عدد المحاضرات الإجمالي
+                المحاضرات الإجمالية
               </label>
               <input
                 type="number"
@@ -225,6 +225,21 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({
                 onChange={(e) => setTotalLessonsCount(Number(e.target.value))}
                 style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)', fontWeight: 700, textAlign: 'center' }}
               />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem', color: 'var(--text-main)' }}>
+                حالة إتاحة الكورس *
+              </label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as CourseStatus)}
+                style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)', fontWeight: 600, fontSize: '0.85rem' }}
+              >
+                <option value="published">منشور ومتاح للتسجيل والالتحاق</option>
+                <option value="coming_soon">قريباً (قيد الإعداد والإعلان - التسجيل مغلق)</option>
+                <option value="draft">مسودة داخلية (غير معلن)</option>
+                <option value="archived">مؤرشف</option>
+              </select>
             </div>
           </div>
 

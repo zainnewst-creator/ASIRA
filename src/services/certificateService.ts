@@ -1,9 +1,9 @@
 // ===================================================
 // منظومة الشهادات والتحقق الأكاديمي (Certificate Service)
 // ===================================================
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from './firebaseConfig';
-import { Certificate, CertificateStatus } from '../types';
+import { Certificate } from '../types';
 import { logAuditEvent } from './auditService';
 
 // التحقق من أهلية الطالب للحصول على الشهادة

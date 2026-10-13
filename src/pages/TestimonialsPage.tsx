@@ -1,5 +1,5 @@
 import React from 'react';
-import { Star, Quote, Award, BookOpen, ExternalLink } from 'lucide-react';
+import { Star, Quote, Award } from 'lucide-react';
 import { INITIAL_TESTIMONIALS } from '../data/mockData';
 
 export const TestimonialsPage: React.FC = () => {

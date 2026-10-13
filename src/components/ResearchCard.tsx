@@ -1,12 +1,18 @@
 import React from 'react';
-import { ExternalLink, BookOpen, Calendar, User, Eye, CheckCircle2 } from 'lucide-react';
+import { ExternalLink, BookOpen, Calendar, User, Eye, CheckCircle2, Edit3 } from 'lucide-react';
 import { ResearchPaper } from '../types';
 
 interface ResearchCardProps {
   paper: ResearchPaper;
+  isInstructorOrAdmin?: boolean;
+  onEdit?: (paper: ResearchPaper) => void;
 }
 
-export const ResearchCard: React.FC<ResearchCardProps> = ({ paper }) => {
+export const ResearchCard: React.FC<ResearchCardProps> = ({ 
+  paper,
+  isInstructorOrAdmin,
+  onEdit,
+}) => {
   return (
     <article className="card" style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
       {/* صورة الغلاف إن وجدت أو شارة البحث */}
@@ -18,11 +24,32 @@ export const ResearchCard: React.FC<ResearchCardProps> = ({ paper }) => {
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             loading="lazy"
           />
-          <div style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', gap: '0.5rem' }}>
+          <div style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <span className="badge badge-emerald" style={{ background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(4px)' }}>
               <CheckCircle2 size={13} color="#059669" /> بحث منشور دولياً
             </span>
           </div>
+          {isInstructorOrAdmin && onEdit && (
+            <button
+              onClick={() => onEdit(paper)}
+              className="btn btn-outline"
+              style={{
+                position: 'absolute',
+                top: '12px',
+                left: '12px',
+                padding: '0.35rem 0.65rem',
+                fontSize: '0.75rem',
+                background: 'rgba(255,255,255,0.92)',
+                color: 'var(--text-main)',
+                backdropFilter: 'blur(4px)',
+                borderRadius: 'var(--radius-sm)',
+              }}
+              title="تعديل تفاصيل الورقة البحثية وصورة الغلاف"
+            >
+              <Edit3 size={13} />
+              <span>تعديل الصورة</span>
+            </button>
+          )}
         </div>
       )}
 

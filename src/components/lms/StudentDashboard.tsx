@@ -14,16 +14,11 @@ import {
   ChevronUp,
   GraduationCap, 
   RotateCcw,
-  MessageSquare,
-  Check,
   ShieldCheck,
   Download,
   PlayCircle,
-  Layers,
   Edit3,
-  Printer,
-  Sparkles,
-  HelpCircle
+  Lock
 } from 'lucide-react';
 import { 
   MockStudentSubmission, 
@@ -66,7 +61,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   submissions: propSubmissions,
   onSubmitAssignment,
   examAttempts: propExamAttempts,
-  onSubmitExamAttempt,
+  onSubmitExamAttempt: _onSubmitExamAttempt,
   curriculum: propCurriculum,
   practicalGrades: propPracticalGrades,
   certRequests: propCertRequests,
@@ -85,12 +80,17 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   const currentCourse = courses.find((c) => c.id === selectedCourseId) || courses[0];
 
   // استخدام البيانات الممررة أو الافتراضية
-  const submissions = propSubmissions || INITIAL_STUDENT_SUBMISSIONS;
+  const [localSubmissions, setLocalSubmissions] = useState<MockStudentSubmission[]>(propSubmissions || INITIAL_STUDENT_SUBMISSIONS);
+  const submissions = propSubmissions || localSubmissions;
   const examAttempts = propExamAttempts || INITIAL_EXAM_ATTEMPTS;
   const curriculum = propCurriculum || INITIAL_CURRICULUM;
   const practicalGrades = propPracticalGrades || {
     'student-1': { score: 42, notes: 'أداء ممتاز في اختبار تحليل البيانات الإحصائية الحضوري' }
   };
+
+  // تتبع التكليفات والاختبارات المنجزة لفتح الدروس اللاحقة فوراً
+  const [submittedAssignmentIds, setSubmittedAssignmentIds] = useState<string[]>(['asg-1']);
+  const [completedExamIds, setCompletedExamIds] = useState<string[]>([]);
 
   // تكليف الطالب الحالي
   const studentSubmission = submissions.find((s) => s.studentUid === studentUid) || submissions[0];
@@ -142,6 +142,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   const [studentNotesInput, setStudentNotesInput] = useState('');
   const [submitSuccessNotice, setSubmitSuccessNotice] = useState(false);
 
+  // إشعار قفل المتطلبات الأكاديمية
+  const [lockedNotice, setLockedNotice] = useState<string | null>(null);
+
   // حالة الاختبار التفاعلي والأسئلة الثلاثة
   const [examSubmitted, setExamSubmitted] = useState(studentExamAttempt?.status === 'approved');
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({
@@ -152,11 +155,59 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   const [examTimer, setExamTimer] = useState<number>(1455); // ~24 minutes
   const [examCalculatedScore, setExamCalculatedScore] = useState<number>(studentExamAttempt?.calculatedScore || 28);
 
-  // مؤقت الاختبار
+  // تسليم الاختبار التفاعلي - يفتح الدرس الجديد فوراً
+  const handleExamSubmit = () => {
+    let score = 0;
+    if (selectedAnswers.q1 === 'A') score += 10;
+    if (selectedAnswers.q2 === 'A') score += 10;
+    if (selectedAnswers.q3 === 'A') score += 10;
+
+    const firstExam = curriculum.modules.flatMap((m) => m.exams || [])[0];
+    if (firstExam?.id) {
+      setCompletedExamIds((prev) => Array.from(new Set([...prev, firstExam.id])));
+    }
+
+    setExamCalculatedScore(score);
+    setExamSubmitted(true);
+
+    if (onLogAudit) {
+      onLogAudit('تسليم اختبار نظري', `قام الطالب (${studentName}) بتسليم محاولة اختبار وحصل مبدئياً على ${score}/30 وتم فتح الدرس التالي فوراً`);
+    }
+  };
+
+  // تسليم تلقائي عند نفاد الوقت المحدد للاختبار - يفتح الدرس الجديد فوراً
+  const handleAutoSubmitOnTimeOut = () => {
+    let score = 0;
+    if (selectedAnswers.q1 === 'A') score += 10;
+    if (selectedAnswers.q2 === 'A') score += 10;
+    if (selectedAnswers.q3 === 'A') score += 10;
+
+    const firstExam = curriculum.modules.flatMap((m) => m.exams || [])[0];
+    if (firstExam?.id) {
+      setCompletedExamIds((prev) => Array.from(new Set([...prev, firstExam.id])));
+    }
+
+    setExamCalculatedScore(score);
+    setExamSubmitted(true);
+    alert('⏱️ انتهى وقت الاختبار المحدد تماماً! تم تسليم إجاباتك تلقائياً للحفاظ على نتيجتك وتم فتح المحاضرة التالية لك.');
+
+    if (onLogAudit) {
+      onLogAudit('تسليم اختبار تلقائي لانتهاء الوقت', `تم تسليم اختبار الطالب (${studentName}) تلقائياً وحصل على ${score}/30`);
+    }
+  };
+
+  // مؤقت الاختبار التنازلي التفاعلي
   useEffect(() => {
     if (activeTab === 'exam' && !examSubmitted && examTimer > 0) {
       const timer = setInterval(() => {
-        setExamTimer((prev) => (prev > 0 ? prev - 1 : 0));
+        setExamTimer((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            handleAutoSubmitOnTimeOut();
+            return 0;
+          }
+          return prev - 1;
+        });
       }, 1000);
       return () => clearInterval(timer);
     }
@@ -170,6 +221,135 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
   // نافذة معاينة الشهادة المعتمدة
   const [isCertificateModalOpen, setIsCertificateModalOpen] = useState(false);
+
+  // تسطيح عناصر الكورس بالكامل لحساب التتابع والتسلسل الأكاديمي الإلزامي
+  interface FlattenedItem {
+    type: 'lesson' | 'assignment' | 'exam';
+    id: string;
+    title: string;
+    moduleIndex: number;
+    subIndex: number;
+    moduleTitle: string;
+    isModuleComingSoon: boolean;
+    isCompleted: boolean;
+    isLocked: boolean;
+    prerequisiteTitle?: string;
+  }
+
+  const flattenedCourseItems: FlattenedItem[] = [];
+  (curriculum.modules || []).forEach((mod, mIdx) => {
+    const isModComingSoon = mod.status === 'coming_soon' || currentCourse?.status === 'coming_soon';
+
+    // 1. المحاضرات والدروس
+    (mod.lessons || []).forEach((les, lIdx) => {
+      flattenedCourseItems.push({
+        type: 'lesson',
+        id: les.id,
+        title: les.title,
+        moduleIndex: mIdx,
+        subIndex: lIdx,
+        moduleTitle: mod.title,
+        isModuleComingSoon: isModComingSoon,
+        isCompleted: completedLessonIds.includes(les.id),
+        isLocked: false,
+      });
+    });
+
+    // 2. التكليفات العملية: بمجرد رفع وتسليم أول ملف، يفتح الدرس التالي حتى لو كان بانتظار تصحيح ومراجعة أو مطلوب تعديل
+    (mod.assignments || []).forEach((asg, aIdx) => {
+      const isCompleted =
+        submittedAssignmentIds.includes(asg.id) ||
+        submissions.some((s) => {
+          const titleMatch =
+            s.assignmentTitle === asg.title ||
+            s.assignmentTitle.includes(asg.title) ||
+            asg.title.includes(s.assignmentTitle);
+          const hasUploadedFileOrStatus =
+            Boolean(s.driveFileUrl) ||
+            s.status === 'submitted' ||
+            s.status === 'graded' ||
+            s.status === 'revision_required';
+          return titleMatch && hasUploadedFileOrStatus;
+        });
+
+      flattenedCourseItems.push({
+        type: 'assignment',
+        id: asg.id,
+        title: asg.title,
+        moduleIndex: mIdx,
+        subIndex: aIdx,
+        moduleTitle: mod.title,
+        isModuleComingSoon: isModComingSoon,
+        isCompleted,
+        isLocked: false,
+      });
+    });
+
+    // 3. الاختبارات والتقييمات: أول ما يخلص الاختبار يفتح له الدرس الجديد فوراً
+    (mod.exams || []).forEach((ex, eIdx) => {
+      const isCompleted =
+        completedExamIds.includes(ex.id) ||
+        examSubmitted ||
+        examAttempts.some((a) => {
+          const titleMatch =
+            a.examTitle === ex.title ||
+            a.examTitle.includes(ex.title) ||
+            ex.title.includes(a.examTitle);
+          return (
+            titleMatch &&
+            (a.status === 'approved' ||
+              a.calculatedScore !== undefined ||
+              a.officialGrade !== undefined)
+          );
+        });
+
+      flattenedCourseItems.push({
+        type: 'exam',
+        id: ex.id,
+        title: ex.title,
+        moduleIndex: mIdx,
+        subIndex: eIdx,
+        moduleTitle: mod.title,
+        isModuleComingSoon: isModComingSoon,
+        isCompleted,
+        isLocked: false,
+      });
+    });
+  });
+
+  // تطبيق القفل التسلسلي:
+  // العنصر الأول متاح ما لم تكن الوحدة قريباً
+  // أي عنصر لاحق يقفل إذا لم يكتمل العنصر الذي قبله مباشرة
+  let previousItemCompleted = true;
+  for (let i = 0; i < flattenedCourseItems.length; i++) {
+    const item = flattenedCourseItems[i];
+    if (i === 0) {
+      item.isLocked = item.isModuleComingSoon;
+      if (item.isModuleComingSoon) {
+        item.prerequisiteTitle = 'المحتوى قيد الإعداد الأكاديمي (قريباً)';
+      }
+    } else {
+      const prev = flattenedCourseItems[i - 1];
+      if (item.isModuleComingSoon) {
+        item.isLocked = true;
+        item.prerequisiteTitle = 'هذه الوحدة قيد الإعداد الأكاديمي (قريباً)';
+      } else if (!previousItemCompleted) {
+        item.isLocked = true;
+        item.prerequisiteTitle = prev.title;
+      }
+    }
+
+    if (!item.isCompleted) {
+      previousItemCompleted = false;
+    }
+  }
+
+  // التحقق من حالة الدرس الحالي
+  const currentFlattenedLesson = flattenedCourseItems.find(
+    (item) => item.type === 'lesson' && item.id === currentLesson?.id
+  );
+  const isCurrentLessonLocked = currentFlattenedLesson?.isLocked || false;
+  const currentLessonPrerequisite = currentFlattenedLesson?.prerequisiteTitle || '';
 
   // حساب نسبة التقدم في الكورس
   const totalLessonsCount = curriculum.modules.reduce((sum, m) => sum + m.lessons.length, 0);
@@ -198,6 +378,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
     e.preventDefault();
     if (!assignmentInputLink.trim()) return;
 
+    // استخراج التكليف المرتبط في مديول الكورس
+    const firstAsg = curriculum.modules.flatMap((m) => m.assignments || [])[0];
+    const targetTitle = firstAsg?.title || studentSubmission?.assignmentTitle || 'صياغة بروتوكول بحثي بنظام PICO وتحديد الفرضيات';
+    const targetId = firstAsg?.id || 'asg-1';
+
     const nextVersion = studentSubmission ? (studentSubmission.version || 1) + 1 : 1;
     const updatedSub: MockStudentSubmission = {
       ...studentSubmission,
@@ -205,7 +390,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
       studentUid,
       studentName,
       university: 'جامعة الملك سعود - كلية الطب',
-      assignmentTitle: studentSubmission?.assignmentTitle || 'صياغة بروتوكول بحثي وتحديد استراتيجية MeSH',
+      assignmentTitle: targetTitle,
       version: nextVersion,
       driveFileUrl: assignmentInputLink,
       submittedAt: 'الآن (2026-10-13)',
@@ -215,33 +400,21 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
       revisionNotes: studentNotesInput ? `ملاحظة الطالب: ${studentNotesInput}` : undefined,
     };
 
+    setSubmittedAssignmentIds((prev) => Array.from(new Set([...prev, targetId])));
+    setLocalSubmissions((prev) => prev.map((s) => s.id === updatedSub.id ? updatedSub : s));
+
     if (onSubmitAssignment) {
       onSubmitAssignment(updatedSub);
     }
 
     if (onLogAudit) {
-      onLogAudit('تسليم تكليف أكاديمي', `قام الطالب (${studentName}) بتسليم النسخة v${nextVersion} بكورس ${currentCourse?.code}`);
+      onLogAudit('تسليم تكليف أكاديمي', `قام الطالب (${studentName}) بتسليم النسخة v${nextVersion} بكورس ${currentCourse?.code} وتم فتح الدرس التالي فوراً`);
     }
 
     setSubmitSuccessNotice(true);
-    setTimeout(() => setSubmitSuccessNotice(false), 4000);
+    setTimeout(() => setSubmitSuccessNotice(false), 6000);
   };
 
-  // تسليم الاختبار التفاعلي
-  const handleExamSubmit = () => {
-    // حساب الدرجة التلقائية
-    let score = 0;
-    if (selectedAnswers.q1 === 'A') score += 10;
-    if (selectedAnswers.q2 === 'A') score += 10;
-    if (selectedAnswers.q3 === 'A') score += 10;
-
-    setExamCalculatedScore(score);
-    setExamSubmitted(true);
-
-    if (onLogAudit) {
-      onLogAudit('تسليم اختبار نظري', `قام الطالب (${studentName}) بتسليم محاولة اختبار وحصل مبدئياً على ${score}/30`);
-    }
-  };
 
   // درجات السجل الأكاديمي
   const assignmentScore = studentSubmission?.grade !== undefined ? studentSubmission.grade : 18;
@@ -338,6 +511,28 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
         </button>
       </div>
 
+      {/* إشعار قفل المتطلبات الأكاديمية */}
+      {lockedNotice && (
+        <div style={{
+          padding: '0.85rem 1.25rem',
+          background: 'rgba(239, 68, 68, 0.1)',
+          border: '1px solid #ef4444',
+          borderRadius: 'var(--radius-md)',
+          color: 'var(--text-main)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '1.25rem',
+          fontSize: '0.88rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <Lock size={18} color="#ef4444" />
+            <span style={{ fontWeight: 700 }}>{lockedNotice}</span>
+          </div>
+          <button onClick={() => setLockedNotice(null)} className="btn btn-ghost" style={{ padding: '0.2rem 0.5rem' }}>✕</button>
+        </div>
+      )}
+
       {/* 1. تبويب: دوراتي المسجلة (Multi-Course Overview) */}
       {activeTab === 'my_courses' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -355,12 +550,13 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
           <div className="grid-2">
             {courses.map((course) => {
               const isCurrent = course.id === selectedCourseId;
+              const isComingSoon = course.status === 'coming_soon';
 
               return (
                 <div key={course.id} className="card" style={{ border: isCurrent ? '2px solid var(--primary-600)' : '1px solid var(--border-color)', position: 'relative' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
-                    <span className={`badge ${isCurrent ? 'badge-primary' : 'badge-emerald'}`}>
-                      {isCurrent ? 'الكورس المفتوح حالياً' : 'كورس مسجل'}
+                    <span className={`badge ${isComingSoon ? 'badge-gold' : isCurrent ? 'badge-primary' : 'badge-emerald'}`}>
+                      {isComingSoon ? '⏳ قريباً (قيد الإعداد)' : isCurrent ? 'الكورس المفتوح حالياً' : 'كورس مسجل'}
                     </span>
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontFamily: 'monospace', fontWeight: 700 }}>
                       {course.code}
@@ -377,35 +573,48 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                   <div style={{ marginBottom: '1.25rem', padding: '0.75rem', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '0.35rem' }}>
                       <span>نسبة الإنجاز في المساق:</span>
-                      <strong>{isCurrent ? `${progressPercentage}%` : '40%'}</strong>
+                      <strong>{isComingSoon ? '0% (قيد الإطلاق)' : isCurrent ? `${progressPercentage}%` : '40%'}</strong>
                     </div>
                     <div style={{ height: '8px', background: 'var(--border-color)', borderRadius: 'var(--radius-full)', overflow: 'hidden' }}>
-                      <div style={{ width: isCurrent ? `${progressPercentage}%` : '40%', height: '100%', background: 'linear-gradient(90deg, #10b981, #2563eb)' }} />
+                      <div style={{ width: isComingSoon ? '0%' : isCurrent ? `${progressPercentage}%` : '40%', height: '100%', background: 'linear-gradient(90deg, #10b981, #2563eb)' }} />
                     </div>
                   </div>
 
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <button
-                      onClick={() => {
-                        handleSelectCourse(course.id);
-                        setActiveTab('learn');
-                      }}
-                      className="btn btn-primary"
-                      style={{ flex: 1, fontSize: '0.85rem' }}
-                    >
-                      <span>{isCurrent ? 'متابعة الدروس الآن' : 'فتح محتوى هذا الكورس'}</span>
-                      <ChevronRight size={15} />
-                    </button>
-                    <button
-                      onClick={() => {
-                        handleSelectCourse(course.id);
-                        setActiveTab('assignments');
-                      }}
-                      className="btn btn-outline"
-                      style={{ fontSize: '0.85rem' }}
-                    >
-                      <span>التكليفات</span>
-                    </button>
+                    {isComingSoon ? (
+                      <button
+                        disabled
+                        className="btn btn-outline"
+                        style={{ flex: 1, fontSize: '0.85rem', opacity: 0.65, cursor: 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+                      >
+                        <Lock size={14} />
+                        <span>قريباً (المحتوى قيد التجهيز)</span>
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => {
+                            handleSelectCourse(course.id);
+                            setActiveTab('learn');
+                          }}
+                          className="btn btn-primary"
+                          style={{ flex: 1, fontSize: '0.85rem' }}
+                        >
+                          <span>{isCurrent ? 'متابعة الدروس الآن' : 'فتح محتوى هذا الكورس'}</span>
+                          <ChevronRight size={15} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleSelectCourse(course.id);
+                            setActiveTab('assignments');
+                          }}
+                          className="btn btn-outline"
+                          style={{ fontSize: '0.85rem' }}
+                        >
+                          <span>التكليفات</span>
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               );
@@ -419,37 +628,91 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
           {/* مشغل الفيديو والمحتوى */}
           <div className="card" style={{ padding: '1.5rem' }}>
-            {/* مشغل الفيديو الحقيقي (Responsive YouTube Iframe) */}
-            <div style={{ 
-              width: '100%', 
-              aspectRatio: '16/9', 
-              background: '#050a18', 
-              borderRadius: 'var(--radius-md)', 
-              overflow: 'hidden', 
-              marginBottom: '1.25rem', 
-              boxShadow: 'var(--shadow-md)',
-              position: 'relative'
-            }}>
-              {currentLesson?.youtubeId ? (
-                <iframe
-                  src={`https://www.youtube-nocookie.com/embed/${currentLesson.youtubeId}?rel=0&modestbranding=1`}
-                  title={currentLesson.title}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                  style={{ width: '100%', height: '100%', border: 'none' }}
-                />
-              ) : (
-                <div style={{ textAlign: 'center', color: '#fff', padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                  <PlayCircle size={56} color="#3b82f6" style={{ margin: '0 auto 0.75rem', opacity: 0.9 }} />
-                  <h4 style={{ fontSize: '1.15rem', fontWeight: 800, margin: '0 0 0.4rem' }}>
-                    {currentLesson?.title || 'المحاضرة التعليمية'}
-                  </h4>
-                  <p style={{ fontSize: '0.82rem', color: '#94a3b8', margin: 0 }}>
-                    كورس: {currentCourse?.title}
-                  </p>
+            {/* مشغل الفيديو أو شاشة القفل الأكاديمي الإلزامي */}
+            {isCurrentLessonLocked ? (
+              <div style={{ 
+                width: '100%', 
+                aspectRatio: '16/9', 
+                background: 'linear-gradient(135deg, #0b1120 0%, #1e1b4b 100%)', 
+                borderRadius: 'var(--radius-md)', 
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '2rem',
+                textAlign: 'center',
+                border: '2px dashed rgba(239, 68, 68, 0.4)',
+                marginBottom: '1.25rem', 
+                boxShadow: 'var(--shadow-md)'
+              }}>
+                <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
+                  <Lock size={30} color="#ef4444" />
                 </div>
-              )}
-            </div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', marginBottom: '0.5rem' }}>
+                  هذا الدرس مقفل بالتسلسل الأكاديمي
+                </h3>
+                <p style={{ color: '#cbd5e1', fontSize: '0.88rem', maxWidth: '480px', lineHeight: '1.6', marginBottom: '1.25rem' }}>
+                  لا يمكن فتح هذا الدرس حتى يتم إكمال المتطلب الأكاديمي السابق بنجاح:
+                  <br />
+                  <strong style={{ color: '#f59e0b', fontSize: '0.95rem', display: 'inline-block', marginTop: '0.4rem' }}>
+                    "{currentLessonPrerequisite || 'المتطلب الأكاديمي السابق'}"
+                  </strong>
+                </p>
+                {flattenedCourseItems.find((f) => !f.isCompleted && !f.isLocked) && (
+                  <button
+                    onClick={() => {
+                      const firstAvailable = flattenedCourseItems.find((f) => !f.isCompleted && !f.isLocked);
+                      if (firstAvailable) {
+                        if (firstAvailable.type === 'lesson') {
+                          setCurrentModuleIndex(firstAvailable.moduleIndex);
+                          setCurrentLessonIndex(firstAvailable.subIndex);
+                        } else if (firstAvailable.type === 'assignment') {
+                          setActiveTab('assignments');
+                        } else if (firstAvailable.type === 'exam') {
+                          setActiveTab('exam');
+                        }
+                      }
+                    }}
+                    className="btn btn-primary"
+                    style={{ fontSize: '0.85rem' }}
+                  >
+                    <span>الانتقال للمتطلب الأكاديمي المطلوب إكماله</span>
+                    <ChevronLeft size={15} />
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div style={{ 
+                width: '100%', 
+                aspectRatio: '16/9', 
+                background: '#050a18', 
+                borderRadius: 'var(--radius-md)', 
+                overflow: 'hidden', 
+                marginBottom: '1.25rem', 
+                boxShadow: 'var(--shadow-md)',
+                position: 'relative'
+              }}>
+                {currentLesson?.youtubeId ? (
+                  <iframe
+                    src={`https://www.youtube-nocookie.com/embed/${currentLesson.youtubeId}?rel=0&modestbranding=1`}
+                    title={currentLesson.title}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    style={{ width: '100%', height: '100%', border: 'none' }}
+                  />
+                ) : (
+                  <div style={{ textAlign: 'center', color: '#fff', padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                    <PlayCircle size={56} color="#3b82f6" style={{ margin: '0 auto 0.75rem', opacity: 0.9 }} />
+                    <h4 style={{ fontSize: '1.15rem', fontWeight: 800, margin: '0 0 0.4rem' }}>
+                      {currentLesson?.title || 'المحاضرة التعليمية'}
+                    </h4>
+                    <p style={{ fontSize: '0.82rem', color: '#94a3b8', margin: 0 }}>
+                      كورس: {currentCourse?.title}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1.25rem', marginBottom: '1.25rem' }}>
               <div>
@@ -466,9 +729,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               </div>
 
               <button
+                disabled={isCurrentLessonLocked}
                 onClick={() => currentLesson && toggleLessonCompletion(currentLesson.id)}
                 className={`btn ${currentLesson && completedLessonIds.includes(currentLesson.id) ? 'btn-accent' : 'btn-outline'}`}
-                style={{ padding: '0.55rem 1.15rem' }}
+                style={{ padding: '0.55rem 1.15rem', opacity: isCurrentLessonLocked ? 0.5 : 1 }}
               >
                 <CheckCircle2 size={16} />
                 <span>
@@ -517,7 +781,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               />
             </div>
 
-            {/* التنقل بين الدروس */}
+            {/* التنقل بين الدروس مع التحقق التسلسلي */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
               <button
                 disabled={currentLessonIndex === 0 && currentModuleIndex === 0}
@@ -537,8 +801,27 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
               <button
                 onClick={() => {
-                  if (currentLessonIndex < currentModule.lessons.length - 1) setCurrentLessonIndex(currentLessonIndex + 1);
-                  else if (currentModuleIndex < curriculum.modules.length - 1) {
+                  if (currentLesson && !completedLessonIds.includes(currentLesson.id)) {
+                    setLockedNotice(`🔒 للتقدم للدرس التالي، يرجى إكمال الدرس الحالي ("${currentLesson.title}") أولاً بالضغط على زر "تحديد كمكتمل".`);
+                    return;
+                  }
+
+                  if (currentLessonIndex < currentModule.lessons.length - 1) {
+                    const nextLes = currentModule.lessons[currentLessonIndex + 1];
+                    const nextLocked = flattenedCourseItems.find((f) => f.type === 'lesson' && f.id === nextLes?.id)?.isLocked;
+                    if (nextLocked) {
+                      setLockedNotice(`🔒 الدرس التالي مقفل حالياً. المتطلب: "${currentLesson?.title}".`);
+                      return;
+                    }
+                    setCurrentLessonIndex(currentLessonIndex + 1);
+                  } else if (currentModuleIndex < curriculum.modules.length - 1) {
+                    const nextMod = curriculum.modules[currentModuleIndex + 1];
+                    const firstLes = nextMod?.lessons?.[0];
+                    const nextLocked = firstLes ? flattenedCourseItems.find((f) => f.type === 'lesson' && f.id === firstLes?.id)?.isLocked : false;
+                    if (nextLocked) {
+                      setLockedNotice(`🔒 محتوى الوحدة التالية مقفل حالياً حتى إكمال كافة متطلبات الوحدة الحالية.`);
+                      return;
+                    }
                     setCurrentModuleIndex(currentModuleIndex + 1);
                     setCurrentLessonIndex(0);
                   }
@@ -552,15 +835,16 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
             </div>
           </div>
 
-          {/* شجرة المنهج والوحدات (Sidebar with Accordion) */}
+          {/* شجرة المنهج والوحدات (Sidebar with Accordion & Sequential Locking) */}
           <div className="card" style={{ padding: '1.25rem' }}>
             <h4 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: '0.85rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-              فهرس محاضرات الكورس
+              فهرس محاضرات وعناصر الكورس
             </h4>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               {curriculum.modules.map((mod, mIdx) => {
                 const isExpanded = expandedModules[mod.id] ?? true;
+                const totalModItems = (mod.lessons?.length || 0) + (mod.assignments?.length || 0) + (mod.exams?.length || 0);
 
                 return (
                   <div key={mod.id} style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
@@ -581,23 +865,34 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                         textAlign: 'right'
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                         <span>{mod.title}</span>
-                        <span className="badge badge-primary" style={{ fontSize: '0.72rem', padding: '0.15rem 0.45rem' }}>{mod.lessons.length}</span>
+                        {mod.status === 'coming_soon' ? (
+                          <span className="badge badge-gold" style={{ fontSize: '0.7rem', padding: '0.1rem 0.4rem' }}>⏳ قريباً</span>
+                        ) : (
+                          <span className="badge badge-primary" style={{ fontSize: '0.72rem', padding: '0.15rem 0.45rem' }}>{totalModItems} عنصر</span>
+                        )}
                       </div>
                       {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                     </button>
 
                     {isExpanded && (
                       <div style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', background: 'var(--bg-card)' }}>
+                        {/* 1. قائمة الدروس */}
                         {mod.lessons.map((les, lIdx) => {
                           const isCurrent = mIdx === currentModuleIndex && lIdx === currentLessonIndex;
+                          const fItem = flattenedCourseItems.find((f) => f.type === 'lesson' && f.id === les.id);
+                          const isLocked = fItem?.isLocked || false;
                           const isCompleted = completedLessonIds.includes(les.id);
 
                           return (
                             <button
                               key={les.id}
                               onClick={() => {
+                                if (isLocked) {
+                                  setLockedNotice(`🔒 هذا الدرس مقفل! يتطلب إكمال: "${fItem?.prerequisiteTitle || 'المتطلب السابق'}" أولاً.`);
+                                  return;
+                                }
                                 setCurrentModuleIndex(mIdx);
                                 setCurrentLessonIndex(lIdx);
                               }}
@@ -609,17 +904,131 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                                 borderRadius: 'var(--radius-sm)',
                                 border: isCurrent ? '1px solid var(--primary-600)' : '1px solid transparent',
                                 background: isCurrent ? 'rgba(37, 99, 235, 0.1)' : 'transparent',
-                                color: isCurrent ? 'var(--primary-600)' : 'var(--text-main)',
+                                color: isLocked ? 'var(--text-muted)' : isCurrent ? 'var(--primary-600)' : 'var(--text-main)',
                                 fontSize: '0.82rem',
                                 textAlign: 'right',
-                                cursor: 'pointer',
+                                cursor: isLocked ? 'not-allowed' : 'pointer',
+                                opacity: isLocked ? 0.75 : 1,
                               }}
+                              title={isLocked ? `مقفل: يتطلب إكمال ${fItem?.prerequisiteTitle}` : les.title}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', overflow: 'hidden' }}>
-                                {isCompleted ? <CheckCircle2 size={15} color="#10b981" /> : <PlayCircle size={15} color={isCurrent ? 'var(--primary-600)' : 'var(--text-subtle)'} />}
-                                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: isCurrent ? 700 : 500 }}>{les.title}</span>
+                                {isLocked ? (
+                                  <Lock size={14} color="#ef4444" />
+                                ) : isCompleted ? (
+                                  <CheckCircle2 size={15} color="#10b981" />
+                                ) : (
+                                  <PlayCircle size={15} color={isCurrent ? 'var(--primary-600)' : 'var(--text-subtle)'} />
+                                )}
+                                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: isCurrent ? 700 : 500 }}>
+                                  {les.title}
+                                </span>
                               </div>
-                              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{les.durationMinutes} د</span>
+                              <span style={{ fontSize: '0.72rem', color: isLocked ? '#ef4444' : 'var(--text-muted)' }}>
+                                {isLocked ? 'مقفل 🔒' : `${les.durationMinutes} د`}
+                              </span>
+                            </button>
+                          );
+                        })}
+
+                        {/* 2. قائمة التكليفات في المديول */}
+                        {mod.assignments && mod.assignments.length > 0 && mod.assignments.map((asg) => {
+                          const fItem = flattenedCourseItems.find((f) => f.type === 'assignment' && f.id === asg.id);
+                          const isLocked = fItem?.isLocked || false;
+                          const isCompleted = fItem?.isCompleted || false;
+
+                          return (
+                            <button
+                              key={asg.id}
+                              onClick={() => {
+                                if (isLocked) {
+                                  setLockedNotice(`🔒 هذا التكليف مقفل! يتطلب إكمال: "${fItem?.prerequisiteTitle || 'المتطلب السابق'}" أولاً.`);
+                                  return;
+                                }
+                                setActiveTab('assignments');
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '0.5rem 0.75rem',
+                                borderRadius: 'var(--radius-sm)',
+                                border: '1px solid var(--border-color)',
+                                background: isLocked ? 'rgba(239, 68, 68, 0.04)' : 'rgba(16, 185, 129, 0.05)',
+                                color: isLocked ? 'var(--text-muted)' : 'var(--text-main)',
+                                fontSize: '0.8rem',
+                                textAlign: 'right',
+                                cursor: isLocked ? 'not-allowed' : 'pointer',
+                                opacity: isLocked ? 0.75 : 1,
+                              }}
+                              title={isLocked ? `مقفل: يتطلب إكمال ${fItem?.prerequisiteTitle}` : asg.title}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', overflow: 'hidden' }}>
+                                {isLocked ? (
+                                  <Lock size={13} color="#ef4444" />
+                                ) : isCompleted ? (
+                                  <CheckCircle2 size={14} color="#10b981" />
+                                ) : (
+                                  <FileText size={14} color="var(--accent-emerald)" />
+                                )}
+                                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 600 }}>
+                                  📄 {asg.title}
+                                </span>
+                              </div>
+                              <span style={{ fontSize: '0.7rem', color: isLocked ? '#ef4444' : 'var(--accent-emerald)' }}>
+                                {isLocked ? 'مقفل 🔒' : 'تكليف عملي'}
+                              </span>
+                            </button>
+                          );
+                        })}
+
+                        {/* 3. قائمة الاختبارات في المديول */}
+                        {mod.exams && mod.exams.length > 0 && mod.exams.map((ex) => {
+                          const fItem = flattenedCourseItems.find((f) => f.type === 'exam' && f.id === ex.id);
+                          const isLocked = fItem?.isLocked || false;
+                          const isCompleted = fItem?.isCompleted || false;
+
+                          return (
+                            <button
+                              key={ex.id}
+                              onClick={() => {
+                                if (isLocked) {
+                                  setLockedNotice(`🔒 هذا الاختبار مقفل! يتطلب إكمال: "${fItem?.prerequisiteTitle || 'المتطلب السابق'}" أولاً.`);
+                                  return;
+                                }
+                                setActiveTab('exam');
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '0.5rem 0.75rem',
+                                borderRadius: 'var(--radius-sm)',
+                                border: '1px solid var(--border-color)',
+                                background: isLocked ? 'rgba(239, 68, 68, 0.04)' : 'rgba(245, 158, 11, 0.06)',
+                                color: isLocked ? 'var(--text-muted)' : 'var(--text-main)',
+                                fontSize: '0.8rem',
+                                textAlign: 'right',
+                                cursor: isLocked ? 'not-allowed' : 'pointer',
+                                opacity: isLocked ? 0.75 : 1,
+                              }}
+                              title={isLocked ? `مقفل: يتطلب إكمال ${fItem?.prerequisiteTitle}` : ex.title}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', overflow: 'hidden' }}>
+                                {isLocked ? (
+                                  <Lock size={13} color="#ef4444" />
+                                ) : isCompleted ? (
+                                  <CheckCircle2 size={14} color="#10b981" />
+                                ) : (
+                                  <Award size={14} color="var(--accent-gold)" />
+                                )}
+                                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 600 }}>
+                                  🏆 {ex.title}
+                                </span>
+                              </div>
+                              <span style={{ fontSize: '0.7rem', color: isLocked ? '#ef4444' : 'var(--accent-gold)' }}>
+                                {isLocked ? 'مقفل 🔒' : 'اختبار'}
+                              </span>
                             </button>
                           );
                         })}
@@ -740,8 +1149,43 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               </div>
 
               {submitSuccessNotice && (
-                <div style={{ marginTop: '0.75rem', padding: '0.5rem 0.85rem', background: '#10b981', color: '#fff', borderRadius: 'var(--radius-sm)', fontSize: '0.82rem' }}>
-                  تم حفظ وتسليم رابط التكليف بنجاح للمشرف الأكاديمي!
+                <div style={{
+                  marginTop: '0.85rem',
+                  padding: '0.85rem 1rem',
+                  background: 'rgba(16, 185, 129, 0.1)',
+                  border: '1px solid #10b981',
+                  color: '#047857',
+                  borderRadius: 'var(--radius-md)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '0.6rem',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                    <CheckCircle2 size={18} color="#059669" />
+                    <span style={{ fontSize: '0.88rem', fontWeight: 700 }}>
+                      تم حفظ وتسليم ملف التكليف بنجاح! تم فتح المحاضرة التالية لك في المنهج فوراً.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextUnlocked = flattenedCourseItems.find(
+                        (f) => f.type === 'lesson' && !completedLessonIds.includes(f.id) && !f.isLocked
+                      ) || flattenedCourseItems.find((f) => f.type === 'lesson');
+                      if (nextUnlocked) {
+                        setCurrentModuleIndex(nextUnlocked.moduleIndex);
+                        setCurrentLessonIndex(nextUnlocked.subIndex);
+                      }
+                      setActiveTab('learn');
+                    }}
+                    className="btn btn-primary"
+                    style={{ fontSize: '0.82rem', padding: '0.4rem 0.9rem' }}
+                    id="assignment-next-lesson-btn"
+                  >
+                    <span>الانتقال للمحاضرة التالية المفتوحة الآن ←</span>
+                  </button>
                 </div>
               )}
             </form>
@@ -760,9 +1204,23 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               </h3>
             </div>
             {!examSubmitted ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#ef4444', fontWeight: 800, background: 'rgba(239, 68, 68, 0.1)', padding: '0.35rem 0.85rem', borderRadius: 'var(--radius-md)' }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                color: examTimer <= 120 ? '#ef4444' : 'var(--primary-600)',
+                fontWeight: 800,
+                background: examTimer <= 120 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(14, 165, 233, 0.1)',
+                border: examTimer <= 120 ? '1px solid #ef4444' : '1px solid var(--border-color)',
+                padding: '0.4rem 0.95rem',
+                borderRadius: 'var(--radius-md)',
+                boxShadow: examTimer <= 120 ? '0 0 10px rgba(239, 68, 68, 0.3)' : 'none',
+              }}>
                 <Clock size={16} />
-                <span>الوقت المتبقي: {formatTimer(examTimer)} دقيقة</span>
+                <span>
+                  {examTimer <= 120 ? '⚠️ تحذير قرب انتهاء الوقت: ' : 'الوقت المتبقي: '}
+                  {formatTimer(examTimer)}
+                </span>
               </div>
             ) : (
               <span className="badge badge-emerald">تم اعتماد المحاولة</span>
@@ -773,10 +1231,32 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
             <div style={{ padding: '2rem', textAlign: 'center', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)' }}>
               <CheckCircle2 size={52} color="#10b981" style={{ margin: '0 auto 0.75rem' }} />
               <h3 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '0.5rem', color: 'var(--text-main)' }}>تم رصد وتسليم محاولة الاختبار بنجاح</h3>
-              <p style={{ fontSize: '0.95rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+              <p style={{ fontSize: '0.95rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
                 الدرجة الرسمية المحسوبة: <strong style={{ color: 'var(--accent-emerald)', fontSize: '1.2rem' }}>{examCalculatedScore} / 30 درجة</strong>
               </p>
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem' }}>
+              <div style={{ padding: '0.65rem 1rem', background: 'rgba(16, 185, 129, 0.1)', color: '#047857', borderRadius: 'var(--radius-md)', maxWidth: '420px', margin: '0 auto 1.25rem', fontSize: '0.85rem', fontWeight: 600 }}>
+                🎉 تم فتح المحاضرة والدرس التالي لك في الكورس فوراً!
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextUnlocked = flattenedCourseItems.find(
+                      (f) => f.type === 'lesson' && !completedLessonIds.includes(f.id) && !f.isLocked
+                    ) || flattenedCourseItems.find((f) => f.type === 'lesson');
+                    if (nextUnlocked) {
+                      setCurrentModuleIndex(nextUnlocked.moduleIndex);
+                      setCurrentLessonIndex(nextUnlocked.subIndex);
+                    }
+                    setActiveTab('learn');
+                  }}
+                  className="btn btn-primary"
+                  style={{ fontSize: '0.9rem', padding: '0.6rem 1.4rem' }}
+                  id="exam-continue-to-next-lesson-btn"
+                >
+                  <PlayCircle size={16} />
+                  <span>الانتقال للمحاضرة التالية المفتوحة الآن ←</span>
+                </button>
                 <button onClick={() => setExamSubmitted(false)} className="btn btn-outline" style={{ fontSize: '0.82rem' }}>
                   <RotateCcw size={14} />
                   <span>إعادة المحاولة التدريبية</span>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Target, Compass, Award, Users, BookOpen, CheckCircle, ShieldCheck } from 'lucide-react';
+import { Target, Compass, ShieldCheck } from 'lucide-react';
 
 export const AboutPage: React.FC = () => {
   return (

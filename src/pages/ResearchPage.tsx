@@ -1,24 +1,30 @@
 import React, { useState } from 'react';
-import { Search, Filter, BookOpen, ExternalLink, Award, FileCheck, Plus } from 'lucide-react';
+import { Search, FileCheck, Plus } from 'lucide-react';
 import { INITIAL_RESEARCHES } from '../data/mockData';
 import { ResearchCard } from '../components/ResearchCard';
 import { ResearchPaper } from '../types';
 import { AddResearchModal } from '../components/AddResearchModal';
+import { EditResearchModal } from '../components/EditResearchModal';
 
 interface ResearchPageProps {
   researches?: ResearchPaper[];
   currentUser?: { name: string; role: string; email: string } | null;
   onAddResearch?: (research: ResearchPaper) => void;
+  onUpdateResearch?: (research: ResearchPaper) => void;
+  onDeleteResearch?: (id: string) => void;
 }
 
 export const ResearchPage: React.FC<ResearchPageProps> = ({ 
   researches = INITIAL_RESEARCHES,
   currentUser,
-  onAddResearch 
+  onAddResearch,
+  onUpdateResearch,
+  onDeleteResearch,
 }) => {
   const [selectedField, setSelectedField] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingPaper, setEditingPaper] = useState<ResearchPaper | null>(null);
 
   const isInstructorOrAdmin = currentUser?.role === 'instructor' || currentUser?.role === 'admin';
 
@@ -110,7 +116,12 @@ export const ResearchPage: React.FC<ResearchPageProps> = ({
       {filteredPapers.length > 0 ? (
         <div className="grid-3">
           {filteredPapers.map((paper) => (
-            <ResearchCard key={paper.id} paper={paper} />
+            <ResearchCard
+              key={paper.id}
+              paper={paper}
+              isInstructorOrAdmin={isInstructorOrAdmin}
+              onEdit={(p) => setEditingPaper(p)}
+            />
           ))}
         </div>
       ) : (
@@ -127,6 +138,17 @@ export const ResearchPage: React.FC<ResearchPageProps> = ({
           isOpen={isAddModalOpen}
           onClose={() => setIsAddModalOpen(false)}
           onAddResearch={onAddResearch}
+        />
+      )}
+
+      {/* نافذة تعديل تفاصيل وصورة البحث المنشور */}
+      {editingPaper && onUpdateResearch && (
+        <EditResearchModal
+          isOpen={Boolean(editingPaper)}
+          paper={editingPaper}
+          onClose={() => setEditingPaper(null)}
+          onUpdateResearch={onUpdateResearch}
+          onDeleteResearch={onDeleteResearch}
         />
       )}
     </div>

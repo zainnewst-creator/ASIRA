@@ -1,6 +1,33 @@
 import React, { useState } from 'react';
 import { ResearchPaper } from '../types';
-import { FileText, Plus, X, ExternalLink } from 'lucide-react';
+import { FileText, Plus, X, Upload, Image, Check } from 'lucide-react';
+
+const RESEARCH_IMAGE_PRESETS = [
+  {
+    title: 'مختبر أبحاث وتحاليل',
+    url: 'https://images.unsplash.com/photo-1582719471384-894fbb16e074?auto=format&fit=crop&w=800&q=80',
+  },
+  {
+    title: 'إحصاء وتحليل بيانات',
+    url: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=800&q=80',
+  },
+  {
+    title: 'جينوم ووراثة خلوية',
+    url: 'https://images.unsplash.com/photo-1530497610245-94d3c16cda28?auto=format&fit=crop&w=800&q=80',
+  },
+  {
+    title: 'طب باطنة وقلب وأوعية',
+    url: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=800&q=80',
+  },
+  {
+    title: 'مكتبة مراجع علمية',
+    url: 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=800&q=80',
+  },
+  {
+    title: 'أبحاث سريرية وطب أطفال',
+    url: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=800&q=80',
+  },
+];
 
 interface AddResearchModalProps {
   isOpen: boolean;
@@ -22,9 +49,28 @@ export const AddResearchModal: React.FC<AddResearchModalProps> = ({
   const [doiLink, setDoiLink] = useState('https://doi.org/10.1016/j.');
   const [pubmedLink, setPubmedLink] = useState('');
   const [abstract, setAbstract] = useState('');
-  const [coverImageUrl, setCoverImageUrl] = useState('https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?auto=format&fit=crop&w=800&q=80');
+  const [coverImageUrl, setCoverImageUrl] = useState(RESEARCH_IMAGE_PRESETS[0].url);
+  const [uploadedFileName, setUploadedFileName] = useState<string>('');
 
   if (!isOpen) return null;
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert('حجم الصورة كبير جداً، يرجى اختيار صورة أقل من 5 ميجابايت');
+        return;
+      }
+      setUploadedFileName(file.name);
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          setCoverImageUrl(reader.result);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,7 +89,7 @@ export const AddResearchModal: React.FC<AddResearchModalProps> = ({
       doiLink: doiLink.trim() || 'https://doi.org/10.1000/182',
       pubmedLink: pubmedLink.trim() || undefined,
       abstract: abstract.trim() || 'دراسة بحثية علمية محكمة أنجزها باحثو منتدى أسيرا وفق المعايير الأكاديمية الدولية.',
-      coverImageUrl: coverImageUrl.trim() || 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?auto=format&fit=crop&w=800&q=80',
+      coverImageUrl: coverImageUrl.trim() || RESEARCH_IMAGE_PRESETS[0].url,
       status: 'published',
       isFeatured: true,
       viewsCount: 150,
@@ -57,6 +103,7 @@ export const AddResearchModal: React.FC<AddResearchModalProps> = ({
     setAuthors('');
     setJournal('');
     setAbstract('');
+    setUploadedFileName('');
   };
 
   return (
@@ -207,6 +254,113 @@ export const AddResearchModal: React.FC<AddResearchModalProps> = ({
               placeholder="اكتب ملخصاً للدراسة يشمل الأهداف والمنهجية والنتائج الرئيسية..."
               style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.88rem', fontFamily: 'var(--font-arabic)' }}
             />
+          </div>
+
+          {/* قسم رفع صورة البحث والمعاينة وخيارات النماذج الجاهزة */}
+          <div style={{ padding: '1rem', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-color)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Image size={16} color="var(--primary-600)" />
+                <span>صورة غلاف البحث العلمي المنشور:</span>
+              </label>
+
+              {/* زر رفع الصورة من الجهاز */}
+              <div>
+                <input
+                  type="file"
+                  id="add-research-image-input"
+                  accept="image/png, image/jpeg, image/webp"
+                  style={{ display: 'none' }}
+                  onChange={handleImageFileChange}
+                />
+                <label
+                  htmlFor="add-research-image-input"
+                  className="btn btn-outline"
+                  style={{ fontSize: '0.82rem', padding: '0.35rem 0.75rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                  id="upload-research-image-btn"
+                >
+                  <Upload size={14} />
+                  <span>رفع صورة من الجهاز</span>
+                </label>
+              </div>
+            </div>
+
+            {uploadedFileName && (
+              <div style={{ fontSize: '0.78rem', color: 'var(--accent-emerald)', marginBottom: '0.65rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Check size={14} />
+                <span>تم تحميل الملف: <strong>{uploadedFileName}</strong></span>
+              </div>
+            )}
+
+            {/* معاينة الصورة المختارة */}
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '0.75rem', background: 'var(--bg-card)', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+              <div style={{ width: '90px', height: '60px', borderRadius: 'var(--radius-sm)', overflow: 'hidden', flexShrink: 0, border: '1px solid var(--border-color)' }}>
+                <img
+                  src={coverImageUrl}
+                  alt="Research Cover Preview"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = RESEARCH_IMAGE_PRESETS[0].url;
+                  }}
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>
+                  رابط الصورة المباشر أو المرفوع (يمكنك تعديله أو لصق رابط جديد):
+                </span>
+                <input
+                  type="url"
+                  value={coverImageUrl}
+                  onChange={(e) => setCoverImageUrl(e.target.value)}
+                  placeholder="https://images.unsplash.com/..."
+                  style={{ width: '100%', padding: '0.4rem 0.65rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.8rem', direction: 'ltr', textAlign: 'left' }}
+                />
+              </div>
+            </div>
+
+            {/* مكتبة الصور الجاهزة المتنوعة لمنع تكرار الصورة الافتراضية */}
+            <div>
+              <span style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>
+                أو اختر صورة علمية مناسبة بنقرة واحدة من النماذج المعتمدة:
+              </span>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(105px, 1fr))', gap: '0.5rem' }}>
+                {RESEARCH_IMAGE_PRESETS.map((preset, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setCoverImageUrl(preset.url);
+                      setUploadedFileName('');
+                    }}
+                    style={{
+                      border: coverImageUrl === preset.url ? '2px solid var(--primary-600)' : '1px solid var(--border-color)',
+                      borderRadius: 'var(--radius-sm)',
+                      overflow: 'hidden',
+                      padding: '0',
+                      background: 'none',
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      position: 'relative'
+                    }}
+                    title={preset.title}
+                  >
+                    <img
+                      src={preset.url}
+                      alt={preset.title}
+                      style={{ width: '100%', height: '50px', objectFit: 'cover', display: 'block' }}
+                    />
+                    <span style={{ display: 'block', fontSize: '0.68rem', padding: '0.2rem 0.1rem', background: 'var(--bg-subtle)', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {preset.title}
+                    </span>
+                    {coverImageUrl === preset.url && (
+                      <div style={{ position: 'absolute', top: '2px', right: '2px', background: 'var(--primary-600)', color: '#fff', borderRadius: '50%', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Check size={10} />
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.75rem' }}>

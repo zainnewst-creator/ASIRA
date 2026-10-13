@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, Mail, User, BookOpen, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { BookOpen, ShieldCheck } from 'lucide-react';
 import { UserRole } from '../types';
 
 interface AuthModalProps {

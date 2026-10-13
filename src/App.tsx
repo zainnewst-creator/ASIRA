@@ -11,7 +11,7 @@ import { PoliciesPage } from './pages/PoliciesPage';
 import { LmsDashboardPreview } from './pages/LmsDashboardPreview';
 import { AuthModal } from './components/AuthModal';
 import { Course, ResearchPaper, UserRole } from './types';
-import { INITIAL_COURSES, INITIAL_RESEARCHES } from './data/mockData';
+import { INITIAL_COURSES, INITIAL_RESEARCHES, INITIAL_CURRICULA, MockCourseCurriculum } from './data/mockData';
 import { CheckCircle2, ShieldAlert } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -21,20 +21,54 @@ export const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<{ name: string; role: UserRole; email: string } | null>(null);
   const [enrollSuccessCourse, setEnrollSuccessCourse] = useState<Course | null>(null);
 
-  // الحالة المركزية للكورسات والأبحاث (Central Dynamic Courses & Researches)
+  // الحالة المركزية للكورسات والأبحاث والمناهج (Central Dynamic State)
   const [courses, setCourses] = useState<Course[]>(INITIAL_COURSES);
   const [researches, setResearches] = useState<ResearchPaper[]>(INITIAL_RESEARCHES);
+  const [curricula, setCurricula] = useState<Record<string, MockCourseCurriculum>>(INITIAL_CURRICULA);
 
   const handleAddCourse = (newCourse: Course) => {
     setCourses((prev) => [newCourse, ...prev]);
+    // إنشاء منهج مستقل معزول للكورس الجديد دون توريث محتوى وهمي
+    setCurricula((prev) => ({
+      ...prev,
+      [newCourse.id]: {
+        courseId: newCourse.id,
+        modules: [
+          {
+            id: `mod-${newCourse.id}-1`,
+            title: 'الوحدة الأولى: مدخل ومقدمة عامة في المسار',
+            description: 'الوحدة التأسيسية الأولى للمقرر.',
+            status: newCourse.status === 'coming_soon' ? 'coming_soon' : 'published',
+            lessons: [],
+            assignments: [],
+            exams: []
+          }
+        ]
+      }
+    }));
   };
 
   const handleUpdateCourse = (updatedCourse: Course) => {
     setCourses((prev) => prev.map((c) => c.id === updatedCourse.id ? updatedCourse : c));
   };
 
+  const handleUpdateCurriculum = (updated: MockCourseCurriculum) => {
+    setCurricula((prev) => ({
+      ...prev,
+      [updated.courseId]: updated,
+    }));
+  };
+
   const handleAddResearch = (newPaper: ResearchPaper) => {
     setResearches((prev) => [newPaper, ...prev]);
+  };
+
+  const handleUpdateResearch = (updatedPaper: ResearchPaper) => {
+    setResearches((prev) => prev.map((p) => p.id === updatedPaper.id ? updatedPaper : p));
+  };
+
+  const handleDeleteResearch = (id: string) => {
+    setResearches((prev) => prev.filter((p) => p.id !== id));
   };
 
   // إدارة الوضع الليلي
@@ -102,6 +136,7 @@ export const App: React.FC = () => {
         {currentTab === 'courses' && (
           <CoursesPage
             courses={courses}
+            curricula={curricula}
             currentUser={currentUser}
             onAddCourse={handleAddCourse}
             onEnroll={handleEnrollRequest}
@@ -114,6 +149,8 @@ export const App: React.FC = () => {
             researches={researches}
             currentUser={currentUser}
             onAddResearch={handleAddResearch}
+            onUpdateResearch={handleUpdateResearch}
+            onDeleteResearch={handleDeleteResearch}
           />
         )}
 
@@ -132,6 +169,8 @@ export const App: React.FC = () => {
             onUpdateCourse={handleUpdateCourse}
             researches={researches}
             onAddResearch={handleAddResearch}
+            curricula={curricula}
+            onUpdateCurriculum={handleUpdateCurriculum}
             userRole={currentUser?.role || 'student'}
             userName={currentUser?.name || 'أحمد الصالح'}
             onLogout={() => {

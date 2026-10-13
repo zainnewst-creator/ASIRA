@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { Search, Filter, BookOpen, Clock, Award, Users, CheckCircle, ArrowLeft, Plus } from 'lucide-react';
-import { INITIAL_COURSES } from '../data/mockData';
+import { Search, BookOpen, Award, Users, CheckCircle, ArrowLeft, Plus, Lock } from 'lucide-react';
+import { INITIAL_COURSES, INITIAL_CURRICULA, MockCourseCurriculum } from '../data/mockData';
 import { CourseCard } from '../components/CourseCard';
 import { Course, UserRole } from '../types';
 import { AddCourseModal } from '../components/AddCourseModal';
 
 interface CoursesPageProps {
   courses?: Course[];
+  curricula?: Record<string, MockCourseCurriculum>;
   currentUser?: { name: string; role: UserRole; email: string } | null;
   onAddCourse?: (course: Course) => void;
   onEnroll: (course: Course) => void;
@@ -15,6 +16,7 @@ interface CoursesPageProps {
 
 export const CoursesPage: React.FC<CoursesPageProps> = ({ 
   courses = INITIAL_COURSES,
+  curricula,
   currentUser,
   onAddCourse,
   onEnroll, 
@@ -98,7 +100,10 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
               key={course.id}
               course={course}
               onEnroll={onEnroll}
-              onSelect={(c) => setSelectedCourseModal(c)}
+              onSelect={(c) => {
+                setSelectedCourseModal(c);
+                if (onSelectCourse) onSelectCourse(c);
+              }}
             />
           ))}
         </div>
@@ -111,70 +116,169 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
       )}
 
       {/* نافذة تفاصيل الكورس والمقرر التفصيلي */}
-      {selectedCourseModal && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(7, 13, 30, 0.75)',
-          backdropFilter: 'blur(6px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 100,
-          padding: '1.5rem',
-        }}>
-          <div className="card" style={{ maxWidth: '650px', width: '100%', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
-            <button
-              onClick={() => setSelectedCourseModal(null)}
-              className="btn btn-ghost"
-              style={{ position: 'absolute', top: '12px', left: '12px' }}
-            >
-              ✕
-            </button>
+      {selectedCourseModal && (() => {
+        const isComingSoon = selectedCourseModal.status === 'coming_soon';
+        const activeCurriculum = (curricula && curricula[selectedCourseModal.id]) || INITIAL_CURRICULA[selectedCourseModal.id];
+        const dynamicModules = activeCurriculum?.modules || [];
 
-            <span className="badge badge-primary" style={{ marginBottom: '0.5rem' }}>
-              كود الكورس: {selectedCourseModal.code}
-            </span>
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '0.75rem', color: 'var(--text-main)' }}>
-              {selectedCourseModal.title}
-            </h2>
-            <p style={{ fontSize: '0.95rem', color: 'var(--text-muted)', lineHeight: '1.7', marginBottom: '1.5rem' }}>
-              {selectedCourseModal.description}
-            </p>
+        return (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(7, 13, 30, 0.75)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100,
+            padding: '1.5rem',
+          }}>
+            <div className="card" style={{ maxWidth: '680px', width: '100%', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
+              <button
+                onClick={() => setSelectedCourseModal(null)}
+                className="btn btn-ghost"
+                style={{ position: 'absolute', top: '12px', left: '12px' }}
+              >
+                ✕
+              </button>
 
-            <div style={{ marginBottom: '1.5rem' }}>
-              <h4 style={{ fontSize: '1.05rem', fontWeight: 800, marginBottom: '0.75rem' }}>
-                المحاور التدريبية الرئيسية (Syllabus):
-              </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {selectedCourseModal.syllabusSummary?.map((item, idx) => (
-                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
-                    <CheckCircle size={16} color="var(--accent-emerald)" />
-                    <span>{item}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <span className="badge badge-primary">
+                  كود الكورس: {selectedCourseModal.code}
+                </span>
+                {isComingSoon && (
+                  <span className="badge" style={{ background: '#f59e0b', color: '#fff', fontWeight: 800 }}>
+                    ⏳ قريباً - قيد الإعداد والإعلان
+                  </span>
+                )}
+              </div>
+
+              <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '0.5rem', color: 'var(--text-main)' }}>
+                {selectedCourseModal.title}
+              </h2>
+
+              {/* إحصائيات الكورس والمسجلين */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', padding: '0.65rem 0.85rem', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)', marginBottom: '1.25rem', fontSize: '0.85rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: isComingSoon ? 'var(--text-muted)' : 'var(--accent-emerald)', fontWeight: 700 }}>
+                  <Users size={16} />
+                  <span>
+                    عدد الطلاب المسجلين: {isComingSoon ? '0 (التسجيل مغلق حالياً)' : `${selectedCourseModal.enrolledCount !== undefined ? selectedCourseModal.enrolledCount : 0} طالباً`}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-muted)' }}>
+                  <BookOpen size={15} color="var(--primary-600)" />
+                  <span>{selectedCourseModal.totalLessonsCount} محاضرة ودرس</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-muted)' }}>
+                  <Award size={15} color="var(--accent-gold)" />
+                  <span>درجة النجاح: {selectedCourseModal.passingScore}%</span>
+                </div>
+              </div>
+
+              <p style={{ fontSize: '0.92rem', color: 'var(--text-muted)', lineHeight: '1.7', marginBottom: '1.25rem' }}>
+                {selectedCourseModal.description || selectedCourseModal.summary}
+              </p>
+
+              {/* تنبيه كورس قيد الإعداد */}
+              {isComingSoon && (
+                <div style={{ padding: '0.85rem 1rem', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid #f59e0b', borderRadius: 'var(--radius-md)', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.65rem', color: '#b45309' }}>
+                  <Lock size={20} style={{ flexShrink: 0 }} />
+                  <div>
+                    <strong style={{ display: 'block', fontSize: '0.92rem' }}>مسار أكاديمي قيد الإعداد والإعلان</strong>
+                    <span style={{ fontSize: '0.82rem' }}>
+                      هذا المسار التدريبي قيد التجهيز من قبل العمادة. سيتم فتح باب التسجيل فور الإطلاق الرسمي، ولا يمكن التقديم حالياً.
+                    </span>
                   </div>
-                ))}
+                </div>
+              )}
+
+              {/* المحاور التدريبية التلقائية المستخرجة من مديولات الكورس */}
+              <div style={{ marginBottom: '1.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                  <h4 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0 }}>
+                    محاور ومكونات المنهج (Syllabus Modules):
+                  </h4>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    مستخرجة تلقائياً من وحدات الكورس
+                  </span>
+                </div>
+
+                {dynamicModules.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {dynamicModules.map((mod, idx) => (
+                      <div
+                        key={mod.id || idx}
+                        style={{
+                          padding: '0.65rem 0.85rem',
+                          background: 'var(--bg-subtle)',
+                          borderRadius: 'var(--radius-sm)',
+                          border: '1px solid var(--border-color)',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          flexWrap: 'wrap',
+                          gap: '0.5rem',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <CheckCircle size={16} color="var(--accent-emerald)" />
+                          <strong style={{ fontSize: '0.88rem' }}>{mod.title}</strong>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.4rem', fontSize: '0.75rem' }}>
+                          <span className="badge badge-primary">{mod.lessons?.length || 0} درس</span>
+                          {mod.assignments && mod.assignments.length > 0 && (
+                            <span className="badge badge-gold">{mod.assignments.length} تكليف</span>
+                          )}
+                          {mod.exams && mod.exams.length > 0 && (
+                            <span className="badge badge-emerald">{mod.exams.length} اختبار</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {selectedCourseModal.syllabusSummary?.map((item, idx) => (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
+                        <CheckCircle size={16} color="var(--accent-emerald)" />
+                        <span>{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', borderTop: '1px solid var(--border-color)', paddingTop: '1.25rem' }}>
+                <button onClick={() => setSelectedCourseModal(null)} className="btn btn-outline">
+                  إغلاق
+                </button>
+                {isComingSoon ? (
+                  <button
+                    disabled
+                    className="btn btn-outline"
+                    style={{ opacity: 0.65, cursor: 'not-allowed', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                  >
+                    <Lock size={15} />
+                    <span>التسجيل مغلق حالياً (قريباً)</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      const course = selectedCourseModal;
+                      setSelectedCourseModal(null);
+                      onEnroll(course);
+                    }}
+                    className="btn btn-primary"
+                  >
+                    <span>طلب الالتحاق بالدورة الآن</span>
+                    <ArrowLeft size={16} />
+                  </button>
+                )}
               </div>
             </div>
-
-            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', borderTop: '1px solid var(--border-color)', paddingTop: '1.25rem' }}>
-              <button onClick={() => setSelectedCourseModal(null)} className="btn btn-outline">
-                إغلاق
-              </button>
-              <button
-                onClick={() => {
-                  const course = selectedCourseModal;
-                  setSelectedCourseModal(null);
-                  onEnroll(course);
-                }}
-                className="btn btn-primary"
-              >
-                <span>طلب الالتحاق بالدورة الآن</span>
-                <ArrowLeft size={16} />
-              </button>
-            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* نافذة إضافة كورس جديد */}
       {onAddCourse && (

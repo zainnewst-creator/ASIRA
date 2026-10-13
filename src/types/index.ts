@@ -20,7 +20,7 @@ export interface UserProfile {
   updatedAt: string;
 }
 
-export type CourseStatus = 'draft' | 'published' | 'archived';
+export type CourseStatus = 'draft' | 'published' | 'coming_soon' | 'archived';
 
 export interface Course {
   id: string;

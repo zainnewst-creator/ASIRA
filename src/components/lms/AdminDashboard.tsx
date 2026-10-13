@@ -7,16 +7,11 @@ import {
   Check, 
   X, 
   Award, 
-  Clock, 
   Download, 
   Upload,
   Layers, 
   Search,
-  Filter,
-  DollarSign,
-  AlertCircle,
   ExternalLink,
-  ChevronRight,
   Database
 } from 'lucide-react';
 import { 
@@ -27,7 +22,8 @@ import {
   MockAuditLogItem, 
   MockCertificateRequest
 } from '../../data/mockData';
-import { UserRole, UserProfile } from '../../types';
+import { UserRole } from '../../types';
+import { exportPlatformData, validateRestorePackage } from '../../services/backupService';
 
 export interface AdminDashboardProps {
   enrollments?: MockPendingEnrollment[];
@@ -63,7 +59,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const enrollments = propEnrollments || localEnrollments;
 
   // بيانات سجل التدقيق
-  const [localAuditLogs, setLocalAuditLogs] = useState<MockAuditLogItem[]>(INITIAL_AUDIT_LOGS);
+  const [localAuditLogs] = useState<MockAuditLogItem[]>(INITIAL_AUDIT_LOGS);
   const auditLogs = propAuditLogs || localAuditLogs;
 
   // بيانات وإدارة طلبات الشهادات الأكاديمية
@@ -1058,7 +1054,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </span>
               </div>
               <button
-                onClick={() => alert('تم توليد وتنزيل ملف النسخة الاحتياطية ASIRA_Backup_20261012.json بنجاح!')}
+                onClick={async () => {
+                  try {
+                    const pkg = await exportPlatformData();
+                    const jsonStr = JSON.stringify(pkg, null, 2);
+                    const blob = new Blob([jsonStr], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `ASIRA_Backup_${new Date().toISOString().slice(0, 10)}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    if (onLogAudit) {
+                      onLogAudit('تصدير نسخة احتياطية', 'تم تصدير حزمة البيانات الأكاديمية بنجاح');
+                    }
+                  } catch (e) {
+                    console.error('Backup export error:', e);
+                  }
+                }}
                 className="btn btn-primary"
               >
                 <Download size={15} />
@@ -1074,7 +1089,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </span>
               </div>
               <button
-                onClick={() => alert('تم تنفيذ الفحص التجريبي (Dry-Run): تم التحقق من سلامة 100% من السجلات والبيانات!')}
+                onClick={async () => {
+                  try {
+                    const pkg = await exportPlatformData();
+                    const result = validateRestorePackage(JSON.stringify(pkg));
+                    if (result.isValid) {
+                      alert(`✓ تقرير الفحص التجريبي (Dry-Run):\n\n${result.report.join('\n')}`);
+                    } else {
+                      alert(`⚠️ نتائج الفحص:\n\n${result.report.join('\n')}`);
+                    }
+                    if (onLogAudit) {
+                      onLogAudit('فحص تجريبي للاستعادة', 'تم فحص حزمة الاستعادة التجريبية بنجاح');
+                    }
+                  } catch (e) {
+                    console.error('Dry-run error:', e);
+                  }
+                }}
                 className="btn btn-outline"
               >
                 <CheckCircle2 size={15} />

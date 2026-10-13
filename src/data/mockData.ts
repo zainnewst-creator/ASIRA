@@ -1,4 +1,4 @@
-import { Course, ResearchPaper, Testimonial, UserProfile, AssignmentSubmission, ExamAttempt, OfficialGrade } from '../types';
+import { Course, ResearchPaper, Testimonial } from '../types';
 
 export const INITIAL_STATS = {
   publishedPapers: 48,
@@ -99,6 +99,35 @@ export const INITIAL_COURSES: Course[] = [
     ],
     createdAt: '2026-10-08',
     updatedAt: '2026-10-12',
+  },
+  {
+    id: 'course-4',
+    title: 'الذكاء الاصطناعي التوليدي في البحث الطبي والأكاديمي (AI in Research)',
+    code: 'RES-305',
+    summary: 'مسار متقدم لتوظيف نماذج الذكاء الاصطناعي في تحليل الأدبيات وصياغة الأوراق مع الالتزام الصارم بالنزاهة الأكاديمية.',
+    description: 'دورة تدريبية متخصصة قادمة تركز على توظيف النماذج اللغوية الكبيرة (LLMs) وأدوات الذكاء الاصطناعي في تسريع مراجعة الأوراق، تحليل وتلخيص البيانات، وصياغة طلبات المنح البحثية وفق الإرشادات الدولية الصادرة عن ICMJE و WAME.',
+    coverUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80',
+    instructorIds: ['inst-1', 'inst-2'],
+    instructorNames: ['د. إبراهيم يحيى', 'د. يحيى المنصوري'],
+    startDate: '2027-01-10',
+    endDate: '2027-02-25',
+    status: 'coming_soon',
+    passingScore: 75,
+    totalLessonsCount: 16,
+    enrolledCount: 0,
+    features: [
+      'قيد الإعداد والتطوير الأكاديمي',
+      'معايير النزاهة في استخدام AI في الأوراق العلمية',
+      'ورش عمل وتطبيقات عملية على نماذج متقدمة'
+    ],
+    syllabusSummary: [
+      'الوحدة 1: مقدمة في الذكاء الاصطناعي التوليدي وأخلاقيات البحث العلمي',
+      'الوحدة 2: تقنيات الاسترجاع والتلخيص الذكي للأوراق البحثية',
+      'الوحدة 3: التحليل الإحصائي الموجه بالذكاء الاصطناعي',
+      'الوحدة 4: كشف الانتحال العلمي وضمان أصالة المحتوى'
+    ],
+    createdAt: '2026-10-12',
+    updatedAt: '2026-10-13',
   }
 ];
 
@@ -432,93 +461,338 @@ export const INITIAL_EXAM_ATTEMPTS: MockExamAttemptForInstructor[] = [
   }
 ];
 
-export interface MockCourseCurriculum {
-  courseId: string;
-  modules: {
-    id: string;
-    title: string;
-    lessons: {
-      id: string;
-      title: string;
-      youtubeId: string;
-      durationMinutes: number;
-      isMandatory: boolean;
-      drivePdfUrl?: string;
-    }[];
-  }[];
+export interface MockLessonItem {
+  id: string;
+  title: string;
+  youtubeId: string;
+  durationMinutes: number;
+  isMandatory: boolean;
+  drivePdfUrl?: string;
 }
 
-export const INITIAL_CURRICULUM: MockCourseCurriculum = {
-  courseId: 'course-1',
-  modules: [
-    {
-      id: 'mod-1',
-      title: 'الوحدة الأولى: أساسيات البحث العلمي وصياغة السؤال (PICO Framework)',
-      lessons: [
-        {
-          id: 'les-1',
-          title: 'الدرس 1: مقدمة في البحث الأكاديمي وهرم الأدلة الطبية (Evidence Pyramid)',
-          youtubeId: 'dQw4w9WgXcQ',
-          durationMinutes: 45,
-          isMandatory: true,
-          drivePdfUrl: 'https://drive.google.com/file/d/sampleSlideModule1/view'
-        },
-        {
-          id: 'les-2',
-          title: 'الدرس 2: صياغة سؤال البحث الإكلينيكي بنظام PICO و PEO',
-          youtubeId: 'dQw4w9WgXcQ',
-          durationMinutes: 50,
-          isMandatory: true,
-          drivePdfUrl: 'https://drive.google.com/file/d/sampleSlideModule2/view'
-        }
-      ]
-    },
-    {
-      id: 'mod-2',
-      title: 'الوحدة الثانية: استراتيجيات البحث في قواعد البيانات الطبية المتقدمة',
-      lessons: [
-        {
-          id: 'les-3',
-          title: 'الدرس 3: استراتيجيات البحث في PubMed ومصطلحات MeSH Terms',
-          youtubeId: 'dQw4w9WgXcQ',
-          durationMinutes: 60,
-          isMandatory: true,
-          drivePdfUrl: 'https://drive.google.com/file/d/sampleSlideModule3/view'
-        },
-        {
-          id: 'les-4',
-          title: 'الدرس 4: التصفية المزدوجة وإدارة المراجع بواسطة EndNote و Rayyan',
-          youtubeId: 'dQw4w9WgXcQ',
-          durationMinutes: 40,
-          isMandatory: true,
-          drivePdfUrl: 'https://drive.google.com/file/d/sampleSlideModule4/view'
-        }
-      ]
-    },
-    {
-      id: 'mod-3',
-      title: 'الوحدة الثالثة: تصميم الدراسات الإكلينيكية وأدوات تقييم الانحياز',
-      lessons: [
-        {
-          id: 'les-5',
-          title: 'الدرس 5: تصاميم الدراسات المقطعية وحالات الشواهد (Observational Studies)',
-          youtubeId: 'dQw4w9WgXcQ',
-          durationMinutes: 55,
-          isMandatory: true,
-          drivePdfUrl: 'https://drive.google.com/file/d/sampleSlideModule5/view'
-        },
-        {
-          id: 'les-6',
-          title: 'الدرس 6: التجارب السريرية العشوائية المزدوجة التعمية (RCT Design)',
-          youtubeId: 'dQw4w9WgXcQ',
-          durationMinutes: 65,
-          isMandatory: true,
-          drivePdfUrl: 'https://drive.google.com/file/d/sampleSlideModule6/view'
-        }
-      ]
-    }
-  ]
+export interface MockAssignmentItem {
+  id: string;
+  title: string;
+  instructions?: string;
+  driveTemplateUrl?: string;
+  maxScore: number;
+  deadline?: string;
+}
+
+export interface MockExamItem {
+  id: string;
+  title: string;
+  examType: 'theory' | 'quiz' | 'final' | 'practical';
+  durationMinutes: number;
+  maxScore: number;
+  questions?: Array<{
+    id: string;
+    text: string;
+    options: string[];
+    correctIndex: number;
+    points: number;
+  }>;
+}
+
+export interface MockCurriculumModule {
+  id: string;
+  title: string;
+  description?: string;
+  status?: 'published' | 'coming_soon' | 'draft';
+  lessons: MockLessonItem[];
+  assignments?: MockAssignmentItem[];
+  exams?: MockExamItem[];
+}
+
+export interface MockCourseCurriculum {
+  courseId: string;
+  modules: MockCurriculumModule[];
+}
+
+export const INITIAL_CURRICULA: Record<string, MockCourseCurriculum> = {
+  'course-1': {
+    courseId: 'course-1',
+    modules: [
+      {
+        id: 'mod-1',
+        title: 'الوحدة الأولى: أساسيات البحث العلمي وصياغة السؤال (PICO Framework)',
+        description: 'المدخل الشامل لفهم هرم الأدلة وصياغة الفرضيات العلمية الدقيقة.',
+        status: 'published',
+        lessons: [
+          {
+            id: 'les-1',
+            title: 'الدرس 1: مقدمة في البحث الأكاديمي وهرم الأدلة الطبية (Evidence Pyramid)',
+            youtubeId: 'dQw4w9WgXcQ',
+            durationMinutes: 45,
+            isMandatory: true,
+            drivePdfUrl: 'https://drive.google.com/file/d/sampleSlideModule1/view'
+          },
+          {
+            id: 'les-2',
+            title: 'الدرس 2: صياغة سؤال البحث الإكلينيكي بنظام PICO و PEO',
+            youtubeId: 'dQw4w9WgXcQ',
+            durationMinutes: 50,
+            isMandatory: true,
+            drivePdfUrl: 'https://drive.google.com/file/d/sampleSlideModule2/view'
+          }
+        ],
+        assignments: [
+          {
+            id: 'asg-1',
+            title: 'تكليف عملي: صياغة بروتوكول بحثي بنظام PICO وتحديد الفرضيات',
+            instructions: 'قم بتحميل القالب المرفق وصياغة سؤال بحثي تخصصي في مجالك وتحديد عناصر PICO الأربعة بالتفصيل.',
+            driveTemplateUrl: 'https://drive.google.com/file/d/TemplatePICO2026/view',
+            maxScore: 20,
+            deadline: '2026-11-20'
+          }
+        ]
+      },
+      {
+        id: 'mod-2',
+        title: 'الوحدة الثانية: استراتيجيات البحث في قواعد البيانات الطبية المتقدمة',
+        description: 'إتقان محركات البحث PubMed و Scopus وتطبيق MeSH Terms واستخدام برامج الفرز.',
+        status: 'published',
+        lessons: [
+          {
+            id: 'les-3',
+            title: 'الدرس 3: استراتيجيات البحث في PubMed ومصطلحات MeSH Terms',
+            youtubeId: 'dQw4w9WgXcQ',
+            durationMinutes: 60,
+            isMandatory: true,
+            drivePdfUrl: 'https://drive.google.com/file/d/sampleSlideModule3/view'
+          },
+          {
+            id: 'les-4',
+            title: 'الدرس 4: التصفية المزدوجة وإدارة المراجع بواسطة EndNote و Rayyan',
+            youtubeId: 'dQw4w9WgXcQ',
+            durationMinutes: 40,
+            isMandatory: true,
+            drivePdfUrl: 'https://drive.google.com/file/d/sampleSlideModule4/view'
+          }
+        ],
+        exams: [
+          {
+            id: 'quiz-1',
+            title: 'اختبار قصير (Quiz): استراتيجيات البحث وبناء معادلة MeSH',
+            examType: 'quiz',
+            durationMinutes: 15,
+            maxScore: 10,
+            questions: [
+              {
+                id: 'q1',
+                text: 'ما هي الأداة المعتمدة للربط المنطقي بين مصطلحات البحث في PubMed؟',
+                options: ['Boolean Operators (AND, OR, NOT)', 'HTML Tags', 'SQL Queries', 'Regular Expressions'],
+                correctIndex: 0,
+                points: 5
+              },
+              {
+                id: 'q2',
+                text: 'ما هو الهدف من استخدام برمجية Rayyan في المراجعات؟',
+                options: ['التصفية المزدوجة التعمية للعناوين والملخصات (Blinded Screening)', 'كتابة الورقة', 'حساب المتوسط الحسابي', 'النشر المباشر'],
+                correctIndex: 0,
+                points: 5
+              }
+            ]
+          }
+        ]
+      },
+      {
+        id: 'mod-3',
+        title: 'الوحدة الثالثة: تصميم الدراسات الإكلينيكية وأدوات تقييم الانحياز',
+        description: 'التمييز بين التصاميم الرصدية والتجريبية وتطبيق مقاييس RoB 2 و ROBINS-I.',
+        status: 'published',
+        lessons: [
+          {
+            id: 'les-5',
+            title: 'الدرس 5: تصاميم الدراسات المقطعية وحالات الشواهد (Observational Studies)',
+            youtubeId: 'dQw4w9WgXcQ',
+            durationMinutes: 55,
+            isMandatory: true,
+            drivePdfUrl: 'https://drive.google.com/file/d/sampleSlideModule5/view'
+          },
+          {
+            id: 'les-6',
+            title: 'الدرس 6: التجارب السريرية العشوائية المزدوجة التعمية (RCT Design)',
+            youtubeId: 'dQw4w9WgXcQ',
+            durationMinutes: 65,
+            isMandatory: true,
+            drivePdfUrl: 'https://drive.google.com/file/d/sampleSlideModule6/view'
+          }
+        ],
+        exams: [
+          {
+            id: 'exam-1',
+            title: 'الاختبار النظري الشامل (Mid-Term Assessment)',
+            examType: 'theory',
+            durationMinutes: 30,
+            maxScore: 30,
+            questions: [
+              {
+                id: 'eq1',
+                text: 'ما هو المعيار الدولي الأحدث لإعداد وكتابة تقارير المراجعات المنهجية؟',
+                options: ['PRISMA 2020', 'PRISMA 2009', 'STROBE Statement', 'CONSORT 2010'],
+                correctIndex: 0,
+                points: 10
+              },
+              {
+                id: 'eq2',
+                text: 'أي من تصاميم الدراسات التالية يعتبر قمة هرم الأدلة للدراسات الأولية؟',
+                options: ['التجارب السريرية العشوائية (RCT)', 'سلسلة الحالات Case Series', 'الدراسات المقطعية Cross-sectional', 'آراء الخبراء'],
+                correctIndex: 0,
+                points: 10
+              },
+              {
+                id: 'eq3',
+                text: 'ما هي الأداة المعتمدة من منظمة كوكرين لتقييم خطر الانحياز في تجارب RCT؟',
+                options: ['RoB 2 (Risk of Bias 2)', 'ROBINS-I', 'Newcastle-Ottawa Scale', 'AMSTAR 2'],
+                correctIndex: 0,
+                points: 10
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  'course-2': {
+    courseId: 'course-2',
+    modules: [
+      {
+        id: 'mod-c2-1',
+        title: 'الوحدة 1: مدخل إلى المراجعات المنهجية ومعايير PRISMA 2020',
+        description: 'الأسس النظرية وإعداد خطة بروتوكول المراجعة للتسجيل في PROSPERO.',
+        status: 'published',
+        lessons: [
+          {
+            id: 'les-c2-1',
+            title: 'الدرس 1: مبادئ الطب المسند بالدليل وموقع Systematic Review في البحث',
+            youtubeId: 'dQw4w9WgXcQ',
+            durationMinutes: 50,
+            isMandatory: true,
+            drivePdfUrl: 'https://drive.google.com/file/d/c2-m1-slides/view'
+          },
+          {
+            id: 'les-c2-2',
+            title: 'الدرس 2: صياغة البروتوكول والتسجيل الرسمي في PROSPERO',
+            youtubeId: 'dQw4w9WgXcQ',
+            durationMinutes: 45,
+            isMandatory: true,
+            drivePdfUrl: 'https://drive.google.com/file/d/c2-m2-slides/view'
+          }
+        ],
+        assignments: [
+          {
+            id: 'asg-c2-1',
+            title: 'تسليم مسودة بروتوكول المراجعة المنهجية الجاهزة للتسجيل',
+            instructions: 'قم بتعبئة قالب PROSPERO وتحديد شروط الاشتمال والاستبعاد واستراتيجية البحث.',
+            driveTemplateUrl: 'https://drive.google.com/file/d/ProsperoFormTemplate/view',
+            maxScore: 25,
+            deadline: '2026-12-05'
+          }
+        ]
+      },
+      {
+        id: 'mod-c2-2',
+        title: 'الوحدة 2: استخلاص البيانات والتحليل الإحصائي التلوي (RevMan & Metafor)',
+        description: 'التحليل البعدي ونماذج التأثيرات الثابتة والعشوائية وإخراج Forest Plot.',
+        status: 'published',
+        lessons: [
+          {
+            id: 'les-c2-3',
+            title: 'الدرس 3: استخلاص البيانات وتوحيد مقاييس الأثر (OR, RR, MD, SMD)',
+            youtubeId: 'dQw4w9WgXcQ',
+            durationMinutes: 55,
+            isMandatory: true,
+            drivePdfUrl: 'https://drive.google.com/file/d/c2-m3-slides/view'
+          },
+          {
+            id: 'les-c2-4',
+            title: 'الدرس 4: بناء وتفسير مخططات الغابة Forest Plots ومخططات القمع Funnel Plots',
+            youtubeId: 'dQw4w9WgXcQ',
+            durationMinutes: 60,
+            isMandatory: true,
+            drivePdfUrl: 'https://drive.google.com/file/d/c2-m4-slides/view'
+          }
+        ]
+      }
+    ]
+  },
+  'course-3': {
+    courseId: 'course-3',
+    modules: [
+      {
+        id: 'mod-c3-1',
+        title: 'الوحدة 1: تنظيف البيانات وإدارتها في برمجية SPSS',
+        description: 'التعامل مع القيم المفقودة، الترميز، واختبار التوزيع الطبيعي للبيانات.',
+        status: 'published',
+        lessons: [
+          {
+            id: 'les-c3-1',
+            title: 'الدرس 1: مقدمة في SPSS وإدخال وترميز المتغيرات الطبية',
+            youtubeId: 'dQw4w9WgXcQ',
+            durationMinutes: 45,
+            isMandatory: true,
+            drivePdfUrl: 'https://drive.google.com/file/d/c3-m1-slides/view'
+          },
+          {
+            id: 'les-c3-2',
+            title: 'الدرس 2: اختبارات التوزيع الطبيعي (Shapiro-Wilk) والإحصاء الوصفي',
+            youtubeId: 'dQw4w9WgXcQ',
+            durationMinutes: 50,
+            isMandatory: true,
+            drivePdfUrl: 'https://drive.google.com/file/d/c3-m2-slides/view'
+          }
+        ]
+      },
+      {
+        id: 'mod-c3-2',
+        title: 'الوحدة 2: اختبارات الفروق والعلاقات الإحصائية (T-test, ANOVA, Regression)',
+        description: 'اختيار الاختبار المناسب وحساب الدلالة وفترات الثقة 95% CI.',
+        status: 'published',
+        lessons: [
+          {
+            id: 'les-c3-3',
+            title: 'الدرس 3: الاختبارات المعلمية واللامعلمية للعينات المستقلة والمرتبطة',
+            youtubeId: 'dQw4w9WgXcQ',
+            durationMinutes: 55,
+            isMandatory: true,
+            drivePdfUrl: 'https://drive.google.com/file/d/c3-m3-slides/view'
+          }
+        ]
+      }
+    ]
+  },
+  'course-4': {
+    courseId: 'course-4',
+    modules: [
+      {
+        id: 'mod-c4-1',
+        title: 'الوحدة 1: نماذج الذكاء الاصطناعي التوليدي وأخلاقيات البحث العلمي (قيد الإعداد)',
+        description: 'إرشادات النزاهة الأكاديمية والحدود الآمنة لاستخدام نماذج LLMs في الكتابة البحثية.',
+        status: 'coming_soon',
+        lessons: [
+          {
+            id: 'les-c4-1',
+            title: 'الدرس 1: معايير ICMJE و WAME للافصاح عن أدوات الذكاء الاصطناعي في الأوراق العلمية',
+            youtubeId: 'dQw4w9WgXcQ',
+            durationMinutes: 40,
+            isMandatory: true,
+            drivePdfUrl: 'https://drive.google.com/file/d/c4-m1-slides/view'
+          }
+        ]
+      },
+      {
+        id: 'mod-c4-2',
+        title: 'الوحدة 2: التحليل الذكي وتلخيص الأدبيات واستخراج البيانات (قيد الإعداد)',
+        description: 'تطبيقات عملية على استرجاع المعرفة وتلخيص الدراسات بدقة.',
+        status: 'coming_soon',
+        lessons: []
+      }
+    ]
+  }
 };
+
+export const INITIAL_CURRICULUM: MockCourseCurriculum = INITIAL_CURRICULA['course-1'];
 
 export interface MockPendingEnrollment {
   id: string;

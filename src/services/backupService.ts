@@ -1,7 +1,7 @@
 // ===================================================
 // أداة النسخ الاحتياطي والاستعادة ثنائية الاتجاه (Backup & Restore Engine)
 // ===================================================
-import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import { INITIAL_COURSES, INITIAL_RESEARCHES, INITIAL_TESTIMONIALS } from '../data/mockData';
 

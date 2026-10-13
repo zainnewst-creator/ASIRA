@@ -4,11 +4,9 @@ import {
   Award, 
   Sparkles, 
   ArrowLeft, 
-  CheckCircle2, 
   Search, 
   FileText, 
   GraduationCap, 
-  Quote, 
   Star 
 } from 'lucide-react';
 import { INITIAL_STATS, INITIAL_COURSES, INITIAL_RESEARCHES, INITIAL_TESTIMONIALS } from '../data/mockData';

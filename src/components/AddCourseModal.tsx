@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Course } from '../types';
+import { Course, CourseStatus } from '../types';
 import { BookOpen, Plus, X, Upload, Image, Award, CheckCircle } from 'lucide-react';
 
 interface AddCourseModalProps {
@@ -21,6 +21,7 @@ export const AddCourseModal: React.FC<AddCourseModalProps> = ({
   const [coverUrl, setCoverUrl] = useState('https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=800&q=80');
   const [passingScore, setPassingScore] = useState(70);
   const [totalLessons, setTotalLessons] = useState(12);
+  const [status, setStatus] = useState<CourseStatus>('published');
   const [fileName, setFileName] = useState<string>('');
 
   if (!isOpen) return null;
@@ -59,7 +60,7 @@ export const AddCourseModal: React.FC<AddCourseModalProps> = ({
       instructorNames: instructorNames.split(',').map((s) => s.trim()).filter(Boolean),
       startDate: '2026-11-20',
       endDate: '2026-12-31',
-      status: 'published',
+      status: status,
       passingScore: Number(passingScore) || 70,
       totalLessonsCount: Number(totalLessons) || 10,
       enrolledCount: 0,
@@ -185,10 +186,10 @@ export const AddCourseModal: React.FC<AddCourseModalProps> = ({
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.3fr', gap: '1rem' }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.3rem', color: 'var(--text-main)' }}>
-                درجة النجاح والاجتياز (%)
+                درجة النجاح (%)
               </label>
               <input
                 type="number"
@@ -201,7 +202,7 @@ export const AddCourseModal: React.FC<AddCourseModalProps> = ({
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.3rem', color: 'var(--text-main)' }}>
-                عدد المحاضرات الإجمالي
+                المحاضرات الإجمالية
               </label>
               <input
                 type="number"
@@ -211,6 +212,20 @@ export const AddCourseModal: React.FC<AddCourseModalProps> = ({
                 onChange={(e) => setTotalLessons(Number(e.target.value))}
                 style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)', fontWeight: 700, textAlign: 'center' }}
               />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.3rem', color: 'var(--text-main)' }}>
+                حالة إتاحة الكورس *
+              </label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as CourseStatus)}
+                style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)', fontWeight: 600, fontSize: '0.85rem' }}
+              >
+                <option value="published">منشور ومتاح للتسجيل والالتحاق</option>
+                <option value="coming_soon">قريباً (قيد الإعداد والإعلان - التسجيل مغلق)</option>
+                <option value="draft">مسودة داخلية (غير معلن)</option>
+              </select>
             </div>
           </div>
 

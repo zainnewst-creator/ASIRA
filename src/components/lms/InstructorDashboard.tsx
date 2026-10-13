@@ -3,33 +3,31 @@ import {
   CheckCircle2, 
   ExternalLink, 
   Edit3, 
-  MessageSquare, 
   FileText, 
-  BookOpen, 
   Layers, 
   Plus, 
-  Clock, 
-  AlertCircle, 
   Save, 
   RotateCcw, 
   GraduationCap,
   Eye,
-  Check,
-  X,
   PlayCircle,
-  HelpCircle,
   Award,
   Search,
-  Filter
+  Trash2,
+  FolderPlus
 } from 'lucide-react';
 import { 
   INITIAL_STUDENT_SUBMISSIONS, 
   INITIAL_EXAM_ATTEMPTS, 
-  INITIAL_CURRICULUM,
   INITIAL_COURSES,
+  INITIAL_CURRICULUM,
   MockStudentSubmission,
   MockExamAttemptForInstructor,
-  MockCourseCurriculum
+  MockCourseCurriculum,
+  MockCurriculumModule,
+  MockLessonItem,
+  MockAssignmentItem,
+  MockExamItem
 } from '../../data/mockData';
 import { Course, ResearchPaper } from '../../types';
 import { AddCourseModal } from '../AddCourseModal';
@@ -123,14 +121,36 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
   const [localCurriculum, setLocalCurriculum] = useState(INITIAL_CURRICULUM);
   const curriculum = propCurriculum || localCurriculum;
 
+  // إدارة المديولات والوحدات
+  const [targetModuleId, setTargetModuleId] = useState<string>('');
+  const [isAddModuleModalOpen, setIsAddModuleModalOpen] = useState(false);
+  const [newModuleTitle, setNewModuleTitle] = useState('');
+  const [newModuleDesc, setNewModuleDesc] = useState('');
+  const [newModuleStatus, setNewModuleStatus] = useState<'published' | 'coming_soon'>('published');
+  const [isEditModuleModalOpen, setIsEditModuleModalOpen] = useState(false);
+  const [moduleToEdit, setModuleToEdit] = useState<MockCurriculumModule | null>(null);
+  const [editModuleTitle, setEditModuleTitle] = useState('');
+  const [editModuleDesc, setEditModuleDesc] = useState('');
+  const [editModuleStatus, setEditModuleStatus] = useState<'published' | 'coming_soon'>('published');
+
   // نوافذ الإضافة والتعديل العامة
   const [isAddCourseModalOpen, setIsAddCourseModalOpen] = useState(false);
   const [isEditCourseModalOpen, setIsEditCourseModalOpen] = useState(false);
   const [isAddResearchModalOpen, setIsAddResearchModalOpen] = useState(false);
 
+  // حالة معاينة الدرس
+  const [previewLesson, setPreviewLesson] = useState<MockLessonItem | null>(null);
+
+  // الدرجات العملية
+  const [localPracticalGrades, setLocalPracticalGrades] = useState<Record<string, { score: number; notes: string }>>({
+    'student-1': { score: 42, notes: 'أداء ممتاز في اختبار تحليل البيانات الإحصائية الحضوري' },
+    'student-2': { score: 38, notes: 'جيد جداً مع ملاحظة طفيفة في صياغة الفرضية' },
+  });
+  const practicalGrades = propPracticalGrades || localPracticalGrades;
+  const [selectedPracticalStudent, setSelectedPracticalStudent] = useState<{ id: string; name: string; score: number; notes: string } | null>(null);
+
   // نافذة إضافة درس
   const [isAddLessonModalOpen, setIsAddLessonModalOpen] = useState(false);
-  const [previewLesson, setPreviewLesson] = useState<{ id: string; title: string; youtubeId: string; durationMinutes: number; drivePdfUrl?: string } | null>(null);
   const [newLessonTitle, setNewLessonTitle] = useState('');
   const [newLessonYoutube, setNewLessonYoutube] = useState('');
   const [newLessonDrive, setNewLessonDrive] = useState('');
@@ -166,15 +186,7 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
   const [newOptC, setNewOptC] = useState('');
   const [newOptD, setNewOptD] = useState('');
   const [newCorrectOpt, setNewCorrectOpt] = useState('A');
-  const [newQPoints, setNewQPoints] = useState(5);
-
-  // بيانات الامتحان العملي الحضوري
-  const [localPracticalGrades, setLocalPracticalGrades] = useState<Record<string, { score: number; notes: string }>>({
-    'student-1': { score: 42, notes: 'أداء ممتاز في اختبار تحليل البيانات الإحصائية الحضوري' },
-    'student-2': { score: 38, notes: 'جيد جداً مع ملاحظة طفيفة في صياغة الفرضية' },
-  });
-  const practicalGrades = propPracticalGrades || localPracticalGrades;
-  const [selectedPracticalStudent, setSelectedPracticalStudent] = useState<{ id: string; name: string; score: number; notes: string } | null>(null);
+  const [newQPoints] = useState(5);
 
   // تبديل الكورس
   const handleSelectCourse = (id: string) => {
@@ -237,32 +249,125 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
     setSelectedAttempt(null);
   };
 
-  // إضافة درس جديد
-  const handleAddLesson = (e: React.FormEvent) => {
+  // 1. إضافة مديول / وحدة دراسية جديدة
+  const handleAddModule = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newLessonTitle) return;
+    if (!newModuleTitle.trim()) return;
 
-    const newLesson = {
-      id: `les-${Date.now()}`,
-      title: newLessonTitle,
-      youtubeId: newLessonYoutube || 'dQw4w9WgXcQ',
-      durationMinutes: 45,
-      isMandatory: true,
-      drivePdfUrl: newLessonDrive || 'https://drive.google.com',
+    const newMod: MockCurriculumModule = {
+      id: `mod-${Date.now()}`,
+      title: newModuleTitle.trim(),
+      description: newModuleDesc.trim() || undefined,
+      status: newModuleStatus,
+      lessons: [],
+      assignments: [],
+      exams: [],
     };
 
-    const updatedCurriculum = {
+    const updatedCurriculum: MockCourseCurriculum = {
       ...curriculum,
-      modules: curriculum.modules.map((m, idx) =>
-        idx === 0 ? { ...m, lessons: [...m.lessons, newLesson] } : m
+      modules: [...(curriculum.modules || []), newMod],
+    };
+
+    if (onUpdateCurriculum) onUpdateCurriculum(updatedCurriculum);
+    else setLocalCurriculum(updatedCurriculum);
+
+    if (onLogAudit) {
+      onLogAudit('إضافة مديول دراسي', `تم إنشاء وحدة دراسية جديدة: "${newModuleTitle}" (${newModuleStatus === 'coming_soon' ? 'قريباً' : 'منشورة'}) بكورس ${currentCourse?.code}`);
+    }
+
+    setIsAddModuleModalOpen(false);
+    setNewModuleTitle('');
+    setNewModuleDesc('');
+    setNewModuleStatus('published');
+  };
+
+  // 2. تعديل اسم ووصف المديول
+  const handleSaveEditModule = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!moduleToEdit || !editModuleTitle.trim()) return;
+
+    const updatedCurriculum: MockCourseCurriculum = {
+      ...curriculum,
+      modules: (curriculum.modules || []).map((m) =>
+        m.id === moduleToEdit.id
+          ? { 
+              ...m, 
+              title: editModuleTitle.trim(), 
+              description: editModuleDesc.trim() || undefined,
+              status: editModuleStatus
+            }
+          : m
       ),
     };
 
-    if (onUpdateCurriculum) {
-      onUpdateCurriculum(updatedCurriculum);
-    } else {
-      setLocalCurriculum(updatedCurriculum);
+    if (onUpdateCurriculum) onUpdateCurriculum(updatedCurriculum);
+    else setLocalCurriculum(updatedCurriculum);
+
+    if (onLogAudit) {
+      onLogAudit('تعديل مديول دراسي', `تم تعديل بيانات وحالة الوحدة: "${editModuleTitle}"`);
     }
+
+    setIsEditModuleModalOpen(false);
+    setModuleToEdit(null);
+  };
+
+  // 3. حذف مديول بالكامل
+  const handleDeleteModule = (modId: string, modTitle: string) => {
+    if (!window.confirm(`هل أنت متأكد من حذف الوحدة: "${modTitle}" وجميع محتوياتها من محاضرات وتكليفات؟`)) return;
+
+    const updatedCurriculum: MockCourseCurriculum = {
+      ...curriculum,
+      modules: (curriculum.modules || []).filter((m) => m.id !== modId),
+    };
+
+    if (onUpdateCurriculum) onUpdateCurriculum(updatedCurriculum);
+    else setLocalCurriculum(updatedCurriculum);
+
+    if (onLogAudit) {
+      onLogAudit('حذف مديول دراسي', `تم حذف الوحدة "${modTitle}"`);
+    }
+  };
+
+  // 4. إضافة درس جديد لمديول محدد
+  const handleAddLesson = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newLessonTitle.trim()) return;
+
+    const targetModId = targetModuleId || curriculum.modules?.[0]?.id;
+    const newLesson: MockLessonItem = {
+      id: `les-${Date.now()}`,
+      title: newLessonTitle.trim(),
+      youtubeId: newLessonYoutube.trim() || 'dQw4w9WgXcQ',
+      durationMinutes: 45,
+      isMandatory: true,
+      drivePdfUrl: newLessonDrive.trim() || 'https://drive.google.com',
+    };
+
+    let modules = [...(curriculum.modules || [])];
+    if (modules.length === 0) {
+      modules = [{
+        id: `mod-${Date.now()}`,
+        title: 'الوحدة الأولى: مدخل ومقدمة عامة',
+        lessons: [newLesson],
+        assignments: [],
+        exams: [],
+      }];
+    } else {
+      modules = modules.map((m) =>
+        (m.id === targetModId || (!targetModId && m === modules[0]))
+          ? { ...m, lessons: [...(m.lessons || []), newLesson] }
+          : m
+      );
+    }
+
+    const updatedCurriculum: MockCourseCurriculum = {
+      ...curriculum,
+      modules,
+    };
+
+    if (onUpdateCurriculum) onUpdateCurriculum(updatedCurriculum);
+    else setLocalCurriculum(updatedCurriculum);
 
     if (onLogAudit) {
       onLogAudit('إضافة درس ومحاضرة', `إضافة درس جديد: "${newLessonTitle}" بكورس ${currentCourse?.code}`);
@@ -274,10 +379,66 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
     setNewLessonDrive('');
   };
 
-  // إضافة تكليف جديد
+  // 5. حذف درس من مديول
+  const handleDeleteLesson = (modId: string, lesId: string, lesTitle: string) => {
+    if (!window.confirm(`هل أنت متأكد من حذف الدرس: "${lesTitle}"؟`)) return;
+
+    const updatedCurriculum: MockCourseCurriculum = {
+      ...curriculum,
+      modules: (curriculum.modules || []).map((m) =>
+        m.id === modId
+          ? { ...m, lessons: (m.lessons || []).filter((l) => l.id !== lesId) }
+          : m
+      ),
+    };
+
+    if (onUpdateCurriculum) onUpdateCurriculum(updatedCurriculum);
+    else setLocalCurriculum(updatedCurriculum);
+
+    if (onLogAudit) {
+      onLogAudit('حذف درس', `تم حذف الدرس "${lesTitle}" من كورس ${currentCourse?.code}`);
+    }
+  };
+
+  // 6. إضافة تكليف جديد لمديول محدد
   const handleAddAssignment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!assignmentTitle.trim()) return;
+
+    const targetModId = targetModuleId || curriculum.modules?.[0]?.id;
+    const newAsg: MockAssignmentItem = {
+      id: `asg-${Date.now()}`,
+      title: assignmentTitle.trim(),
+      instructions: assignmentInstructions.trim() || undefined,
+      driveTemplateUrl: assignmentDriveTemplate.trim() || undefined,
+      maxScore: Number(assignmentMaxScore) || 20,
+      deadline: assignmentDeadline,
+    };
+
+    let modules = [...(curriculum.modules || [])];
+    if (modules.length === 0) {
+      modules = [{
+        id: `mod-${Date.now()}`,
+        title: 'الوحدة الأولى: مدخل ومقدمة عامة',
+        lessons: [],
+        assignments: [newAsg],
+        exams: [],
+      }];
+    } else {
+      modules = modules.map((m) =>
+        (m.id === targetModId || (!targetModId && m === modules[0]))
+          ? { ...m, assignments: [...(m.assignments || []), newAsg] }
+          : m
+      );
+    }
+
+    const updatedCurriculum: MockCourseCurriculum = {
+      ...curriculum,
+      modules,
+    };
+
+    if (onUpdateCurriculum) onUpdateCurriculum(updatedCurriculum);
+    else setLocalCurriculum(updatedCurriculum);
 
     // إضافة تكليف جديد لقائمة تسليمات الطلاب
     const newSubmissionEntry: MockStudentSubmission = {
@@ -295,14 +456,11 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
       instructorFeedback: undefined,
     };
 
-    if (onUpdateSubmission) {
-      onUpdateSubmission(newSubmissionEntry);
-    } else {
-      setLocalSubmissions((prev) => [newSubmissionEntry, ...prev]);
-    }
+    if (onUpdateSubmission) onUpdateSubmission(newSubmissionEntry);
+    else setLocalSubmissions((prev) => [newSubmissionEntry, ...prev]);
 
     if (onLogAudit) {
-      onLogAudit('إضافة تكليف أكاديمي جديد', `تم إنشاء ونشر تكليف: "${assignmentTitle}" بدرجة كلية ${assignmentMaxScore}`);
+      onLogAudit('إضافة تكليف أكاديمي جديد', `تم إنشاء ونشر تكليف: "${assignmentTitle}" بدرجة ${assignmentMaxScore}`);
     }
 
     setIsAddAssignmentModalOpen(false);
@@ -311,7 +469,28 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
     setAssignmentDriveTemplate('');
   };
 
-  // إضافة سؤال لمصفوفة أسئلة الاختبار
+  // 7. حذف تكليف من مديول
+  const handleDeleteAssignment = (modId: string, asgId: string, asgTitle: string) => {
+    if (!window.confirm(`هل أنت متأكد من حذف التكليف: "${asgTitle}"؟`)) return;
+
+    const updatedCurriculum: MockCourseCurriculum = {
+      ...curriculum,
+      modules: (curriculum.modules || []).map((m) =>
+        m.id === modId
+          ? { ...m, assignments: (m.assignments || []).filter((a) => a.id !== asgId) }
+          : m
+      ),
+    };
+
+    if (onUpdateCurriculum) onUpdateCurriculum(updatedCurriculum);
+    else setLocalCurriculum(updatedCurriculum);
+
+    if (onLogAudit) {
+      onLogAudit('حذف تكليف', `تم حذف التكليف "${asgTitle}"`);
+    }
+  };
+
+  // 8. إضافة سؤال لمصفوفة أسئلة الاختبار
   const handleAddQuestionToExam = () => {
     if (!newQText.trim() || !newOptA.trim() || !newOptB.trim()) {
       alert('يرجى ملء نص السؤال وخيارين على الأقل');
@@ -338,10 +517,51 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
     setNewOptD('');
   };
 
-  // حفظ ونشر الاختبار الجديد
+  // 9. حفظ ونشر الاختبار الجديد لمديول محدد
   const handleSaveExam = (e: React.FormEvent) => {
     e.preventDefault();
     if (!examTitle.trim()) return;
+
+    const targetModId = targetModuleId || curriculum.modules?.[0]?.id;
+    const newExamItem: MockExamItem = {
+      id: `exam-${Date.now()}`,
+      title: examTitle.trim(),
+      examType: examType,
+      durationMinutes: Number(examDuration) || 30,
+      maxScore: Number(examMaxScore) || 30,
+      questions: examQuestions.map((q, idx) => ({
+        id: `q-${idx}`,
+        text: q.qText,
+        options: [q.optA, q.optB, q.optC, q.optD],
+        correctIndex: q.correctOpt === 'A' ? 0 : q.correctOpt === 'B' ? 1 : q.correctOpt === 'C' ? 2 : 3,
+        points: q.points,
+      })),
+    };
+
+    let modules = [...(curriculum.modules || [])];
+    if (modules.length === 0) {
+      modules = [{
+        id: `mod-${Date.now()}`,
+        title: 'الوحدة الأولى: مدخل ومقدمة عامة',
+        lessons: [],
+        assignments: [],
+        exams: [newExamItem],
+      }];
+    } else {
+      modules = modules.map((m) =>
+        (m.id === targetModId || (!targetModId && m === modules[0]))
+          ? { ...m, exams: [...(m.exams || []), newExamItem] }
+          : m
+      );
+    }
+
+    const updatedCurriculum: MockCourseCurriculum = {
+      ...curriculum,
+      modules,
+    };
+
+    if (onUpdateCurriculum) onUpdateCurriculum(updatedCurriculum);
+    else setLocalCurriculum(updatedCurriculum);
 
     const newAttemptEntry: MockExamAttemptForInstructor = {
       id: `attempt-new-${Date.now()}`,
@@ -366,11 +586,8 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
       }))
     };
 
-    if (onUpdateExamAttempt) {
-      onUpdateExamAttempt(newAttemptEntry);
-    } else {
-      setLocalExamAttempts((prev) => [newAttemptEntry, ...prev]);
-    }
+    if (onUpdateExamAttempt) onUpdateExamAttempt(newAttemptEntry);
+    else setLocalExamAttempts((prev) => [newAttemptEntry, ...prev]);
 
     if (onLogAudit) {
       onLogAudit('إضافة اختبار أكاديمي جديد', `تم إنشاء ونشر اختبار: "${examTitle}" (${examQuestions.length} أسئلة)`);
@@ -378,6 +595,27 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
 
     setIsAddExamModalOpen(false);
     setExamTitle('');
+  };
+
+  // 10. حذف اختبار من مديول
+  const handleDeleteExam = (modId: string, exId: string, exTitle: string) => {
+    if (!window.confirm(`هل أنت متأكد من حذف الاختبار: "${exTitle}"؟`)) return;
+
+    const updatedCurriculum: MockCourseCurriculum = {
+      ...curriculum,
+      modules: (curriculum.modules || []).map((m) =>
+        m.id === modId
+          ? { ...m, exams: (m.exams || []).filter((e) => e.id !== exId) }
+          : m
+      ),
+    };
+
+    if (onUpdateCurriculum) onUpdateCurriculum(updatedCurriculum);
+    else setLocalCurriculum(updatedCurriculum);
+
+    if (onLogAudit) {
+      onLogAudit('حذف اختبار', `تم حذف الاختبار "${exTitle}"`);
+    }
   };
 
   return (
@@ -478,7 +716,7 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
           style={{ fontSize: '0.9rem' }}
         >
           <Layers size={16} />
-          <span>منشئ المحتوى والتقييمات (Builder)</span>
+          <span>المنهج والوحدات الدراسية (Curriculum Builder)</span>
         </button>
 
         <button
@@ -944,57 +1182,83 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
         </div>
       )}
 
-      {/* 3. تبويب منشئ المحتوى والتقييمات (Course Builder & Assessments) */}
+      {/* 3. تبويب منشئ المحتوى والتقييمات بالمديولات (Modular Curriculum Builder) */}
       {activeTab === 'curriculum' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          {/* شريط الإجراءات لإنشاء الدروس والتكاليف والامتحانات */}
-          <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+          {/* شريط الإجراءات لإنشاء المديولات والدروس والتكاليف والامتحانات */}
+          <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', borderTop: '4px solid var(--primary-600)' }}>
             <div>
-              <h2 style={{ fontSize: '1.3rem', fontWeight: 800, margin: 0 }}>
-                منشئ المحتوى والتقييمات الأكاديمية
-              </h2>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                أضف المحاضرات، أنشئ التكليفات العملية بروابط Drive، وابنِ الامتحانات الإلكترونية بأنواعها لكورس: <strong>{currentCourse?.title}</strong>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                <span className="badge badge-primary">{currentCourse?.code}</span>
+                <h2 style={{ fontSize: '1.3rem', fontWeight: 800, margin: 0 }}>
+                  منشئ المنهج والمديولات والتقييمات الأكاديمية
+                </h2>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
+                هيكلة الكورس على شكل وحدات (Modules)، وبناء المحاضرات والتكليفات والامتحانات داخل كل وحدة بالترتيب لكورس: <strong>{currentCourse?.title}</strong>
               </p>
             </div>
 
-            {/* الأزرار الثلاثة المباشرة للإضافة */}
+            {/* أزرار الإجراءات الرئيسية */}
             <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
               <button
-                onClick={() => setIsAddLessonModalOpen(true)}
+                onClick={() => {
+                  setNewModuleTitle('');
+                  setNewModuleDesc('');
+                  setIsAddModuleModalOpen(true);
+                }}
                 className="btn btn-primary"
                 style={{ fontSize: '0.85rem' }}
+                id="add-new-module-btn"
               >
-                <Plus size={15} />
-                <span>إضافة محاضرة / درس</span>
+                <FolderPlus size={16} />
+                <span>+ إضافة مديول / وحدة دراسية</span>
               </button>
 
               <button
-                onClick={() => setIsAddAssignmentModalOpen(true)}
-                className="btn btn-accent"
-                style={{ fontSize: '0.85rem' }}
-              >
-                <Plus size={15} />
-                <span>إضافة تكليف جديد</span>
-              </button>
-
-              <button
-                onClick={() => setIsAddExamModalOpen(true)}
+                onClick={() => {
+                  setTargetModuleId(curriculum.modules?.[0]?.id || '');
+                  setIsAddLessonModalOpen(true);
+                }}
                 className="btn btn-outline"
                 style={{ fontSize: '0.85rem' }}
               >
                 <Plus size={15} />
-                <span>إضافة امتحان / اختبار</span>
+                <span>إضافة محاضرة</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setTargetModuleId(curriculum.modules?.[0]?.id || '');
+                  setIsAddAssignmentModalOpen(true);
+                }}
+                className="btn btn-accent"
+                style={{ fontSize: '0.85rem' }}
+              >
+                <Plus size={15} />
+                <span>إضافة تكليف</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setTargetModuleId(curriculum.modules?.[0]?.id || '');
+                  setIsAddExamModalOpen(true);
+                }}
+                className="btn btn-outline"
+                style={{ fontSize: '0.85rem' }}
+              >
+                <Plus size={15} />
+                <span>إضافة اختبار</span>
               </button>
 
               <button
                 onClick={() => setIsEditCourseModalOpen(true)}
-                className="btn btn-primary"
+                className="btn btn-ghost"
                 style={{ fontSize: '0.85rem' }}
                 id="builder-edit-course-btn"
               >
                 <Edit3 size={15} />
-                <span>تعديل بيانات وإعدادات الكورس</span>
+                <span>إعدادات الكورس</span>
               </button>
             </div>
           </div>
@@ -1012,10 +1276,15 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
               <div style={{ flex: 1, minWidth: '240px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.3rem' }}>
                   <span className="badge badge-primary">{currentCourse.code}</span>
+                  {currentCourse.status === 'coming_soon' && (
+                    <span className="badge" style={{ background: '#f59e0b', color: '#fff', fontWeight: 800 }}>
+                      ⏳ قريباً - قيد الإعداد
+                    </span>
+                  )}
                   <strong style={{ fontSize: '1.05rem', color: 'var(--text-main)' }}>{currentCourse.title}</strong>
                 </div>
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '0 0 0.35rem' }}>
-                  المشرفون: <strong>{currentCourse.instructorNames?.join('، ') || 'المشرف الأكاديمي'}</strong> | درجة الاجتياز: <strong>{currentCourse.passingScore}%</strong> | المحاضرات: <strong>{currentCourse.totalLessonsCount} درس</strong>
+                  المشرفون: <strong>{currentCourse.instructorNames?.join('، ') || 'المشرف الأكاديمي'}</strong> | درجة النجاح: <strong>{currentCourse.passingScore}%</strong> | الوحدات المجهزة: <strong>{curriculum.modules?.length || 0} وحدة</strong>
                 </p>
                 <p style={{ fontSize: '0.82rem', color: 'var(--text-subtle)', margin: 0 }}>
                   {currentCourse.summary}
@@ -1032,63 +1301,319 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
             </div>
           )}
 
-          {/* قائمة الوحدات والدروس */}
-          <div className="card">
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <BookOpen size={18} color="var(--primary-600)" />
-              <span>فهرس المحاضرات والدروس المنشورة:</span>
-            </h3>
+          {/* قائمة المديولات ومحتوياتها المنظمة بالترتيب */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            {(!curriculum.modules || curriculum.modules.length === 0) ? (
+              <div className="card" style={{ textAlign: 'center', padding: '3.5rem 1.5rem', border: '2px dashed var(--border-color)' }}>
+                <FolderPlus size={48} color="var(--primary-600)" style={{ margin: '0 auto 1rem', opacity: 0.8 }} />
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '0.5rem' }}>
+                  لم يتم إنشاء أي مديولات أو وحدات في هذا الكورس بعد
+                </h3>
+                <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', maxWidth: '520px', margin: '0 auto 1.5rem' }}>
+                  ابدأ ببناء المحتوى الأكاديمي عبر إنشاء المديول الأول، ثم أضف الدروس والتكليفات والاختبارات التفاعلية بداخله.
+                </p>
+                <button
+                  onClick={() => {
+                    setNewModuleTitle('الوحدة الأولى: مدخل وأساسيات المسار');
+                    setNewModuleDesc('المفاهيم التأسيسية وأهداف البرنامج التدريبي');
+                    setIsAddModuleModalOpen(true);
+                  }}
+                  className="btn btn-primary"
+                  style={{ padding: '0.65rem 1.75rem', fontSize: '0.92rem' }}
+                >
+                  <Plus size={16} />
+                  <span>+ إنشاء أول مديول للكورس الآن</span>
+                </button>
+              </div>
+            ) : (
+              curriculum.modules.map((mod, modIdx) => (
+                <div key={mod.id} className="card" style={{ padding: '0', overflow: 'hidden', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
+                  {/* رأس المديول وأزرار إدارته */}
+                  <div style={{
+                    padding: '1rem 1.25rem',
+                    background: 'var(--bg-subtle)',
+                    borderBottom: '1px solid var(--border-color)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '0.75rem'
+                  }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <span className="badge badge-primary" style={{ fontWeight: 800, fontSize: '0.82rem' }}>
+                          مديول {modIdx + 1}
+                        </span>
+                        <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>
+                          {mod.title}
+                        </h3>
+                        {mod.status === 'coming_soon' && (
+                          <span className="badge" style={{ background: '#f59e0b', color: '#fff', fontSize: '0.75rem' }}>
+                            قريباً
+                          </span>
+                        )}
+                      </div>
+                      {mod.description && (
+                        <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '0.35rem 0 0' }}>
+                          {mod.description}
+                        </p>
+                      )}
+                    </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {curriculum.modules.map((mod) => (
-                <div key={mod.id} style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
-                  <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-subtle)', fontWeight: 800, fontSize: '0.95rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>{mod.title}</span>
-                    <span className="badge badge-primary">{mod.lessons.length} دروس</span>
+                    {/* أزرار التحكم بالمديول وإضافة العناصر إليه */}
+                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                      <button
+                        onClick={() => {
+                          setTargetModuleId(mod.id);
+                          setIsAddLessonModalOpen(true);
+                        }}
+                        className="btn btn-primary"
+                        style={{ fontSize: '0.78rem', padding: '0.3rem 0.65rem' }}
+                        title="إضافة درس في هذه الوحدة"
+                      >
+                        <Plus size={13} />
+                        <span>درس</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setTargetModuleId(mod.id);
+                          setIsAddAssignmentModalOpen(true);
+                        }}
+                        className="btn btn-accent"
+                        style={{ fontSize: '0.78rem', padding: '0.3rem 0.65rem' }}
+                        title="إضافة تكليف في هذه الوحدة"
+                      >
+                        <Plus size={13} />
+                        <span>تكليف</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setTargetModuleId(mod.id);
+                          setIsAddExamModalOpen(true);
+                        }}
+                        className="btn btn-outline"
+                        style={{ fontSize: '0.78rem', padding: '0.3rem 0.65rem' }}
+                        title="إضافة اختبار في هذه الوحدة"
+                      >
+                        <Plus size={13} />
+                        <span>اختبار</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setModuleToEdit(mod);
+                          setEditModuleTitle(mod.title);
+                          setEditModuleDesc(mod.description || '');
+                          setEditModuleStatus(mod.status === 'coming_soon' ? 'coming_soon' : 'published');
+                          setIsEditModuleModalOpen(true);
+                        }}
+                        className="btn btn-ghost"
+                        style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem' }}
+                        title="تعديل عنوان ووصف هذه الوحدة"
+                      >
+                        <Edit3 size={13} />
+                        <span>تعديل</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteModule(mod.id, mod.title)}
+                        className="btn btn-ghost"
+                        style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem', color: '#ef4444' }}
+                        title="حذف هذه الوحدة بالكامل"
+                      >
+                        <Trash2 size={13} />
+                        <span>حذف</span>
+                      </button>
+                    </div>
                   </div>
 
-                  <div style={{ padding: '0.85rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {mod.lessons.map((les) => (
-                      <div
-                        key={les.id}
-                        style={{
-                          padding: '0.65rem 0.85rem',
-                          background: 'var(--bg-card)',
-                          border: '1px solid var(--border-color)',
-                          borderRadius: 'var(--radius-sm)',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          flexWrap: 'wrap',
-                          gap: '0.5rem',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <PlayCircle size={16} color="var(--primary-600)" />
-                          <strong style={{ fontSize: '0.88rem' }}>{les.title}</strong>
-                          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>({les.durationMinutes} دقيقة)</span>
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '0.4rem' }}>
-                          <button
-                            onClick={() => setPreviewLesson(les)}
-                            className="btn btn-outline"
-                            style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem' }}
+                  {/* قائمة العناصر داخل المديول (الدروس والتكليفات والامتحانات) */}
+                  <div style={{ padding: '1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                    {/* 1. الدروس */}
+                    {mod.lessons && mod.lessons.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                          🎥 المحاضرات المسجلة ({mod.lessons.length}):
+                        </span>
+                        {mod.lessons.map((les) => (
+                          <div
+                            key={les.id}
+                            style={{
+                              padding: '0.65rem 0.85rem',
+                              background: 'var(--bg-card)',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: 'var(--radius-sm)',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              flexWrap: 'wrap',
+                              gap: '0.5rem',
+                            }}
                           >
-                            <span>معاينة</span>
-                          </button>
-                          {les.drivePdfUrl && (
-                            <a href={les.drivePdfUrl} target="_blank" rel="noreferrer" className="btn btn-outline" style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem' }}>
-                              <span>السلايدات</span>
-                            </a>
-                          )}
-                        </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <PlayCircle size={16} color="var(--primary-600)" />
+                              <strong style={{ fontSize: '0.88rem' }}>{les.title}</strong>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>({les.durationMinutes} دقيقة)</span>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                              <button
+                                onClick={() => setPreviewLesson(les)}
+                                className="btn btn-outline"
+                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.55rem' }}
+                              >
+                                <span>معاينة</span>
+                              </button>
+                              {les.drivePdfUrl && (
+                                <a
+                                  href={les.drivePdfUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="btn btn-outline"
+                                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.55rem' }}
+                                >
+                                  <span>السلايدات</span>
+                                </a>
+                              )}
+                              <button
+                                onClick={() => handleDeleteLesson(mod.id, les.id, les.title)}
+                                className="btn btn-ghost"
+                                style={{ padding: '0.25rem 0.45rem', color: '#ef4444' }}
+                                title="حذف هذا الدرس"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
+
+                    {/* 2. التكليفات داخل هذا المديول */}
+                    {mod.assignments && mod.assignments.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                          📄 التكليفات العملية ({mod.assignments.length}):
+                        </span>
+                        {mod.assignments.map((asg) => (
+                          <div
+                            key={asg.id}
+                            style={{
+                              padding: '0.65rem 0.85rem',
+                              background: 'var(--bg-card)',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: 'var(--radius-sm)',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              flexWrap: 'wrap',
+                              gap: '0.5rem',
+                              borderRight: '3px solid var(--accent-emerald)'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <FileText size={16} color="var(--accent-emerald)" />
+                              <div>
+                                <strong style={{ fontSize: '0.88rem', display: 'block' }}>{asg.title}</strong>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                  الدرجة القصوى: {asg.maxScore} نقطة {asg.deadline ? `• الموعد: ${asg.deadline}` : ''}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                              {asg.driveTemplateUrl && (
+                                <a
+                                  href={asg.driveTemplateUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="btn btn-outline"
+                                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.55rem' }}
+                                >
+                                  <ExternalLink size={12} />
+                                  <span>قالب Drive</span>
+                                </a>
+                              )}
+                              <button
+                                onClick={() => handleDeleteAssignment(mod.id, asg.id, asg.title)}
+                                className="btn btn-ghost"
+                                style={{ padding: '0.25rem 0.45rem', color: '#ef4444' }}
+                                title="حذف هذا التكليف"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* 3. الامتحانات والاختبارات داخل هذا المديول */}
+                    {mod.exams && mod.exams.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                          🏆 الاختبارات والتقييمات ({mod.exams.length}):
+                        </span>
+                        {mod.exams.map((ex) => (
+                          <div
+                            key={ex.id}
+                            style={{
+                              padding: '0.65rem 0.85rem',
+                              background: 'var(--bg-card)',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: 'var(--radius-sm)',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              flexWrap: 'wrap',
+                              gap: '0.5rem',
+                              borderRight: '3px solid var(--accent-gold)'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <Award size={16} color="var(--accent-gold)" />
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                  <strong style={{ fontSize: '0.88rem' }}>{ex.title}</strong>
+                                  <span className="badge badge-gold" style={{ fontSize: '0.72rem' }}>
+                                    {ex.examType === 'quiz' ? 'كويز سريع' : ex.examType === 'theory' ? 'نظري Mid-Term' : 'امتحان شامل'}
+                                  </span>
+                                </div>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                  المدة: {ex.durationMinutes} دقيقة • الدرجة: {ex.maxScore} نقطة • الأسئلة: {ex.questions?.length || 0} أسئلة
+                                </span>
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                              <button
+                                onClick={() => handleDeleteExam(mod.id, ex.id, ex.title)}
+                                className="btn btn-ghost"
+                                style={{ padding: '0.25rem 0.45rem', color: '#ef4444' }}
+                                title="حذف هذا الاختبار"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* إذا كانت الوحدة فارغة تماماً */}
+                    {(!mod.lessons || mod.lessons.length === 0) &&
+                     (!mod.assignments || mod.assignments.length === 0) &&
+                     (!mod.exams || mod.exams.length === 0) && (
+                      <div style={{ padding: '1.25rem', textAlign: 'center', background: 'var(--bg-card)', borderRadius: 'var(--radius-sm)', border: '1px dashed var(--border-color)', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                        الوحدة فارغة حالياً. استخدم أزرار <strong>(+ درس)</strong> أو <strong>(+ تكليف)</strong> أو <strong>(+ اختبار)</strong> بالأعلى لإضافة محتوى إليها.
+                      </div>
+                    )}
                   </div>
                 </div>
-              ))}
-            </div>
+              ))
+            )}
           </div>
         </div>
       )}
@@ -1133,17 +1658,339 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                         id: 'student-1',
                         name: 'أحمد محمد الصالح',
                         score: practicalGrades['student-1']?.score || 42,
-                        notes: practicalGrades['student-1']?.notes || '',
+                        notes: practicalGrades['student-1']?.notes || 'أداء ممتاز في اختبار تحليل البيانات الإحصائية الحضوري',
                       })}
                       className="btn btn-outline"
                       style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
                     >
+                      <Edit3 size={13} />
+                      <span>تعديل الدرجة</span>
+                    </button>
+                  </td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                  <td style={{ padding: '0.85rem' }}>
+                    <strong>سارة خالد الكيلاني</strong>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>جامعة العلوم والتكنولوجيا - دكتور صيدلة</div>
+                  </td>
+                  <td style={{ padding: '0.85rem', fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary-700)' }}>
+                    {practicalGrades['student-2']?.score || 38} / 50
+                  </td>
+                  <td style={{ padding: '0.85rem', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                    {practicalGrades['student-2']?.notes || 'جيد جداً مع ملاحظة طفيفة في صياغة الفرضية'}
+                  </td>
+                  <td style={{ padding: '0.85rem' }}>
+                    <button
+                      onClick={() => setSelectedPracticalStudent({
+                        id: 'student-2',
+                        name: 'سارة خالد الكيلاني',
+                        score: practicalGrades['student-2']?.score || 38,
+                        notes: practicalGrades['student-2']?.notes || 'جيد جداً مع ملاحظة طفيفة في صياغة الفرضية',
+                      })}
+                      className="btn btn-outline"
+                      style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
+                    >
+                      <Edit3 size={13} />
                       <span>تعديل الدرجة</span>
                     </button>
                   </td>
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          {/* نافذة تعديل درجة الامتحان العملي الحضوري */}
+          {selectedPracticalStudent && (
+            <div className="modal-overlay">
+              <div className="modal-content" style={{ maxWidth: '520px', width: '100%', position: 'relative' }}>
+                <button
+                  onClick={() => setSelectedPracticalStudent(null)}
+                  className="btn btn-ghost"
+                  style={{ position: 'absolute', top: '12px', left: '12px' }}
+                >
+                  ✕
+                </button>
+
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '0.4rem' }}>
+                  رصد وتعديل درجة الامتحان العملي: {selectedPracticalStudent.name}
+                </h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
+                  الامتحان العملي الحضوري في المعمل المركزي
+                </p>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                    الدرجة المرصودة (من 50):
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={50}
+                    value={selectedPracticalStudent.score}
+                    onChange={(e) => setSelectedPracticalStudent({ ...selectedPracticalStudent, score: Number(e.target.value) })}
+                    style={{ width: '130px', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '2px solid var(--primary-600)', fontSize: '1.2rem', fontWeight: 800, textAlign: 'center' }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                    الملاحظات الأكاديمية على أداء الطالب:
+                  </label>
+                  <input
+                    type="text"
+                    value={selectedPracticalStudent.notes}
+                    onChange={(e) => setSelectedPracticalStudent({ ...selectedPracticalStudent, notes: e.target.value })}
+                    style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                  <button onClick={() => setSelectedPracticalStudent(null)} className="btn btn-outline">
+                    إلغاء
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (onUpdatePracticalGrade) {
+                        onUpdatePracticalGrade(selectedPracticalStudent.id, selectedPracticalStudent.score, selectedPracticalStudent.notes);
+                      } else {
+                        setLocalPracticalGrades((prev) => ({
+                          ...prev,
+                          [selectedPracticalStudent.id]: {
+                            score: selectedPracticalStudent.score,
+                            notes: selectedPracticalStudent.notes,
+                          }
+                        }));
+                      }
+
+                      if (onLogAudit) {
+                        onLogAudit(
+                          'رصد/تعديل درجة الامتحان العملي الحضوري',
+                          `رصد درجة الطالب (${selectedPracticalStudent.name}): ${selectedPracticalStudent.score}/50. الملاحظات: ${selectedPracticalStudent.notes}`
+                        );
+                      }
+
+                      setSelectedPracticalStudent(null);
+                    }}
+                    className="btn btn-primary"
+                  >
+                    <Save size={15} />
+                    <span>حفظ وتثبيت الدرجة</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* نافذة إضافة مديول / وحدة دراسية جديدة */}
+      {isAddModuleModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '520px' }}>
+            <button
+              onClick={() => setIsAddModuleModalOpen(false)}
+              className="btn btn-ghost"
+              style={{ position: 'absolute', top: '16px', left: '16px', padding: '0.4rem' }}
+            >
+              ✕
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
+              <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(14, 165, 233, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <FolderPlus size={20} color="var(--primary-600)" />
+              </div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0 }}>إضافة وحدة دراسية (مديول) جديد</h3>
+            </div>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
+              قم بتقسيم وتوزيع محتوى الكورس على وحدات دراسية متسلسلة أكاديمياً.
+            </p>
+
+            <form onSubmit={handleAddModule} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                  اسم الوحدة الدراسية *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newModuleTitle}
+                  onChange={(e) => setNewModuleTitle(e.target.value)}
+                  placeholder="مثال: الوحدة الثالثة: تحليل البيانات وصياغة الورقة العلمية"
+                  style={{
+                    width: '100%',
+                    padding: '0.65rem',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-color)',
+                    background: 'var(--bg-main)',
+                    color: 'var(--text-main)',
+                    fontFamily: 'var(--font-arabic)'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                  وصف مختصر لأهداف ومحاور الوحدة
+                </label>
+                <textarea
+                  rows={3}
+                  value={newModuleDesc}
+                  onChange={(e) => setNewModuleDesc(e.target.value)}
+                  placeholder="أهداف التعلم ومخرجات هذه الوحدة..."
+                  style={{
+                    width: '100%',
+                    padding: '0.65rem',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-color)',
+                    background: 'var(--bg-main)',
+                    color: 'var(--text-main)',
+                    fontFamily: 'var(--font-arabic)'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                  حالة نشر الوحدة التعليمية
+                </label>
+                <select
+                  value={newModuleStatus}
+                  onChange={(e) => setNewModuleStatus(e.target.value as any)}
+                  style={{
+                    width: '100%',
+                    padding: '0.65rem',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-color)',
+                    background: 'var(--bg-main)',
+                    color: 'var(--text-main)'
+                  }}
+                >
+                  <option value="published">منشورة ومتاحة للدراسة والتسلسل (Published)</option>
+                  <option value="coming_soon">قريباً / قيد الإعداد الأكاديمي (Coming Soon - مقفلة للطلاب)</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsAddModuleModalOpen(false)}
+                  className="btn btn-outline"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                >
+                  <Plus size={15} />
+                  <span>إنشاء الوحدة التعليمية</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* نافذة تعديل بيانات المديول / الوحدة الدراسية */}
+      {isEditModuleModalOpen && moduleToEdit && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '520px' }}>
+            <button
+              onClick={() => setIsEditModuleModalOpen(false)}
+              className="btn btn-ghost"
+              style={{ position: 'absolute', top: '16px', left: '16px', padding: '0.4rem' }}
+            >
+              ✕
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
+              <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(99, 102, 241, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Edit3 size={18} color="var(--primary-600)" />
+              </div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0 }}>تعديل بيانات الوحدة الدراسية</h3>
+            </div>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
+              تعديل مسمى الوحدة ووصفها المنهجي وحالة النشر.
+            </p>
+
+            <form onSubmit={handleSaveEditModule} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                  اسم الوحدة الدراسية *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editModuleTitle}
+                  onChange={(e) => setEditModuleTitle(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.65rem',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-color)',
+                    background: 'var(--bg-main)',
+                    color: 'var(--text-main)',
+                    fontFamily: 'var(--font-arabic)'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                  وصف الوحدة
+                </label>
+                <textarea
+                  rows={3}
+                  value={editModuleDesc}
+                  onChange={(e) => setEditModuleDesc(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.65rem',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-color)',
+                    background: 'var(--bg-main)',
+                    color: 'var(--text-main)',
+                    fontFamily: 'var(--font-arabic)'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                  حالة نشر الوحدة التعليمية
+                </label>
+                <select
+                  value={editModuleStatus}
+                  onChange={(e) => setEditModuleStatus(e.target.value as any)}
+                  style={{
+                    width: '100%',
+                    padding: '0.65rem',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-color)',
+                    background: 'var(--bg-main)',
+                    color: 'var(--text-main)'
+                  }}
+                >
+                  <option value="published">منشورة ومتاحة للدراسة والتسلسل (Published)</option>
+                  <option value="coming_soon">قريباً / قيد الإعداد الأكاديمي (Coming Soon - مقفلة للطلاب)</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsEditModuleModalOpen(false)}
+                  className="btn btn-outline"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                >
+                  <Save size={15} />
+                  <span>حفظ التعديلات</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -1155,6 +2002,18 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
             <button onClick={() => setIsAddLessonModalOpen(false)} className="btn btn-ghost" style={{ position: 'absolute', top: '16px', left: '16px', padding: '0.4rem' }}>✕</button>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '1rem' }}>إضافة درس ومحاضرة إلى الكورس</h3>
             <form onSubmit={handleAddLesson} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>الوحدة الدراسية (المديول) المستهدف *</label>
+                <select
+                  value={targetModuleId || curriculum.modules?.[0]?.id || ''}
+                  onChange={(e) => setTargetModuleId(e.target.value)}
+                  style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
+                >
+                  {(curriculum.modules || []).map((m) => (
+                    <option key={m.id} value={m.id}>{m.title}</option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>عنوان الدرس *</label>
                 <input type="text" required value={newLessonTitle} onChange={(e) => setNewLessonTitle(e.target.value)} placeholder="مثال: الدرس 4: صياغة استراتيجية MeSH" style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }} />
@@ -1183,6 +2042,18 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
             <button onClick={() => setIsAddAssignmentModalOpen(false)} className="btn btn-ghost" style={{ position: 'absolute', top: '16px', left: '16px', padding: '0.4rem' }}>✕</button>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '1rem' }}>إضافة تكليف جديد للكورس</h3>
             <form onSubmit={handleAddAssignment} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>الوحدة الدراسية (المديول) المستهدف *</label>
+                <select
+                  value={targetModuleId || curriculum.modules?.[0]?.id || ''}
+                  onChange={(e) => setTargetModuleId(e.target.value)}
+                  style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
+                >
+                  {(curriculum.modules || []).map((m) => (
+                    <option key={m.id} value={m.id}>{m.title}</option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>عنوان التكليف الأكاديمي *</label>
                 <input type="text" required value={assignmentTitle} onChange={(e) => setAssignmentTitle(e.target.value)} placeholder="مثال: التكليف 3: تحليل البيانات واستخلاص النتائج" style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }} />
@@ -1227,6 +2098,18 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
             <form onSubmit={handleSaveExam} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>الوحدة الدراسية (المديول) المستهدف *</label>
+                  <select
+                    value={targetModuleId || curriculum.modules?.[0]?.id || ''}
+                    onChange={(e) => setTargetModuleId(e.target.value)}
+                    style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
+                  >
+                    {(curriculum.modules || []).map((m) => (
+                      <option key={m.id} value={m.id}>{m.title}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>نوع الاختبار *</label>
                   <select value={examType} onChange={(e) => setExamType(e.target.value as any)} style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }}>
                     <option value="theory">اختبار منتصف المسار النظري (Mid-term MCQ)</option>
@@ -1235,10 +2118,11 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                     <option value="practical">متطلب امتحان عملي حضوري</option>
                   </select>
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>عنوان الاختبار *</label>
-                  <input type="text" required value={examTitle} onChange={(e) => setExamTitle(e.target.value)} placeholder="مثال: كويز الوحدة الثانية" style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }} />
-                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>عنوان الاختبار *</label>
+                <input type="text" required value={examTitle} onChange={(e) => setExamTitle(e.target.value)} placeholder="مثال: كويز الوحدة الثانية" style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }} />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
