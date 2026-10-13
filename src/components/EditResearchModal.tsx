@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ResearchPaper } from '../types';
 import { Edit3, X, Upload, Image, Check, Trash2 } from 'lucide-react';
+import { sanitizeUrl } from '../utils/security';
 
 const RESEARCH_IMAGE_PRESETS = [
   {
@@ -106,10 +107,10 @@ export const EditResearchModal: React.FC<EditResearchModalProps> = ({
       field: field.trim(),
       journal: journal.trim(),
       publicationYear: Number(publicationYear) || 2026,
-      doiLink: doiLink.trim() || paper.doiLink,
-      pubmedLink: pubmedLink.trim() || undefined,
+      doiLink: sanitizeUrl(doiLink.trim() || paper.doiLink),
+      pubmedLink: pubmedLink.trim() ? sanitizeUrl(pubmedLink.trim()) : undefined,
       abstract: abstract.trim() || paper.abstract,
-      coverImageUrl: coverImageUrl.trim() || RESEARCH_IMAGE_PRESETS[0].url,
+      coverImageUrl: coverImageUrl.trim() ? (coverImageUrl.startsWith('data:image/') ? coverImageUrl : sanitizeUrl(coverImageUrl.trim())) : RESEARCH_IMAGE_PRESETS[0].url,
     };
 
     onUpdateResearch(updatedPaper);

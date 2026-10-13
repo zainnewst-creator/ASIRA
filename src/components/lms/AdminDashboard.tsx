@@ -23,6 +23,7 @@ import {
   MockCertificateRequest
 } from '../../data/mockData';
 import { UserRole } from '../../types';
+import { sanitizeUrl } from '../../utils/security';
 import { exportPlatformData, validateRestorePackage } from '../../services/backupService';
 
 export interface AdminDashboardProps {
@@ -718,7 +719,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <td style={{ padding: '0.85rem' }}>
                         {req.signedPdfUrl ? (
                           <a
-                            href={req.signedPdfUrl}
+                            href={sanitizeUrl(req.signedPdfUrl)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="btn btn-outline"

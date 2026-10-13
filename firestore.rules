@@ -14,20 +14,25 @@ service cloud.firestore {
     }
 
     // فحص صلاحية المدير (Admin Verification)
-    // يدعم بريد الإدارة المؤسس المعتمد أو دور admin المسجل في قاعدة البيانات
+    // يعتمد على Custom Claims أولاً، ثم البريد المعتمد الموثق، ثم دور قاعدة البيانات
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.token.email == 'admin@asira-research.org' ||
+        request.auth.token.admin == true ||
+        request.auth.token.role == 'admin' ||
+        (request.auth.token.email == 'admin@asira-research.org' && request.auth.token.email_verified == true) ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
       );
     }
 
-    // فحص صلاحية المدرس
+    // فحص صلاحية المدرس (Instructor Verification)
     function isInstructor() {
-      return isSignedIn() && 
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'instructor';
+      return isSignedIn() && (
+        request.auth.token.instructor == true ||
+        request.auth.token.role == 'instructor' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'instructor')
+      );
     }
 
     // فحص إسناد المدرس للدورة المحددة
@@ -37,7 +42,7 @@ service cloud.firestore {
         request.auth.uid in get(/databases/$(database)/documents/courses/$(courseId)).data.instructorIds;
     }
 
-    // فحص تسجيل الطالب المعتمد في الدورة
+    // فحص تسجيل الطالب المعتمد في الدورة (Approved Enrollment)
     function isApprovedStudent(courseId) {
       return isSignedIn() && 
         exists(/databases/$(database)/documents/courses/$(courseId)/enrollments/$(request.auth.uid)) &&
@@ -45,24 +50,25 @@ service cloud.firestore {
     }
 
     // ==========================================
-    // 1. المستخدمون (Users) - منع تصعيد الصلاحيات الصارم
+    // 1. المستخدمون (Users) - حماية الخصوصية ومنع تصعيد الصلاحيات
     // ==========================================
     match /users/{uid} {
-      // الطالب يقرأ ملفه الشخصي، والمدير والمدرس يقرؤون لأغراض أكاديمية
-      allow read: if isSignedIn();
+      // حماية الخصوصية: الطالب يقرأ ملفه فقط، والمدير والمدرس يقرؤون للأغراض الأكاديمية
+      allow read: if isOwner(uid) || isAdmin() || isInstructor();
 
-      // إنشاء الحساب: إجباري دور student وحالة active
+      // إنشاء الحساب: إجباري دور student وحالة active، ومطابقة uid الوثيقة
       allow create: if isOwner(uid) && 
         request.resource.data.role == 'student' &&
-        request.resource.data.accountStatus == 'active';
+        request.resource.data.accountStatus == 'active' &&
+        request.resource.data.uid == uid;
 
-      // التعديل: الطالب لا يستطيع تعديل دوره أو حالة حسابه
+      // التعديل: الطالب لا يستطيع تعديل دوره أو حالة حسابه أو تاريخ إنشائه أو البريد
       allow update: if isAdmin() || (
         isOwner(uid) && 
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'accountStatus', 'createdAt'])
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'accountStatus', 'createdAt', 'uid', 'email'])
       );
 
-      // الحذف المباشر محظور لحماية النزاهة الأكاديمية
+      // الحذف المباشر محظور لحماية النزاهة وسجلات التدقيق
       allow delete: if false;
     }
 
@@ -74,7 +80,7 @@ service cloud.firestore {
       allow read: if resource.data.status == 'published' || isAdmin() || isCourseInstructor(courseId);
       allow write: if isAdmin() || isCourseInstructor(courseId);
 
-      // أ. الوحدات (Modules)
+      // أ. الوحدات والمديولات (Modules)
       match /modules/{moduleId} {
         allow read: if isApprovedStudent(courseId) || isAdmin() || isCourseInstructor(courseId);
         allow write: if isAdmin() || isCourseInstructor(courseId);
@@ -95,8 +101,12 @@ service cloud.firestore {
       match /enrollments/{studentUid} {
         allow read: if isOwner(studentUid) || isAdmin() || isCourseInstructor(courseId);
         
-        // الطالب يطلب الالتحاق بحالة pending فقط
-        allow create: if isOwner(studentUid) && request.resource.data.status == 'pending';
+        // الطالب يطلب الالتحاق بحالة pending فقط دون تزوير حالة المراجعة
+        allow create: if isOwner(studentUid) && 
+          request.resource.data.status == 'pending' &&
+          request.resource.data.studentUid == studentUid &&
+          !('reviewedBy' in request.resource.data) &&
+          !('reviewedAt' in request.resource.data);
         
         // فقط المدير أو مدرس الدورة يعتمد أو يرفض الطلب
         allow update: if isAdmin() || isCourseInstructor(courseId);
@@ -108,9 +118,12 @@ service cloud.firestore {
         allow read: if isSignedIn() && (
           request.auth.uid == resource.data.studentUid || isAdmin() || isCourseInstructor(courseId)
         );
-        allow write: if isSignedIn() && (
-          request.auth.uid == request.resource.data.studentUid || isAdmin()
+        allow create, update: if isAdmin() || (
+          isApprovedStudent(courseId) &&
+          request.resource.data.studentUid == request.auth.uid &&
+          request.resource.data.courseId == courseId
         );
+        allow delete: if false;
       }
 
       // هـ. التكليفات والتسليمات (Assignments & Submissions)
@@ -120,9 +133,25 @@ service cloud.firestore {
 
         match /submissions/{studentUid} {
           allow read: if isOwner(studentUid) || isAdmin() || isCourseInstructor(courseId);
-          // الطالب يسلم الرابط، ولا يملك وضع الدرجة
-          allow create, update: if (isOwner(studentUid) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['grade', 'gradedBy', 'gradedAt'])) ||
-                                isAdmin() || isCourseInstructor(courseId);
+          
+          // الطالب يسلم الرابط فقط عند اعتماده في الكورس، وممنوع إرسال أي حقول درجات
+          allow create: if (
+            isOwner(studentUid) &&
+            isApprovedStudent(courseId) &&
+            request.resource.data.studentUid == studentUid &&
+            request.resource.data.status == 'submitted' &&
+            !('grade' in request.resource.data) &&
+            !('gradedBy' in request.resource.data) &&
+            !('gradedAt' in request.resource.data)
+          ) || isAdmin() || isCourseInstructor(courseId);
+
+          // الطالب يحدث تسليمه دون المساس بحقول التقييم
+          allow update: if (
+            isOwner(studentUid) &&
+            isApprovedStudent(courseId) &&
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['grade', 'gradedBy', 'gradedAt'])
+          ) || isAdmin() || isCourseInstructor(courseId);
+
           allow delete: if false;
         }
       }
@@ -138,25 +167,45 @@ service cloud.firestore {
           allow read, write: if isAdmin() || isCourseInstructor(courseId);
         }
 
-        // محاولات الطلاب (Attempts)
+        // محاولات الطلاب (Attempts) - منع تزوير الدرجات عند التسليم
         match /attempts/{attemptDoc} {
           allow read: if (isSignedIn() && request.auth.uid == resource.data.studentUid) || isAdmin() || isCourseInstructor(courseId);
-          allow create: if isOwner(request.resource.data.studentUid);
-          allow update: if (isOwner(resource.data.studentUid) && resource.data.status == 'in_progress') || isAdmin() || isCourseInstructor(courseId);
+          
+          // الطالب يسلم إجاباته فقط، وممنوع تمرير درجات أو تغيير الحالة إلى معتمد
+          allow create: if (
+            isApprovedStudent(courseId) &&
+            isOwner(request.resource.data.studentUid) &&
+            request.resource.data.courseId == courseId &&
+            request.resource.data.examId == examId &&
+            request.resource.data.status in ['in_progress', 'submitted'] &&
+            !('calculatedScore' in request.resource.data) &&
+            !('officialGrade' in request.resource.data) &&
+            !('score' in request.resource.data)
+          ) || isAdmin() || isCourseInstructor(courseId);
+
+          // الطالب يحدث الإجابات أثناء الاختبار فقط، وممنوع حقن أي درجات
+          allow update: if (
+            isOwner(resource.data.studentUid) &&
+            resource.data.status == 'in_progress' &&
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['score', 'officialGrade', 'calculatedScore', 'gradedBy'])
+          ) || isAdmin() || isCourseInstructor(courseId);
+
           allow delete: if false;
         }
       }
 
-      // ز. الدرجات الرسمية المعتمدة (Official Grades) - محظور كتابة الطالب
+      // ز. الدرجات الرسمية المعتمدة (Official Grades) - محظور كتابة الطالب نهائياً
       match /officialGrades/{gradeDoc} {
         allow read: if (isSignedIn() && request.auth.uid == resource.data.studentUid) || isAdmin() || isCourseInstructor(courseId);
         allow write: if isAdmin() || isCourseInstructor(courseId);
+        allow delete: if false;
       }
 
-      // ح. درجات الامتحان العملي (Practical Grades)
+      // ح. درجات الامتحان العملي (Practical Grades) - محظور كتابة الطالب نهائياً
       match /practicalGrades/{practicalDoc} {
         allow read: if (isSignedIn() && request.auth.uid == resource.data.studentUid) || isAdmin() || isCourseInstructor(courseId);
         allow write: if isAdmin() || isCourseInstructor(courseId);
+        allow delete: if false;
       }
     }
 
@@ -166,7 +215,19 @@ service cloud.firestore {
     match /certificates/{certId} {
       // القراءة متاحة للجميع للتحقق من كود الشهادة الأكاديمي
       allow read: if true;
-      allow create, update: if isAdmin();
+
+      // إنشاء طلب شهادة: الطالب يقدم طلباً بحالة requested فقط دون تزوير رابط أو اعتماد
+      allow create: if isAdmin() || (
+        isSignedIn() &&
+        isOwner(request.resource.data.studentUid) &&
+        request.resource.data.status == 'requested' &&
+        !('signedPdfDriveUrl' in request.resource.data) &&
+        !('issuedBy' in request.resource.data) &&
+        isApprovedStudent(request.resource.data.courseId)
+      );
+
+      // التعديل والإصدار وتوثيق التوقيع حصري للمدير فقط
+      allow update: if isAdmin();
       allow delete: if false;
     }
 
@@ -184,7 +245,12 @@ service cloud.firestore {
     }
 
     match /contactMessages/{msgId} {
-      allow create: if true; // إرسال استفسار من زوار الموقع
+      // التحقق من صحة وحجم الرسائل لمنع الإغراق
+      allow create: if request.resource.data.keys().hasAll(['name', 'email', 'message']) &&
+        request.resource.data.name is string &&
+        request.resource.data.email is string &&
+        request.resource.data.message is string &&
+        request.resource.data.message.size() <= 3000;
       allow read, update, delete: if isAdmin();
     }
 
@@ -194,12 +260,16 @@ service cloud.firestore {
     }
 
     // ==========================================
-    // 5. سجل العمليات والتدقيق (Audit Logs) - إضافة فقط وممنوع الحذف
+    // 5. سجل العمليات والتدقيق (Audit Logs) - منع التزوير والانتحال
     // ==========================================
     match /auditLogs/{logId} {
       allow read: if isAdmin();
-      allow create: if isSignedIn();
-      allow update, delete: if false; // سجل تاريخي غير قابل للتلاعب
+      // منع انتحال صفة مدراء آخرين: إجباري مطابقة actorUid ومطابقة الدور الفعلي
+      allow create: if isSignedIn() && 
+        request.resource.data.actorUid == request.auth.uid &&
+        (request.resource.data.actorRole != 'admin' || isAdmin()) &&
+        (request.resource.data.actorRole != 'instructor' || isInstructor() || isAdmin());
+      allow update, delete: if false; // سجل تاريخي غير قابل للتلاعب أو الحذف
     }
 
     // إغلاق أي مسارات أخرى غير معرفة

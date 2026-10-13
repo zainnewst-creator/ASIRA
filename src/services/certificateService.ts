@@ -1,7 +1,7 @@
 // ===================================================
 // منظومة الشهادات والتحقق الأكاديمي (Certificate Service)
 // ===================================================
-import { doc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import { Certificate } from '../types';
 import { logAuditEvent } from './auditService';
@@ -95,22 +95,51 @@ export const issueSignedCertificate = async (
 export const verifyCertificateByCode = async (
   verificationCode: string
 ): Promise<{ valid: boolean; certificate?: Certificate }> => {
-  // محاكاة سريعة للتحقق
-  if (verificationCode.toUpperCase().startsWith('ASIRA-')) {
+  const code = verificationCode.trim().toUpperCase();
+  if (!code) return { valid: false };
+
+  try {
+    const q = query(collection(db, 'certificates'), where('verificationCode', '==', code), where('status', '==', 'issued'));
+    const snapshot = await getDocs(q);
+    if (!snapshot.empty) {
+      const certDoc = snapshot.docs[0];
+      const data = certDoc.data() as Certificate;
+      return {
+        valid: true,
+        certificate: {
+          certId: certDoc.id,
+          studentUid: data.studentUid,
+          studentName: data.studentName,
+          courseId: data.courseId,
+          courseTitle: data.courseTitle,
+          issueDate: data.issueDate,
+          status: 'issued',
+          verificationCode: data.verificationCode,
+          signedPdfDriveUrl: data.signedPdfDriveUrl,
+        }
+      };
+    }
+  } catch (err) {
+    console.info('[Certificate] Firestore lookup fallback:', err);
+  }
+
+  // الكود المعتمد الافتراضي في البيانات التجريبية
+  if (code === 'ASIRA-2026-8812') {
     return {
       valid: true,
       certificate: {
-        certId: 'sample-cert-id',
+        certId: 'CERT_course-1_student-1',
         studentUid: 'student-1',
         studentName: 'أحمد محمد الصالح',
-        courseId: 'RES-101',
+        courseId: 'course-1',
         courseTitle: 'منهجية وأساسيات البحث العلمي والنشر الدولي',
         issueDate: '2026-10-12',
         status: 'issued',
-        verificationCode,
+        verificationCode: 'ASIRA-2026-8812',
         signedPdfDriveUrl: 'https://drive.google.com/file/d/sampleSignedCertificate/view',
       },
     };
   }
+
   return { valid: false };
 };

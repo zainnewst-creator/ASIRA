@@ -1,6 +1,7 @@
 import React from 'react';
 import { Award, CheckCircle2, Download, Printer, ShieldCheck, X, ExternalLink } from 'lucide-react';
 import { Course } from '../../types';
+import { sanitizeUrl } from '../../utils/security';
 
 interface AcademicCertificateModalProps {
   isOpen: boolean;
@@ -54,7 +55,7 @@ export const AcademicCertificateModal: React.FC<AcademicCertificateModalProps> =
           <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
             {signedPdfUrl && (
               <a
-                href={signedPdfUrl}
+                href={sanitizeUrl(signedPdfUrl)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn btn-primary"

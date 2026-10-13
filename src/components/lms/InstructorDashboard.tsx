@@ -33,6 +33,7 @@ import { Course, ResearchPaper } from '../../types';
 import { AddCourseModal } from '../AddCourseModal';
 import { AddResearchModal } from '../AddResearchModal';
 import { EditCourseModal } from '../EditCourseModal';
+import { sanitizeUrl } from '../../utils/security';
 
 export interface InstructorDashboardProps {
   courses?: Course[];
@@ -826,7 +827,7 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                     </td>
                     <td style={{ padding: '0.85rem' }}>
                       <a
-                        href={sub.driveFileUrl}
+                        href={sanitizeUrl(sub.driveFileUrl)}
                         target="_blank"
                         rel="noreferrer"
                         className="btn btn-outline"
@@ -898,7 +899,7 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                 <div style={{ padding: '0.85rem', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>ملف حل التكليف على Google Drive:</span>
                   <a
-                    href={selectedSubmission.driveFileUrl}
+                    href={sanitizeUrl(selectedSubmission.driveFileUrl)}
                     target="_blank"
                     rel="noreferrer"
                     className="btn btn-outline"
@@ -1468,7 +1469,7 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                               </button>
                               {les.drivePdfUrl && (
                                 <a
-                                  href={les.drivePdfUrl}
+                                  href={sanitizeUrl(les.drivePdfUrl)}
                                   target="_blank"
                                   rel="noreferrer"
                                   className="btn btn-outline"
@@ -1526,7 +1527,7 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                             <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
                               {asg.driveTemplateUrl && (
                                 <a
-                                  href={asg.driveTemplateUrl}
+                                  href={sanitizeUrl(asg.driveTemplateUrl)}
                                   target="_blank"
                                   rel="noreferrer"
                                   className="btn btn-outline"

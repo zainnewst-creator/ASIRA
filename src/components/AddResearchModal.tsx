@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ResearchPaper } from '../types';
 import { FileText, Plus, X, Upload, Image, Check } from 'lucide-react';
+import { sanitizeUrl } from '../utils/security';
 
 const RESEARCH_IMAGE_PRESETS = [
   {
@@ -86,10 +87,10 @@ export const AddResearchModal: React.FC<AddResearchModalProps> = ({
       field: field.trim(),
       journal: journal.trim(),
       publicationYear: Number(publicationYear) || 2026,
-      doiLink: doiLink.trim() || 'https://doi.org/10.1000/182',
-      pubmedLink: pubmedLink.trim() || undefined,
+      doiLink: sanitizeUrl(doiLink.trim() || 'https://doi.org/10.1000/182'),
+      pubmedLink: pubmedLink.trim() ? sanitizeUrl(pubmedLink.trim()) : undefined,
       abstract: abstract.trim() || 'دراسة بحثية علمية محكمة أنجزها باحثو منتدى أسيرا وفق المعايير الأكاديمية الدولية.',
-      coverImageUrl: coverImageUrl.trim() || RESEARCH_IMAGE_PRESETS[0].url,
+      coverImageUrl: coverImageUrl.trim() ? (coverImageUrl.startsWith('data:image/') ? coverImageUrl : sanitizeUrl(coverImageUrl.trim())) : RESEARCH_IMAGE_PRESETS[0].url,
       status: 'published',
       isFeatured: true,
       viewsCount: 150,

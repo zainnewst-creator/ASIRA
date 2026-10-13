@@ -1,6 +1,7 @@
 import React from 'react';
 import { ExternalLink, BookOpen, Calendar, User, Eye, CheckCircle2, Edit3 } from 'lucide-react';
 import { ResearchPaper } from '../types';
+import { sanitizeUrl } from '../utils/security';
 
 interface ResearchCardProps {
   paper: ResearchPaper;
@@ -92,7 +93,7 @@ export const ResearchCard: React.FC<ResearchCardProps> = ({
       <div style={{ display: 'flex', gap: '0.75rem', marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--border-color)', flexWrap: 'wrap' }}>
         {paper.doiLink && (
           <a
-            href={paper.doiLink}
+            href={sanitizeUrl(paper.doiLink)}
             target="_blank"
             rel="noreferrer"
             className="btn btn-outline"
@@ -104,7 +105,7 @@ export const ResearchCard: React.FC<ResearchCardProps> = ({
         )}
         {paper.pubmedLink && (
           <a
-            href={paper.pubmedLink}
+            href={sanitizeUrl(paper.pubmedLink)}
             target="_blank"
             rel="noreferrer"
             className="btn btn-ghost"

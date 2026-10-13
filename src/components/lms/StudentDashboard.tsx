@@ -33,6 +33,7 @@ import {
 } from '../../data/mockData';
 import { Course } from '../../types';
 import { AcademicCertificateModal } from './AcademicCertificateModal';
+import { sanitizeUrl } from '../../utils/security';
 
 export interface StudentDashboardProps {
   courses?: Course[];
@@ -749,7 +750,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               </h4>
               <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
                 <a
-                  href={currentLesson?.drivePdfUrl || 'https://drive.google.com'}
+                  href={sanitizeUrl(currentLesson?.drivePdfUrl || 'https://drive.google.com')}
                   target="_blank"
                   rel="noreferrer"
                   className="btn btn-outline"
@@ -1631,7 +1632,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
                       {currentCertReq.signedPdfUrl ? (
                         <a
-                          href={currentCertReq.signedPdfUrl}
+                          href={sanitizeUrl(currentCertReq.signedPdfUrl)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="btn btn-primary"
