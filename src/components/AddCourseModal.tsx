@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Course } from '../types';
-import { BookOpen, Plus, X, Image, Award, Calendar, Layers } from 'lucide-react';
+import { BookOpen, Plus, X, Upload, Image, Award, CheckCircle } from 'lucide-react';
 
 interface AddCourseModalProps {
   isOpen: boolean;
@@ -17,12 +17,32 @@ export const AddCourseModal: React.FC<AddCourseModalProps> = ({
   const [code, setCode] = useState('RES-');
   const [summary, setSummary] = useState('');
   const [description, setDescription] = useState('');
-  const [instructorNames, setInstructorNames] = useState('د. إبراهيم يحيى');
+  const [instructorNames, setInstructorNames] = useState('د. إبراهيم يحيى, د. أحمد الصالح');
   const [coverUrl, setCoverUrl] = useState('https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=800&q=80');
   const [passingScore, setPassingScore] = useState(70);
   const [totalLessons, setTotalLessons] = useState(12);
+  const [fileName, setFileName] = useState<string>('');
 
   if (!isOpen) return null;
+
+  // رفع صورة الغلاف من جهاز المستخدم (File Upload -> Data URL)
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert('حجم الصورة كبير جداً، يرجى اختيار صورة حجمها أقل من 5 ميغابايت');
+        return;
+      }
+      setFileName(file.name);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setCoverUrl(event.target.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,7 +56,7 @@ export const AddCourseModal: React.FC<AddCourseModalProps> = ({
       description: description.trim() || summary.trim() || 'دورة تدريبية مكثفة معتمدة في منتدى أسيرا لتعليم البحث العلمي.',
       coverUrl: coverUrl.trim() || 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=800&q=80',
       instructorIds: ['inst-new'],
-      instructorNames: instructorNames.split(',').map((s) => s.trim()),
+      instructorNames: instructorNames.split(',').map((s) => s.trim()).filter(Boolean),
       startDate: '2026-11-20',
       endDate: '2026-12-31',
       status: 'published',
@@ -65,15 +85,17 @@ export const AddCourseModal: React.FC<AddCourseModalProps> = ({
     setCode('RES-');
     setSummary('');
     setDescription('');
+    setFileName('');
   };
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content" style={{ maxWidth: '680px' }}>
+      <div className="modal-content" style={{ maxWidth: '720px', maxHeight: '90vh', overflowY: 'auto' }}>
         <button
           onClick={onClose}
           className="btn btn-ghost"
           style={{ position: 'absolute', top: '16px', left: '16px', padding: '0.4rem' }}
+          id="close-add-course-modal"
         >
           <X size={20} />
         </button>
@@ -124,13 +146,14 @@ export const AddCourseModal: React.FC<AddCourseModalProps> = ({
 
           <div>
             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.3rem', color: 'var(--text-main)' }}>
-              المشرفون والمحاضرون (افصل بينهم بفاصلة)
+              الدكتور المشرف والمحاضرون (افصل بينهم بفاصلة) *
             </label>
             <input
               type="text"
+              required
               value={instructorNames}
               onChange={(e) => setInstructorNames(e.target.value)}
-              placeholder="مثال: د. إبراهيم يحيى, د. يحيى المنصوري"
+              placeholder="مثال: د. إبراهيم يحيى, د. أحمد الصالح, د. سارة الكيلاني"
               style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.9rem' }}
             />
           </div>
@@ -145,6 +168,19 @@ export const AddCourseModal: React.FC<AddCourseModalProps> = ({
               value={summary}
               onChange={(e) => setSummary(e.target.value)}
               placeholder="موجز عن أهداف الكورس والمخرجات المتوقعة من الطالب..."
+              style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.88rem', fontFamily: 'var(--font-arabic)' }}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.3rem', color: 'var(--text-main)' }}>
+              الوصف الشامل للمقرر
+            </label>
+            <textarea
+              rows={3}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="تفاصيل المنهج، المخرجات الأكاديمية والمهارات المكتسبة..."
               style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.88rem', fontFamily: 'var(--font-arabic)' }}
             />
           </div>
@@ -178,16 +214,71 @@ export const AddCourseModal: React.FC<AddCourseModalProps> = ({
             </div>
           </div>
 
-          <div>
-            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.3rem', color: 'var(--text-main)' }}>
-              رابط صورة الغلاف (Unsplash أو رابط خارجي)
-            </label>
-            <input
-              type="url"
-              value={coverUrl}
-              onChange={(e) => setCoverUrl(e.target.value)}
-              style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.85rem', direction: 'ltr', textAlign: 'left' }}
-            />
+          {/* قسم رفع صورة الغلاف والمعاينة المباشرة */}
+          <div style={{ padding: '1rem', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-color)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Image size={16} color="var(--primary-600)" />
+                <span>صورة غلاف الكورس (Cover Image):</span>
+              </label>
+
+              {/* زر رفع الصورة من الجهاز */}
+              <div>
+                <input
+                  type="file"
+                  id="add-course-image-input"
+                  accept="image/png, image/jpeg, image/webp"
+                  style={{ display: 'none' }}
+                  onChange={handleImageFileChange}
+                />
+                <label
+                  htmlFor="add-course-image-input"
+                  className="btn btn-primary"
+                  style={{ cursor: 'pointer', fontSize: '0.82rem', padding: '0.4rem 0.85rem' }}
+                >
+                  <Upload size={14} />
+                  <span>رفع صورة من جهازك</span>
+                </label>
+              </div>
+            </div>
+
+            {/* معاينة الصورة ومربع الرابط */}
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ width: '130px', height: '80px', borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--border-color)', background: '#000', flexShrink: 0 }}>
+                {coverUrl ? (
+                  <img
+                    src={coverUrl}
+                    alt="معاينة الغلاف"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94a3b8', fontSize: '0.75rem' }}>
+                    لا توجد صورة
+                  </div>
+                )}
+              </div>
+
+              <div style={{ flex: 1, minWidth: '220px' }}>
+                {fileName && (
+                  <div style={{ fontSize: '0.8rem', color: 'var(--accent-emerald)', fontWeight: 600, marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <CheckCircle size={14} />
+                    <span>تم تحديد الملف: {fileName}</span>
+                  </div>
+                )}
+                <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
+                  أو يمكنك وضع رابط مباشر للصورة:
+                </label>
+                <input
+                  type="url"
+                  value={coverUrl}
+                  onChange={(e) => {
+                    setCoverUrl(e.target.value);
+                    setFileName('');
+                  }}
+                  style={{ width: '100%', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.82rem', direction: 'ltr', textAlign: 'left' }}
+                />
+              </div>
+            </div>
           </div>
 
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.75rem' }}>

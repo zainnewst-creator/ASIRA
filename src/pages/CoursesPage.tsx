@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { Search, Filter, BookOpen, Clock, Award, Users, CheckCircle, ArrowLeft, Plus } from 'lucide-react';
 import { INITIAL_COURSES } from '../data/mockData';
 import { CourseCard } from '../components/CourseCard';
-import { Course } from '../types';
+import { Course, UserRole } from '../types';
 import { AddCourseModal } from '../components/AddCourseModal';
 
 interface CoursesPageProps {
   courses?: Course[];
+  currentUser?: { name: string; role: UserRole; email: string } | null;
   onAddCourse?: (course: Course) => void;
   onEnroll: (course: Course) => void;
   onSelectCourse: (course: Course) => void;
@@ -14,6 +15,7 @@ interface CoursesPageProps {
 
 export const CoursesPage: React.FC<CoursesPageProps> = ({ 
   courses = INITIAL_COURSES,
+  currentUser,
   onAddCourse,
   onEnroll, 
   onSelectCourse 
@@ -21,6 +23,8 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCourseModal, setSelectedCourseModal] = useState<Course | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  const isInstructorOrAdmin = currentUser?.role === 'instructor' || currentUser?.role === 'admin';
 
   const filteredCourses = courses.filter((course) =>
     course.title.includes(searchTerm) ||
@@ -70,14 +74,17 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
             />
           </div>
 
-          {onAddCourse && (
+          {/* محمي أمنياً: لا يظهر للعامة أو الطلاب إطلاقاً — للمشرفين والمديرين فقط */}
+          {isInstructorOrAdmin && onAddCourse && (
             <button
               onClick={() => setIsAddModalOpen(true)}
               className="btn btn-primary"
               style={{ padding: '0.85rem 1.5rem', borderRadius: 'var(--radius-full)', fontSize: '0.92rem' }}
+              title="صلاحية خاصة بالمشرفين والأدمن فقط"
+              id="admin-add-course-btn"
             >
               <Plus size={16} />
-              <span>إضافة كورس جديد</span>
+              <span>إضافة كورس جديد (مشرف)</span>
             </button>
           )}
         </div>

@@ -32,12 +32,14 @@ import {
 import { Course, ResearchPaper } from '../../types';
 import { AddCourseModal } from '../AddCourseModal';
 import { AddResearchModal } from '../AddResearchModal';
+import { EditCourseModal } from '../EditCourseModal';
 
 export interface InstructorDashboardProps {
   courses?: Course[];
   activeCourseId?: string;
   onSelectCourseId?: (courseId: string) => void;
   onAddCourse?: (newCourse: Course) => void;
+  onUpdateCourse?: (updatedCourse: Course) => void;
   onAddResearch?: (newPaper: ResearchPaper) => void;
   submissions?: MockStudentSubmission[];
   onUpdateSubmission?: (updated: MockStudentSubmission) => void;
@@ -55,6 +57,7 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
   activeCourseId: propActiveCourseId,
   onSelectCourseId,
   onAddCourse,
+  onUpdateCourse,
   onAddResearch,
   submissions: propSubmissions,
   onUpdateSubmission,
@@ -94,8 +97,9 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
   const [localCurriculum, setLocalCurriculum] = useState(INITIAL_CURRICULUM);
   const curriculum = propCurriculum || localCurriculum;
 
-  // نوافذ الإضافة العامة
+  // نوافذ الإضافة والتعديل العامة
   const [isAddCourseModalOpen, setIsAddCourseModalOpen] = useState(false);
+  const [isEditCourseModalOpen, setIsEditCourseModalOpen] = useState(false);
   const [isAddResearchModalOpen, setIsAddResearchModalOpen] = useState(false);
 
   // نافذة إضافة درس
@@ -384,6 +388,16 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
           <span className="badge badge-emerald" style={{ fontSize: '0.82rem' }}>
             {currentCourse?.title}
           </span>
+          <button
+            onClick={() => setIsEditCourseModalOpen(true)}
+            className="btn btn-outline"
+            style={{ fontSize: '0.82rem', padding: '0.35rem 0.85rem' }}
+            title="تعديل تفاصيل الكورس (الوصف، المشرفين، الغلاف، درجات النجاح)"
+            id="edit-course-details-top-btn"
+          >
+            <Edit3 size={14} />
+            <span>تعديل تفاصيل الكورس</span>
+          </button>
         </div>
 
         {/* أزرار إضافة كورس وبحث عامة */}
@@ -847,8 +861,51 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                 <Plus size={15} />
                 <span>إضافة امتحان / اختبار</span>
               </button>
+
+              <button
+                onClick={() => setIsEditCourseModalOpen(true)}
+                className="btn btn-primary"
+                style={{ fontSize: '0.85rem' }}
+                id="builder-edit-course-btn"
+              >
+                <Edit3 size={15} />
+                <span>تعديل بيانات وإعدادات الكورس</span>
+              </button>
             </div>
           </div>
+
+          {/* بطاقة ملخص تفاصيل الكورس والمشرفين */}
+          {currentCourse && (
+            <div className="card" style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', flexWrap: 'wrap', background: 'var(--bg-subtle)' }}>
+              <div style={{ width: '120px', height: '75px', borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--border-color)', flexShrink: 0 }}>
+                <img
+                  src={currentCourse.coverUrl}
+                  alt={currentCourse.title}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: '240px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.3rem' }}>
+                  <span className="badge badge-primary">{currentCourse.code}</span>
+                  <strong style={{ fontSize: '1.05rem', color: 'var(--text-main)' }}>{currentCourse.title}</strong>
+                </div>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '0 0 0.35rem' }}>
+                  المشرفون: <strong>{currentCourse.instructorNames?.join('، ') || 'المشرف الأكاديمي'}</strong> | درجة الاجتياز: <strong>{currentCourse.passingScore}%</strong> | المحاضرات: <strong>{currentCourse.totalLessonsCount} درس</strong>
+                </p>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-subtle)', margin: 0 }}>
+                  {currentCourse.summary}
+                </p>
+              </div>
+              <button
+                onClick={() => setIsEditCourseModalOpen(true)}
+                className="btn btn-outline"
+                style={{ fontSize: '0.82rem', padding: '0.45rem 1rem' }}
+              >
+                <Edit3 size={14} />
+                <span>تعديل التفاصيل والغلاف</span>
+              </button>
+            </div>
+          )}
 
           {/* قائمة الوحدات والدروس */}
           <div className="card">
@@ -1123,6 +1180,24 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
           isOpen={isAddResearchModalOpen}
           onClose={() => setIsAddResearchModalOpen(false)}
           onAddResearch={onAddResearch}
+        />
+      )}
+
+      {/* نافذة تعديل تفاصيل الكورس والغلاف والمشرفين */}
+      {isEditCourseModalOpen && currentCourse && (
+        <EditCourseModal
+          isOpen={isEditCourseModalOpen}
+          onClose={() => setIsEditCourseModalOpen(false)}
+          course={currentCourse}
+          onUpdateCourse={(updated) => {
+            if (onUpdateCourse) {
+              onUpdateCourse(updated);
+            }
+            if (onLogAudit) {
+              onLogAudit('تعديل كورس', `تم تحديث تفاصيل الكورس ${updated.code} - ${updated.title} بنجاح`);
+            }
+            setIsEditCourseModalOpen(false);
+          }}
         />
       )}
     </div>

@@ -29,6 +29,10 @@ export const App: React.FC = () => {
     setCourses((prev) => [newCourse, ...prev]);
   };
 
+  const handleUpdateCourse = (updatedCourse: Course) => {
+    setCourses((prev) => prev.map((c) => c.id === updatedCourse.id ? updatedCourse : c));
+  };
+
   const handleAddResearch = (newPaper: ResearchPaper) => {
     setResearches((prev) => [newPaper, ...prev]);
   };
@@ -98,6 +102,7 @@ export const App: React.FC = () => {
         {currentTab === 'courses' && (
           <CoursesPage
             courses={courses}
+            currentUser={currentUser}
             onAddCourse={handleAddCourse}
             onEnroll={handleEnrollRequest}
             onSelectCourse={handleSelectCourse}
@@ -107,6 +112,7 @@ export const App: React.FC = () => {
         {currentTab === 'research' && (
           <ResearchPage
             researches={researches}
+            currentUser={currentUser}
             onAddResearch={handleAddResearch}
           />
         )}
@@ -123,6 +129,7 @@ export const App: React.FC = () => {
           <LmsDashboardPreview
             courses={courses}
             onAddCourse={handleAddCourse}
+            onUpdateCourse={handleUpdateCourse}
             researches={researches}
             onAddResearch={handleAddResearch}
             userRole={currentUser?.role || 'student'}

@@ -36,6 +36,7 @@ import {
 interface LmsDashboardPreviewProps {
   courses?: Course[];
   onAddCourse?: (newCourse: Course) => void;
+  onUpdateCourse?: (updatedCourse: Course) => void;
   researches?: ResearchPaper[];
   onAddResearch?: (newPaper: ResearchPaper) => void;
   userRole: UserRole;
@@ -47,6 +48,7 @@ interface LmsDashboardPreviewProps {
 export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
   courses = INITIAL_COURSES,
   onAddCourse,
+  onUpdateCourse,
   researches = INITIAL_RESEARCHES,
   onAddResearch,
   userRole: initialRole,
@@ -254,6 +256,7 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
             activeCourseId={selectedCourseId}
             onSelectCourseId={setSelectedCourseId}
             onAddCourse={onAddCourse}
+            onUpdateCourse={onUpdateCourse}
             onAddResearch={onAddResearch}
             submissions={submissions}
             onUpdateSubmission={handleUpdateSubmission}

@@ -7,16 +7,20 @@ import { AddResearchModal } from '../components/AddResearchModal';
 
 interface ResearchPageProps {
   researches?: ResearchPaper[];
+  currentUser?: { name: string; role: string; email: string } | null;
   onAddResearch?: (research: ResearchPaper) => void;
 }
 
 export const ResearchPage: React.FC<ResearchPageProps> = ({ 
   researches = INITIAL_RESEARCHES,
+  currentUser,
   onAddResearch 
 }) => {
   const [selectedField, setSelectedField] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  const isInstructorOrAdmin = currentUser?.role === 'instructor' || currentUser?.role === 'admin';
 
   const fields = ['all', 'طب بشري وباطنة', 'طب الأطفال والصيدلة السريرية', 'التعليم الطبي والمنهجية'];
 
@@ -72,14 +76,17 @@ export const ResearchPage: React.FC<ResearchPageProps> = ({
               />
             </div>
 
-            {onAddResearch && (
+            {/* محمي أمنياً: للمشرفين والمديرين فقط */}
+            {isInstructorOrAdmin && onAddResearch && (
               <button
                 onClick={() => setIsAddModalOpen(true)}
                 className="btn btn-accent"
                 style={{ padding: '0.85rem 1.5rem', borderRadius: 'var(--radius-full)', fontSize: '0.92rem' }}
+                title="صلاحية خاصة بالمشرفين والأدمن فقط"
+                id="admin-add-research-btn"
               >
                 <Plus size={16} />
-                <span>إضافة بحث منشور</span>
+                <span>إضافة بحث منشور (مشرف)</span>
               </button>
             )}
           </div>
