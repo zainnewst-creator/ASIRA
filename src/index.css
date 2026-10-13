@@ -533,3 +533,30 @@ body {
   }
 }
 
+/* تنسيقات الطباعة الخاصة بالشهادة الأكاديمية (Academic Certificate Print Optimization) */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #asira-academic-certificate,
+  #asira-academic-certificate * {
+    visibility: visible;
+  }
+  #asira-academic-certificate {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    box-shadow: none !important;
+    border: 6px double #b45309 !important;
+  }
+  .modal-overlay {
+    position: static;
+    background: transparent;
+  }
+  .navbar, .footer, .btn, header, nav {
+    display: none !important;
+  }
+}
+

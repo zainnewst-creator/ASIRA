@@ -18,7 +18,9 @@ import {
   X,
   PlayCircle,
   HelpCircle,
-  Award
+  Award,
+  Search,
+  Filter
 } from 'lucide-react';
 import { 
   INITIAL_STUDENT_SUBMISSIONS, 
@@ -92,6 +94,30 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
   const [selectedAttempt, setSelectedAttempt] = useState<MockExamAttemptForInstructor | null>(null);
   const [overrideScoreInput, setOverrideScoreInput] = useState<number>(0);
   const [overrideReasonInput, setOverrideReasonInput] = useState<string>('');
+
+  // فلاتر وبحث التكليفات والاختبارات
+  const [submissionSearch, setSubmissionSearch] = useState('');
+  const [submissionFilter, setSubmissionFilter] = useState<'all' | 'submitted' | 'graded' | 'revision_required'>('all');
+
+  const [examSearch, setExamSearch] = useState('');
+  const [examFilter, setExamFilter] = useState<'all' | 'approved' | 'pending'>('all');
+
+  const filteredSubmissions = submissions.filter((sub) => {
+    const matchesStatus = submissionFilter === 'all' || sub.status === submissionFilter;
+    const matchesSearch = sub.studentName.toLowerCase().includes(submissionSearch.toLowerCase()) ||
+      sub.university.toLowerCase().includes(submissionSearch.toLowerCase()) ||
+      sub.assignmentTitle.toLowerCase().includes(submissionSearch.toLowerCase());
+    return matchesStatus && matchesSearch;
+  });
+
+  const filteredExamAttempts = examAttempts.filter((att) => {
+    const matchesStatus = examFilter === 'all' || 
+      (examFilter === 'approved' ? att.status === 'approved' : att.status !== 'approved');
+    const matchesSearch = att.studentName.toLowerCase().includes(examSearch.toLowerCase()) ||
+      att.university.toLowerCase().includes(examSearch.toLowerCase()) ||
+      att.examTitle.toLowerCase().includes(examSearch.toLowerCase());
+    return matchesStatus && matchesSearch;
+  });
 
   // بيانات المنهج
   const [localCurriculum, setLocalCurriculum] = useState(INITIAL_CURRICULUM);
@@ -482,6 +508,59 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
             </span>
           </div>
 
+          {/* شريط البحث وفلاتر حالة التكليفات */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem' }}>
+            <div style={{ position: 'relative', width: '100%', maxWidth: '320px' }}>
+              <input
+                type="text"
+                value={submissionSearch}
+                onChange={(e) => setSubmissionSearch(e.target.value)}
+                placeholder="ابحث باسم الطالب أو الجامعة أو التكليف..."
+                style={{
+                  width: '100%',
+                  padding: '0.55rem 2.2rem 0.55rem 0.85rem',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-color)',
+                  background: 'var(--bg-main)',
+                  color: 'var(--text-main)',
+                  fontSize: '0.85rem'
+                }}
+              />
+              <Search size={16} color="var(--text-subtle)" style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)' }} />
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setSubmissionFilter('all')}
+                className={`btn ${submissionFilter === 'all' ? 'btn-primary' : 'btn-outline'}`}
+                style={{ fontSize: '0.78rem', padding: '0.3rem 0.75rem', borderRadius: 'var(--radius-full)' }}
+              >
+                الكل ({submissions.length})
+              </button>
+              <button
+                onClick={() => setSubmissionFilter('submitted')}
+                className={`btn ${submissionFilter === 'submitted' ? 'btn-primary' : 'btn-outline'}`}
+                style={{ fontSize: '0.78rem', padding: '0.3rem 0.75rem', borderRadius: 'var(--radius-full)' }}
+              >
+                بانتظار التصحيح ({submissions.filter(s => s.status === 'submitted').length})
+              </button>
+              <button
+                onClick={() => setSubmissionFilter('graded')}
+                className={`btn ${submissionFilter === 'graded' ? 'btn-primary' : 'btn-outline'}`}
+                style={{ fontSize: '0.78rem', padding: '0.3rem 0.75rem', borderRadius: 'var(--radius-full)' }}
+              >
+                تم الرصد ({submissions.filter(s => s.status === 'graded').length})
+              </button>
+              <button
+                onClick={() => setSubmissionFilter('revision_required')}
+                className={`btn ${submissionFilter === 'revision_required' ? 'btn-primary' : 'btn-outline'}`}
+                style={{ fontSize: '0.78rem', padding: '0.3rem 0.75rem', borderRadius: 'var(--radius-full)' }}
+              >
+                مطلوب تعديل ({submissions.filter(s => s.status === 'revision_required').length})
+              </button>
+            </div>
+          </div>
+
           <div className="table-responsive">
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: '0.88rem' }}>
               <thead>
@@ -497,7 +576,7 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {submissions.map((sub) => (
+                {filteredSubmissions.map((sub) => (
                   <tr key={sub.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                     <td style={{ padding: '0.85rem' }}>
                       <strong style={{ display: 'block', color: 'var(--text-main)' }}>{sub.studentName}</strong>
@@ -676,6 +755,52 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
             </div>
           </div>
 
+          {/* شريط البحث والفلترة للاختبارات */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem' }}>
+            <div style={{ position: 'relative', width: '100%', maxWidth: '320px' }}>
+              <input
+                type="text"
+                value={examSearch}
+                onChange={(e) => setExamSearch(e.target.value)}
+                placeholder="ابحث باسم الطالب أو الاختبار..."
+                style={{
+                  width: '100%',
+                  padding: '0.55rem 2.2rem 0.55rem 0.85rem',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-color)',
+                  background: 'var(--bg-main)',
+                  color: 'var(--text-main)',
+                  fontSize: '0.85rem'
+                }}
+              />
+              <Search size={16} color="var(--text-subtle)" style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)' }} />
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setExamFilter('all')}
+                className={`btn ${examFilter === 'all' ? 'btn-primary' : 'btn-outline'}`}
+                style={{ fontSize: '0.78rem', padding: '0.3rem 0.75rem', borderRadius: 'var(--radius-full)' }}
+              >
+                الكل ({examAttempts.length})
+              </button>
+              <button
+                onClick={() => setExamFilter('pending')}
+                className={`btn ${examFilter === 'pending' ? 'btn-primary' : 'btn-outline'}`}
+                style={{ fontSize: '0.78rem', padding: '0.3rem 0.75rem', borderRadius: 'var(--radius-full)' }}
+              >
+                بانتظار المراجعة ({examAttempts.filter(a => a.status !== 'approved').length})
+              </button>
+              <button
+                onClick={() => setExamFilter('approved')}
+                className={`btn ${examFilter === 'approved' ? 'btn-primary' : 'btn-outline'}`}
+                style={{ fontSize: '0.78rem', padding: '0.3rem 0.75rem', borderRadius: 'var(--radius-full)' }}
+              >
+                معتمدة رسمياً ({examAttempts.filter(a => a.status === 'approved').length})
+              </button>
+            </div>
+          </div>
+
           <div className="table-responsive">
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: '0.88rem' }}>
               <thead>
@@ -690,7 +815,7 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {examAttempts.map((att) => (
+                {filteredExamAttempts.map((att) => (
                   <tr key={att.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                     <td style={{ padding: '0.85rem' }}>
                       <strong style={{ display: 'block', color: 'var(--text-main)' }}>{att.studentName}</strong>
