@@ -9,6 +9,7 @@ import {
   Award, 
   Clock, 
   Download, 
+  Upload,
   Layers, 
   Search,
   Filter,
@@ -33,6 +34,13 @@ export interface AdminDashboardProps {
   onApproveEnrollment?: (id: string) => void;
   onRejectEnrollment?: (id: string) => void;
   certRequests?: MockCertificateRequest[];
+  onUpdateCertificate?: (
+    id: string,
+    status: 'pending' | 'processing' | 'issued' | 'rejected',
+    code?: string,
+    pdfUrl?: string,
+    notes?: string
+  ) => void;
   onIssueCertificate?: (id: string, code: string, pdfUrl: string) => void;
   auditLogs?: MockAuditLogItem[];
   onLogAudit?: (action: string, details: string) => void;
@@ -43,6 +51,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onApproveEnrollment,
   onRejectEnrollment,
   certRequests: propCertRequests,
+  onUpdateCertificate,
   onIssueCertificate,
   auditLogs: propAuditLogs,
   onLogAudit,
@@ -57,9 +66,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [localAuditLogs, setLocalAuditLogs] = useState<MockAuditLogItem[]>(INITIAL_AUDIT_LOGS);
   const auditLogs = propAuditLogs || localAuditLogs;
 
-  // بيانات طلبات الشهادات
+  // بيانات وإدارة طلبات الشهادات الأكاديمية
   const [localCertRequests, setLocalCertRequests] = useState<MockCertificateRequest[]>(INITIAL_CERT_REQUESTS);
   const certRequests = propCertRequests || localCertRequests;
+
+  const [certFilter, setCertFilter] = useState<'all' | 'pending' | 'processing' | 'issued' | 'rejected'>('all');
+  const [certSearch, setCertSearch] = useState('');
+  const [selectedCertForManage, setSelectedCertForManage] = useState<MockCertificateRequest | null>(null);
+  const [certStatusInput, setCertStatusInput] = useState<'pending' | 'processing' | 'issued' | 'rejected'>('issued');
+  const [certCodeInput, setCertCodeInput] = useState('ASIRA-2026-8812');
+  const [certPdfUrlInput, setCertPdfUrlInput] = useState('https://drive.google.com/file/d/DeanSignedCertAhmed2026/view');
+  const [certNotesInput, setCertNotesInput] = useState('');
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
 
   // إدارة المستخدمين
   const [usersList, setUsersList] = useState<Array<{ uid: string; name: string; email: string; university: string; role: UserRole; status: 'active' | 'suspended' }>>([
@@ -69,11 +87,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     { uid: 'u-4', name: 'د. يحيى المنصوري', email: 'mansouri@asira-research.org', university: 'اللجنة العلمية', role: 'instructor', status: 'active' },
     { uid: 'u-5', name: 'مدير المنصة العام', email: 'admin@asira-research.org', university: 'إدارة أسيرا', role: 'admin', status: 'active' },
   ]);
-
-  // نموذج إصدار الشهادة
-  const [selectedCertForIssue, setSelectedCertForIssue] = useState<MockCertificateRequest | null>(null);
-  const [certCodeInput, setCertCodeInput] = useState('ASIRA-2026-8812');
-  const [certPdfUrlInput, setCertPdfUrlInput] = useState('https://drive.google.com/file/d/DeanSignedCertAhmed2026/view');
 
   // الموافقة على طلب الالتحاق
   const handleApprove = (id: string) => {
@@ -103,18 +116,93 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  // إصدار الشهادة
-  const handleIssueCert = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedCertForIssue) return;
+  // فتح نافذة إدارة وتحديث حالة الشهادة ورفع الرابط
+  const openManageCertModal = (req: MockCertificateRequest) => {
+    setSelectedCertForManage(req);
+    setCertStatusInput(req.status || 'pending');
+    setCertCodeInput(req.verificationCode || `ASIRA-2026-${Math.floor(1000 + Math.random() * 9000)}`);
+    setCertPdfUrlInput(req.signedPdfUrl || 'https://drive.google.com/file/d/DeanSignedCertificate_2026/view');
+    setCertNotesInput(req.adminNotes || '');
+    setUploadedFileName(null);
+  };
 
-    if (onIssueCertificate) {
-      onIssueCertificate(selectedCertForIssue.id, certCodeInput, certPdfUrlInput);
+  // حفظ التعديلات على حالة الشهادة ورابط الـ PDF الموقع
+  const handleSaveCertStatus = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCertForManage) return;
+
+    if (onUpdateCertificate) {
+      onUpdateCertificate(
+        selectedCertForManage.id,
+        certStatusInput,
+        certCodeInput,
+        certStatusInput === 'issued' ? certPdfUrlInput : undefined,
+        certNotesInput
+      );
+    } else if (onIssueCertificate && certStatusInput === 'issued') {
+      onIssueCertificate(selectedCertForManage.id, certCodeInput, certPdfUrlInput);
     } else {
       setLocalCertRequests((prev) =>
         prev.map((c) =>
-          c.id === selectedCertForIssue.id
-            ? { ...c, status: 'issued', verificationCode: certCodeInput, signedPdfUrl: certPdfUrlInput }
+          c.id === selectedCertForManage.id
+            ? {
+                ...c,
+                status: certStatusInput,
+                verificationCode: certCodeInput,
+                signedPdfUrl: certStatusInput === 'issued' ? certPdfUrlInput : c.signedPdfUrl,
+                adminNotes: certNotesInput,
+                issuedAt: certStatusInput === 'issued' ? new Date().toISOString().split('T')[0] : c.issuedAt,
+              }
+            : c
+        )
+      );
+    }
+
+    if (onLogAudit) {
+      const statusTitle =
+        certStatusInput === 'issued'
+          ? 'اعتماد وتوقيع شهادة ورفع رابط PDF'
+          : certStatusInput === 'processing'
+          ? 'تحويل إلى جاري التجهيز خارج المنصة'
+          : certStatusInput === 'rejected'
+          ? 'رفض طلب الشهادة الأكاديمية'
+          : 'تحديث حالة الشهادة إلى قيد التدقيق';
+
+      onLogAudit(
+        statusTitle,
+        `تم تحديث شهادة الطالب (${selectedCertForManage.studentName}) لكورس (${selectedCertForManage.courseTitle}) إلى حالة: [${certStatusInput}] برمز: ${certCodeInput}`
+      );
+    }
+
+    setSelectedCertForManage(null);
+  };
+
+  // تغيير سريع للحالة من الجدول
+  const handleQuickStatusChange = (req: MockCertificateRequest, newStatus: 'processing' | 'issued') => {
+    if (newStatus === 'issued') {
+      openManageCertModal(req);
+      setCertStatusInput('issued');
+      return;
+    }
+
+    if (onUpdateCertificate) {
+      onUpdateCertificate(
+        req.id,
+        newStatus,
+        req.verificationCode || `ASIRA-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+        req.signedPdfUrl,
+        'جاري إعداد وثيقة الشهادة وتوقيعها خارج المنصة من العميد د. إبراهيم يحيى'
+      );
+    } else {
+      setLocalCertRequests((prev) =>
+        prev.map((c) =>
+          c.id === req.id
+            ? {
+                ...c,
+                status: newStatus,
+                verificationCode: c.verificationCode || `ASIRA-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+                adminNotes: 'جاري إعداد وثيقة الشهادة وتوقيعها خارج المنصة من العميد د. إبراهيم يحيى',
+              }
             : c
         )
       );
@@ -122,12 +210,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
     if (onLogAudit) {
       onLogAudit(
-        'إصدار وتوقيع شهادة رسمية',
-        `تم إصدار وتوقيع الشهادة للطالب (${selectedCertForIssue.studentName}) برمز التحقق: ${certCodeInput} وربط ملف العميد الموقع.`
+        'تحديث مرحلة الشهادة',
+        `تم تحويل طلب الطالب (${req.studentName}) إلى: جاري التجهيز والتوقيع خارج المنصة من قِبل العميد.`
       );
     }
+  };
 
-    setSelectedCertForIssue(null);
+  // محاكاة رفع ملف PDF محلي
+  const handleSimulateFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setUploadedFileName(file.name);
+      const cleanName = encodeURIComponent(file.name.replace(/\.[^/.]+$/, ''));
+      setCertPdfUrlInput(`https://drive.google.com/file/d/${cleanName}_OfficialSigned_ASIRA/view`);
+    }
   };
 
   // تغيير دور المستخدم
@@ -458,68 +554,231 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {activeTab === 'certificates' && (
         <div className="card">
           <div style={{ marginBottom: '1.25rem' }}>
-            <h2 style={{ fontSize: '1.3rem', fontWeight: 800, margin: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.35rem' }}>
+              <span className="badge badge-gold">إدارة الشهادات اليدوية (External Certification Workflow)</span>
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>منظومة الاعتماد والتوقيع خارج المنصة</span>
+            </div>
+            <h2 style={{ fontSize: '1.35rem', fontWeight: 800, margin: 0 }}>
               اعتماد وتوقيع شهادات إتمام الكورسات (Dean Signed Certificates)
             </h2>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-              إصدار الشهادات الرسمية للطلاب الذين أتموا متطلبات الدورة بنجاح، وتوليد رمز التحقق الأكاديمي، وربط ملف PDF الموقع من العميد.
+            <p style={{ fontSize: '0.86rem', color: 'var(--text-muted)', marginTop: '0.35rem', lineHeight: 1.6, maxWidth: '850px' }}>
+              الشهادات الأكاديمية لمنتدى أسيرا لا يتم توليدها برمجياً، بل يتم تدقيق نتائج الطالب وتجهيز وثيقة الشهادة وتوقيعها من العميد واللجنة العلمية خارج المنصة بصيغة PDF معتمدة، ثم يقوم المدير بتحديث حالتها ورفع رابط النسخة الموقعة (Google Drive PDF) وإسناد رمز التحقق، لتصبح متاحة فوراً للطالب للاستعراض والتحميل.
             </p>
           </div>
 
+          {/* شريط الإحصائيات السريعة للشهادات */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+            gap: '0.75rem',
+            marginBottom: '1.5rem',
+          }}>
+            <div style={{ background: 'var(--bg-subtle)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block' }}>إجمالي الطلبات:</span>
+              <strong style={{ fontSize: '1.3rem', color: 'var(--text-main)' }}>{certRequests.length}</strong>
+            </div>
+            <div style={{ background: 'rgba(217, 119, 6, 0.08)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(217, 119, 6, 0.3)' }}>
+              <span style={{ fontSize: '0.78rem', color: 'var(--accent-gold)', display: 'block' }}>قيد التدقيق (Pending):</span>
+              <strong style={{ fontSize: '1.3rem', color: 'var(--accent-gold)' }}>
+                {certRequests.filter((r) => r.status === 'pending').length}
+              </strong>
+            </div>
+            <div style={{ background: 'rgba(217, 119, 6, 0.12)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid #d97706' }}>
+              <span style={{ fontSize: '0.78rem', color: '#b45309', display: 'block' }}>جاري التجهيز خارج المنصة:</span>
+              <strong style={{ fontSize: '1.3rem', color: '#b45309' }}>
+                {certRequests.filter((r) => r.status === 'processing').length}
+              </strong>
+            </div>
+            <div style={{ background: 'rgba(16, 185, 129, 0.08)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+              <span style={{ fontSize: '0.78rem', color: 'var(--accent-emerald)', display: 'block' }}>تم الإصدار والرفع (Issued):</span>
+              <strong style={{ fontSize: '1.3rem', color: 'var(--accent-emerald)' }}>
+                {certRequests.filter((r) => r.status === 'issued').length}
+              </strong>
+            </div>
+          </div>
+
+          {/* شريط الفلترة والبحث */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setCertFilter('all')}
+                className={`btn ${certFilter === 'all' ? 'btn-primary' : 'btn-outline'}`}
+                style={{ fontSize: '0.82rem', padding: '0.4rem 0.85rem' }}
+              >
+                الكل ({certRequests.length})
+              </button>
+              <button
+                onClick={() => setCertFilter('pending')}
+                className={`btn ${certFilter === 'pending' ? 'btn-primary' : 'btn-outline'}`}
+                style={{ fontSize: '0.82rem', padding: '0.4rem 0.85rem' }}
+              >
+                قيد التدقيق ({certRequests.filter((r) => r.status === 'pending').length})
+              </button>
+              <button
+                onClick={() => setCertFilter('processing')}
+                className={`btn ${certFilter === 'processing' ? 'btn-primary' : 'btn-outline'}`}
+                style={{ fontSize: '0.82rem', padding: '0.4rem 0.85rem' }}
+              >
+                جاري التجهيز ({certRequests.filter((r) => r.status === 'processing').length})
+              </button>
+              <button
+                onClick={() => setCertFilter('issued')}
+                className={`btn ${certFilter === 'issued' ? 'btn-primary' : 'btn-outline'}`}
+                style={{ fontSize: '0.82rem', padding: '0.4rem 0.85rem' }}
+              >
+                تم الإصدار والرفع ({certRequests.filter((r) => r.status === 'issued').length})
+              </button>
+              <button
+                onClick={() => setCertFilter('rejected')}
+                className={`btn ${certFilter === 'rejected' ? 'btn-primary' : 'btn-outline'}`}
+                style={{ fontSize: '0.82rem', padding: '0.4rem 0.85rem' }}
+              >
+                مرفوض ({certRequests.filter((r) => r.status === 'rejected').length})
+              </button>
+            </div>
+
+            <div style={{ position: 'relative', width: '260px' }}>
+              <Search size={15} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input
+                type="text"
+                value={certSearch}
+                onChange={(e) => setCertSearch(e.target.value)}
+                placeholder="بحث باسم الطالب أو الكورس..."
+                style={{
+                  width: '100%',
+                  padding: '0.45rem 2.2rem 0.45rem 0.8rem',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-color)',
+                  background: 'var(--bg-main)',
+                  color: 'var(--text-main)',
+                  fontSize: '0.82rem',
+                }}
+              />
+            </div>
+          </div>
+
+          {/* جدول طلبات الشهادات */}
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: '0.9rem' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: '0.88rem' }}>
               <thead>
                 <tr style={{ background: 'var(--bg-subtle)', borderBottom: '2px solid var(--border-color)' }}>
-                  <th style={{ padding: '0.85rem' }}>اسم الطالب</th>
-                  <th style={{ padding: '0.85rem' }}>الكورس الأكاديمي</th>
+                  <th style={{ padding: '0.85rem' }}>اسم الطالب والجهة</th>
+                  <th style={{ padding: '0.85rem' }}>الكورس والمعدل</th>
                   <th style={{ padding: '0.85rem' }}>تاريخ الطلب</th>
-                  <th style={{ padding: '0.85rem' }}>رمز التحقق الأكاديمي</th>
-                  <th style={{ padding: '0.85rem' }}>حالة الإصدار</th>
-                  <th style={{ padding: '0.85rem' }}>الإجراء الأكاديمي</th>
+                  <th style={{ padding: '0.85rem' }}>رمز التحقق</th>
+                  <th style={{ padding: '0.85rem' }}>حالة الإعداد والتوقيع</th>
+                  <th style={{ padding: '0.85rem' }}>رابط الملف المرفوع</th>
+                  <th style={{ padding: '0.85rem' }}>الإجراء الإداري</th>
                 </tr>
               </thead>
               <tbody>
-                {certRequests.map((req) => (
-                  <tr key={req.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                    <td style={{ padding: '0.85rem' }}>
-                      <strong style={{ color: 'var(--text-main)' }}>{req.studentName}</strong>
-                    </td>
-                    <td style={{ padding: '0.85rem' }}>{req.courseTitle}</td>
-                    <td style={{ padding: '0.85rem', fontSize: '0.82rem', color: 'var(--text-muted)' }}>{req.requestedAt}</td>
-                    <td style={{ padding: '0.85rem' }}>
-                      {req.verificationCode ? (
-                        <code style={{ padding: '0.2rem 0.5rem', background: 'var(--bg-subtle)', borderRadius: '4px', fontWeight: 700 }}>
-                          {req.verificationCode}
-                        </code>
-                      ) : (
-                        <span style={{ color: 'var(--text-muted)' }}>—</span>
-                      )}
-                    </td>
-                    <td style={{ padding: '0.85rem' }}>
-                      {req.status === 'issued' ? (
-                        <span className="badge badge-emerald">تم الإصدار والتوقيع</span>
-                      ) : (
-                        <span className="badge badge-gold">بانتظار توقيع العميد</span>
-                      )}
-                    </td>
-                    <td style={{ padding: '0.85rem' }}>
-                      <button
-                        onClick={() => setSelectedCertForIssue(req)}
-                        className="btn btn-primary"
-                        style={{ padding: '0.4rem 0.85rem', fontSize: '0.82rem' }}
-                      >
-                        <Award size={14} />
-                        <span>{req.status === 'issued' ? 'تعديل بيانات الشهادة' : 'إصدار وتوقيع الشهادة'}</span>
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {certRequests
+                  .filter((req) => {
+                    const matchesFilter = certFilter === 'all' || req.status === certFilter;
+                    const matchesSearch =
+                      !certSearch ||
+                      req.studentName.toLowerCase().includes(certSearch.toLowerCase()) ||
+                      req.courseTitle.toLowerCase().includes(certSearch.toLowerCase()) ||
+                      (req.verificationCode && req.verificationCode.toLowerCase().includes(certSearch.toLowerCase()));
+                    return matchesFilter && matchesSearch;
+                  })
+                  .map((req) => (
+                    <tr key={req.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '0.85rem' }}>
+                        <strong style={{ color: 'var(--text-main)', display: 'block' }}>{req.studentName}</strong>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{req.university || 'باحث أكاديمي'}</span>
+                      </td>
+                      <td style={{ padding: '0.85rem' }}>
+                        <div style={{ color: 'var(--text-main)', fontWeight: 700 }}>{req.courseTitle}</div>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--accent-emerald)' }}>
+                          المعدل: {req.totalScore || 86}%
+                        </span>
+                      </td>
+                      <td style={{ padding: '0.85rem', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                        {req.requestedAt}
+                      </td>
+                      <td style={{ padding: '0.85rem' }}>
+                        {req.verificationCode ? (
+                          <code style={{ padding: '0.2rem 0.5rem', background: 'var(--bg-subtle)', borderRadius: '4px', fontWeight: 800, fontFamily: 'monospace' }}>
+                            {req.verificationCode}
+                          </code>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        )}
+                      </td>
+                      <td style={{ padding: '0.85rem' }}>
+                        {req.status === 'issued' ? (
+                          <span className="badge badge-emerald">✓ تم الإصدار والتوقيع</span>
+                        ) : req.status === 'processing' ? (
+                          <span className="badge badge-gold" style={{ background: 'rgba(217, 119, 6, 0.15)', color: '#b45309', border: '1px solid #d97706' }}>
+                            ✍️ جاري التجهيز خارج المنصة
+                          </span>
+                        ) : req.status === 'rejected' ? (
+                          <span className="badge" style={{ background: '#fee2e2', color: '#b91c1c' }}>✕ مرفوض</span>
+                        ) : (
+                          <span className="badge badge-gold">⏳ قيد المراجعة والتدقيق</span>
+                        )}
+                      </td>
+                      <td style={{ padding: '0.85rem' }}>
+                        {req.signedPdfUrl ? (
+                          <a
+                            href={req.signedPdfUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn btn-outline"
+                            style={{ padding: '0.3rem 0.65rem', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', textDecoration: 'none' }}
+                            title="معاينة ملف الشهادة الموقعة"
+                          >
+                            <ExternalLink size={13} />
+                            <span>معاينة الرابط</span>
+                          </a>
+                        ) : (
+                          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>لم يُرفع بعد</span>
+                        )}
+                      </td>
+                      <td style={{ padding: '0.85rem' }}>
+                        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <button
+                            onClick={() => openManageCertModal(req)}
+                            className="btn btn-primary"
+                            id={`manage-cert-btn-${req.id}`}
+                            style={{ padding: '0.38rem 0.85rem', fontSize: '0.8rem', fontWeight: 700 }}
+                          >
+                            <Award size={14} />
+                            <span>تغيير الحالة ورفع الشهادة</span>
+                          </button>
+
+                          {req.status === 'pending' && (
+                            <button
+                              onClick={() => handleQuickStatusChange(req, 'processing')}
+                              className="btn btn-ghost"
+                              style={{ fontSize: '0.75rem', padding: '0.3rem 0.55rem', color: '#d97706' }}
+                              title="تحويل مباشر إلى جاري التجهيز خارج المنصة"
+                            >
+                              بدء التجهيز ✍️
+                            </button>
+                          )}
+
+                          {req.status === 'processing' && (
+                            <button
+                              onClick={() => handleQuickStatusChange(req, 'issued')}
+                              className="btn btn-ghost"
+                              style={{ fontSize: '0.75rem', padding: '0.3rem 0.55rem', color: '#059669' }}
+                              title="رفع واعتماد الشهادة فوراً"
+                            >
+                              رفع واعتماد 🚀
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
 
-          {/* نافذة إصدار الشهادة وربط ملف PDF الموقّع */}
-          {selectedCertForIssue && (
+          {/* نافذة إدارة وتغيير حالة الشهادة ورفع الملف المعتمد (Admin Management Modal) */}
+          {selectedCertForManage && (
             <div style={{
               position: 'fixed',
               inset: 0,
@@ -531,58 +790,193 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               zIndex: 100,
               padding: '1.5rem',
             }}>
-              <div className="card" style={{ maxWidth: '580px', width: '100%', position: 'relative' }}>
+              <div className="card" style={{ maxWidth: '620px', width: '100%', position: 'relative', maxHeight: '92vh', overflowY: 'auto' }}>
                 <button
-                  onClick={() => setSelectedCertForIssue(null)}
+                  onClick={() => setSelectedCertForManage(null)}
                   className="btn btn-ghost"
                   style={{ position: 'absolute', top: '12px', left: '12px' }}
                 >
                   ✕
                 </button>
 
-                <h3 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '0.35rem' }}>
-                  إصدار وتوقيع الشهادة للطالب: {selectedCertForIssue.studentName}
-                </h3>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
-                  الكورس: {selectedCertForIssue.courseTitle}
-                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                  <Award size={22} color="var(--accent-gold)" />
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>
+                    إدارة وتغيير حالة الشهادة ورفع الملف المعتمد
+                  </h3>
+                </div>
 
-                <form onSubmit={handleIssueCert} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)', marginBottom: '1.25rem', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                    الطالب: {selectedCertForManage.studentName}
+                  </div>
+                  <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                    الكورس: {selectedCertForManage.courseTitle} | تاريخ الطلب: {selectedCertForManage.requestedAt}
+                  </div>
+                </div>
+
+                <div style={{ padding: '0.75rem 1rem', background: 'rgba(217, 119, 6, 0.08)', border: '1px solid rgba(217, 119, 6, 0.3)', borderRadius: 'var(--radius-sm)', marginBottom: '1.25rem', fontSize: '0.84rem', color: 'var(--text-main)' }}>
+                  ⚠️ <strong>تنويه للمدير:</strong> الشهادات لا يتم توليدها تلقائياً بالمنصة. بعد قيام العمادة بإعداد وثيقة الشهادة وتوقيعها خارج المنصة بصيغة PDF، قم باختيار الحالة (تم الإصدار والتوقيع)، وإدخال رابط ملف الـ PDF (Google Drive)، وإسناد رمز التحقق لتصبح متاحة فوراً للطالب للاستعراض والتحميل.
+                </div>
+
+                <form onSubmit={handleSaveCertStatus} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+                  {/* اختيار الحالة */}
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>
-                      رمز التحقق الأكاديمي الموحد (Verification Code):
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.4rem', color: 'var(--text-main)' }}>
+                      حالة إعداد الشهادة الحالية:
                     </label>
+                    <select
+                      value={certStatusInput}
+                      onChange={(e) => setCertStatusInput(e.target.value as any)}
+                      style={{
+                        width: '100%',
+                        padding: '0.65rem',
+                        borderRadius: 'var(--radius-md)',
+                        border: '1px solid var(--border-color)',
+                        background: 'var(--bg-main)',
+                        color: 'var(--text-main)',
+                        fontSize: '0.9rem',
+                        fontWeight: 700
+                      }}
+                    >
+                      <option value="pending">⏳ قيد المراجعة والتدقيق الإداري (Pending)</option>
+                      <option value="processing">✍️ جاري التجهيز والتوقيع خارج المنصة من العميد (Processing)</option>
+                      <option value="issued">✓ جاهزة ومعتمدة - تم رفع ملف الشهادة الموقعة (Issued)</option>
+                      <option value="rejected">✕ مرفوض مع توضيح السبب (Rejected)</option>
+                    </select>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.25rem' }}>
+                      {certStatusInput === 'issued'
+                        ? '🟢 باختيارك لهذه الحالة، سيتمكن الطالب فوراً من استعراض الشهادة وتحميل ملف الـ PDF المرفوع.'
+                        : certStatusInput === 'processing'
+                        ? '🟡 يرى الطالب هذه الحالة فقط، وتكون أزرار التحميل مغلقة بانتظار توقيع العميد ورفع الرابط.'
+                        : certStatusInput === 'rejected'
+                        ? '🔴 يتم إبلاغ الطالب برفض الطلب مع إظهار الملاحظات الإدارية.'
+                        : '⚪ الطلب قيد الانتظار الأولي.'}
+                    </span>
+                  </div>
+
+                  {/* رمز التحقق الأكاديمي */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                      <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                        رمز التحقق الأكاديمي الموحد (Verification Code):
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setCertCodeInput(`ASIRA-2026-${Math.floor(1000 + Math.random() * 9000)}`)}
+                        className="btn btn-ghost"
+                        style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', color: 'var(--primary-600)' }}
+                      >
+                        توليد كود عشوائي جديد
+                      </button>
+                    </div>
                     <input
                       type="text"
                       required
                       value={certCodeInput}
                       onChange={(e) => setCertCodeInput(e.target.value)}
                       placeholder="ASIRA-2026-XXXX"
-                      style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', fontFamily: 'monospace', fontWeight: 700 }}
+                      style={{
+                        width: '100%',
+                        padding: '0.65rem',
+                        borderRadius: 'var(--radius-md)',
+                        border: '1px solid var(--border-color)',
+                        fontFamily: 'monospace',
+                        fontWeight: 800,
+                        fontSize: '0.95rem'
+                      }}
                     />
                   </div>
 
+                  {/* رابط ملف الشهادة الموقعة من العميد */}
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem', color: 'var(--text-main)' }}>
                       رابط ملف الشهادة الموقعة من العميد (Google Drive PDF):
                     </label>
                     <input
                       type="url"
-                      required
+                      required={certStatusInput === 'issued'}
                       value={certPdfUrlInput}
                       onChange={(e) => setCertPdfUrlInput(e.target.value)}
-                      placeholder="https://drive.google.com/file/d/..."
-                      style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', direction: 'ltr', textAlign: 'left' }}
+                      placeholder="https://drive.google.com/file/d/.../view"
+                      style={{
+                        width: '100%',
+                        padding: '0.65rem',
+                        borderRadius: 'var(--radius-md)',
+                        border: '1px solid var(--border-color)',
+                        direction: 'ltr',
+                        textAlign: 'left',
+                        fontFamily: 'monospace',
+                        fontSize: '0.85rem'
+                      }}
+                    />
+
+                    {/* خيارات مساعدة وروابط سريعة */}
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+                      <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>روابط تجريبية سريعة:</span>
+                      <button
+                        type="button"
+                        onClick={() => setCertPdfUrlInput('https://drive.google.com/file/d/DeanSignedCert_AhmedAlSaleh_2026/view')}
+                        className="btn btn-ghost"
+                        style={{ fontSize: '0.74rem', padding: '0.2rem 0.5rem' }}
+                      >
+                        رابط Drive 1
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCertPdfUrlInput('https://drive.google.com/file/d/DeanSignedCert_SaraKelani_2026/view')}
+                        className="btn btn-ghost"
+                        style={{ fontSize: '0.74rem', padding: '0.2rem 0.5rem' }}
+                      >
+                        رابط Drive 2
+                      </button>
+
+                      <label
+                        className="btn btn-outline"
+                        style={{ fontSize: '0.74rem', padding: '0.25rem 0.6rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', marginRight: 'auto' }}
+                      >
+                        <Upload size={12} />
+                        <span>محاكاة رفع ملف PDF محلي</span>
+                        <input type="file" accept=".pdf" onChange={handleSimulateFileUpload} style={{ display: 'none' }} />
+                      </label>
+                    </div>
+
+                    {uploadedFileName && (
+                      <div style={{ fontSize: '0.78rem', color: '#059669', marginTop: '0.35rem', fontWeight: 700 }}>
+                        ✓ تم ربط الملف المرفوع: {uploadedFileName}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ملاحظات الإدارة الأكاديمية */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem', color: 'var(--text-main)' }}>
+                      ملاحظات الإدارة الأكاديمية والعمادة (تظهر للطالب):
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={certNotesInput}
+                      onChange={(e) => setCertNotesInput(e.target.value)}
+                      placeholder="مثال: تم تدقيق الدرجات التراكمية واعتماد الشهادة وتوقيعها من العميد د. إبراهيم يحيى."
+                      style={{
+                        width: '100%',
+                        padding: '0.65rem',
+                        borderRadius: 'var(--radius-md)',
+                        border: '1px solid var(--border-color)',
+                        fontSize: '0.85rem',
+                        resize: 'vertical'
+                      }}
                     />
                   </div>
 
-                  <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-                    <button type="button" onClick={() => setSelectedCertForIssue(null)} className="btn btn-outline">
+                  {/* أزرار الإجراءات */}
+                  <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+                    <button type="button" onClick={() => setSelectedCertForManage(null)} className="btn btn-outline">
                       إلغاء
                     </button>
-                    <button type="submit" className="btn btn-primary">
-                      <Award size={15} />
-                      <span>اعتماد وإتاحة الشهادة للطالب فوراً</span>
+                    <button type="submit" className="btn btn-primary" id="save-cert-status-btn" style={{ fontWeight: 800 }}>
+                      <Award size={16} />
+                      <span>حفظ واعتماد التعديلات فوراً</span>
                     </button>
                   </div>
                 </form>

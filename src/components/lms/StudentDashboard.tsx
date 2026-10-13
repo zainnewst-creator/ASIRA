@@ -29,10 +29,12 @@ import {
   MockStudentSubmission, 
   MockExamAttemptForInstructor, 
   MockCourseCurriculum,
+  MockCertificateRequest,
   INITIAL_STUDENT_SUBMISSIONS, 
   INITIAL_EXAM_ATTEMPTS, 
   INITIAL_CURRICULUM,
-  INITIAL_COURSES
+  INITIAL_COURSES,
+  INITIAL_CERT_REQUESTS
 } from '../../data/mockData';
 import { Course } from '../../types';
 import { AcademicCertificateModal } from './AcademicCertificateModal';
@@ -49,6 +51,8 @@ export interface StudentDashboardProps {
   onSubmitExamAttempt?: (attempt: MockExamAttemptForInstructor) => void;
   curriculum?: MockCourseCurriculum;
   practicalGrades?: Record<string, { score: number; notes: string }>;
+  certRequests?: MockCertificateRequest[];
+  onRequestCertificate?: (courseId: string) => void;
   onNavigateTab?: (tab: string) => void;
   onLogAudit?: (action: string, details: string) => void;
 }
@@ -65,10 +69,17 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   onSubmitExamAttempt,
   curriculum: propCurriculum,
   practicalGrades: propPracticalGrades,
+  certRequests: propCertRequests,
+  onRequestCertificate,
   onLogAudit,
 }) => {
   const [activeTab, setActiveTab] = useState<'my_courses' | 'learn' | 'assignments' | 'exam' | 'transcript'>('my_courses');
   const [selectedCourseId, setSelectedCourseId] = useState<string>(propActiveCourseId || courses[0]?.id || 'course-1');
+
+  // طلبات الشهادات الأكاديمية
+  const [localCertRequests, setLocalCertRequests] = useState<MockCertificateRequest[]>(INITIAL_CERT_REQUESTS);
+  const certRequests = propCertRequests || localCertRequests;
+  const [requestFeedback, setRequestFeedback] = useState<string | null>(null);
 
   // الكورس الحالي المختار
   const currentCourse = courses.find((c) => c.id === selectedCourseId) || courses[0];
@@ -898,21 +909,300 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
             </table>
           </div>
 
-          <div style={{ padding: '1.25rem', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', border: '1px solid var(--border-color)' }}>
-            <div>
-              <strong style={{ fontSize: '1rem', display: 'block', color: 'var(--text-main)' }}>شهادة إتمام الدورة الأكاديمية:</strong>
-              <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>رمز التحقق المعتمد: ASIRA-2026-8812</span>
+          {/* رسالة إشعار تقديم الطلب السريعة */}
+          {requestFeedback && (
+            <div style={{
+              padding: '0.85rem 1.25rem',
+              background: 'rgba(16, 185, 129, 0.12)',
+              border: '1px solid var(--accent-emerald)',
+              borderRadius: 'var(--radius-md)',
+              color: 'var(--text-main)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.25rem',
+              fontSize: '0.88rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <CheckCircle2 size={18} color="var(--accent-emerald)" />
+                <span>{requestFeedback}</span>
+              </div>
+              <button onClick={() => setRequestFeedback(null)} className="btn btn-ghost" style={{ padding: '0.2rem 0.5rem' }}>✕</button>
             </div>
-            <button
-              onClick={() => setIsCertificateModalOpen(true)}
-              className="btn btn-primary"
-              style={{ padding: '0.6rem 1.4rem' }}
-              id="view-certificate-btn"
-            >
-              <Award size={16} />
-              <span>معاينة وتحميل الشهادة الأكاديمية الرسمية</span>
-            </button>
-          </div>
+          )}
+
+          {/* منظومة الشهادات: التحقق من الأهلية ودورة التجهيز خارج المنصة */}
+          {(() => {
+            const currentCertReq = certRequests.find(
+              (r) => r.studentUid === studentUid && (r.courseId === currentCourse?.id || r.courseTitle === currentCourse?.title)
+            );
+            const isEligibleForCert = totalScore >= (currentCourse?.passingScore || 70);
+
+            const handleRequestCert = () => {
+              if (!currentCourse) return;
+              if (onRequestCertificate) {
+                onRequestCertificate(currentCourse.id);
+              } else {
+                const newReq: MockCertificateRequest = {
+                  id: `cert-req-${Date.now()}`,
+                  studentUid,
+                  studentName,
+                  courseId: currentCourse.id,
+                  courseTitle: currentCourse.title,
+                  courseCode: currentCourse.code,
+                  totalScore,
+                  requestedAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
+                  status: 'pending',
+                };
+                setLocalCertRequests((prev) => [newReq, ...prev]);
+              }
+              setRequestFeedback('تم إرسال طلب إصدار وتوقيع الشهادة إلى عمادة منتدى أسيرا بنجاح! سيتم تدقيق درجاتك وتجهيز الشهادة الموقعة خارج المنصة.');
+              if (onLogAudit) {
+                onLogAudit('طلب شهادة أكاديمية', `قام الطالب (${studentName}) بطلب شهادة لكورس: ${currentCourse.title}`);
+              }
+            };
+
+            // الحالة 1: لم يتم طلب الشهادة بعد
+            if (!currentCertReq) {
+              if (isEligibleForCert) {
+                return (
+                  <div style={{
+                    padding: '1.5rem',
+                    background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.06) 0%, rgba(217, 119, 6, 0.06) 100%)',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1rem'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+                      <div style={{ flex: 1, minWidth: '260px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                          <span className="badge badge-emerald">✓ مؤهل للتخرج ونيل الشهادة الرسمية</span>
+                          <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>المعدل التراكمي: {totalScore}%</span>
+                        </div>
+                        <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: '0 0 0.35rem', color: 'var(--text-main)' }}>
+                          طلب إصدار الشهادة الأكاديمية الرسمية
+                        </h3>
+                        <p style={{ fontSize: '0.86rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.6 }}>
+                          تنويه أكاديمي: شهادات إتمام البرامج التدريبية في منتدى أسيرا لا يتم إنشاؤها تلقائياً بالمنصة، بل يتم تدقيق نتائج الطالب وتجهيز وثيقة الشهادة وتوقيعها رسمياً من قِبل عميد المبادرة خارج المنصة بصيغة PDF معتمدة وموثقة بكود تحقق، ثم رفعها للمنصة.
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={handleRequestCert}
+                        className="btn btn-primary"
+                        id="request-certificate-btn"
+                        style={{ padding: '0.75rem 1.6rem', fontWeight: 800, fontSize: '0.92rem', whiteSpace: 'nowrap' }}
+                      >
+                        <Award size={18} />
+                        <span>طلب إصدار الشهادة الأكاديمية</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              } else {
+                return (
+                  <div style={{
+                    padding: '1.25rem',
+                    background: 'var(--bg-subtle)',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-color)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.85rem'
+                  }}>
+                    <AlertCircle size={24} color="#f59e0b" style={{ flexShrink: 0 }} />
+                    <div>
+                      <strong style={{ display: 'block', color: 'var(--text-main)', fontSize: '0.95rem' }}>
+                        متطلبات نيل الشهادة غير مكتملة بعد:
+                      </strong>
+                      <span style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
+                        نسبة النجاح المقررة هي {currentCourse?.passingScore || 70}%. مجموعك الحالي هو {totalScore}%. يرجى استكمال التكليفات والامتحانات أولاً للتأهل لطلب الشهادة.
+                      </span>
+                    </div>
+                  </div>
+                );
+              }
+            }
+
+            // الحالة 2: الطلب قيد المراجعة أو قيد التجهيز والتوقيع خارج المنصة
+            if (currentCertReq.status === 'pending' || currentCertReq.status === 'processing') {
+              return (
+                <div style={{
+                  padding: '1.5rem',
+                  background: 'rgba(217, 119, 6, 0.05)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid rgba(217, 119, 6, 0.35)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '1.25rem'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem' }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                        <span className="badge badge-gold">
+                          {currentCertReq.status === 'processing' ? '✍️ جاري تجهيز وتوقيع الشهادة خارج المنصة' : '⏳ طلب الشهادة قيد المراجعة والتدقيق'}
+                        </span>
+                        <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                          تاريخ تقديم الطلب: {currentCertReq.requestedAt}
+                        </span>
+                      </div>
+                      <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: '0 0 0.35rem', color: 'var(--text-main)' }}>
+                        طلب الشهادة قيد الإجراء لدى إدارة المنصة والعمادة
+                      </h3>
+                      <p style={{ fontSize: '0.86rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.6, maxWidth: '700px' }}>
+                        تم تسجيل طلبك بنجاح. تقوم عمادة منتدى أسيرا واللجنة الأكاديمية حالياً بمراجعة درجاتك وإعداد الشهادة وتوقيعها يدوياً خارج المنصة.
+                        <br />
+                        <strong style={{ color: 'var(--accent-gold)' }}>
+                          تنبيه: يمكنك متابعة حالة الطلب هنا، وستتاح أزرار استعراض وتحميل الشهادة فور قيام الإدارة باعتمادها ورفع رابط النسخة الموقعة.
+                        </strong>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* مسار مراحل إعداد وتوقيع الشهادة */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                    gap: '0.75rem',
+                    background: 'var(--bg-card)',
+                    padding: '1rem',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--border-color)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <CheckCircle2 size={18} color="#10b981" />
+                      <div>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)' }}>1. تقديم الطلب</div>
+                        <div style={{ fontSize: '0.74rem', color: '#10b981' }}>مكتمل ({currentCertReq.requestedAt.split(' ')[0]})</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <Clock size={18} color="#d97706" />
+                      <div>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)' }}>2. التجهيز والتوقيع خارج المنصة</div>
+                        <div style={{ fontSize: '0.74rem', color: '#d97706', fontWeight: 700 }}>قيد الإجراء حالياً ⏳</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: 0.55 }}>
+                      <ShieldCheck size={18} />
+                      <div>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)' }}>3. رفع الرابط وإتاحة التحميل</div>
+                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>بانتظار اعتماد الإدارة 🔒</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            // الحالة 3: تم اعتماد وإصدار الشهادة ورفع رابطها من قبل المدير
+            if (currentCertReq.status === 'issued') {
+              return (
+                <div style={{
+                  padding: '1.5rem',
+                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(217, 119, 6, 0.08) 100%)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--accent-emerald)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '1.25rem'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.35rem' }}>
+                        <span className="badge badge-emerald">✓ تم اعتماد وتوقيع الشهادة رسمياً</span>
+                        <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                          تاريخ الاعتماد: {currentCertReq.issuedAt || '2026-10-13'}
+                        </span>
+                      </div>
+                      <h3 style={{ fontSize: '1.25rem', fontWeight: 900, margin: '0 0 0.35rem', color: 'var(--text-main)' }}>
+                        شهادتك الأكاديمية الرسمية جاهزة وموثقة
+                      </h3>
+                      <p style={{ fontSize: '0.86rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
+                        تم توقيع الشهادة من عميد منتدى أسيرا واعتمادها باللجنة العلمية ورفع النسخة الموثقة بنجاح.
+                      </p>
+                      
+                      <div style={{ marginTop: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>رمز التحقق الأكاديمي المعتمد:</span>
+                        <code style={{ padding: '0.2rem 0.5rem', background: 'var(--bg-subtle)', borderRadius: '4px', fontWeight: 800, color: 'var(--primary-600)', fontFamily: 'monospace' }}>
+                          {currentCertReq.verificationCode || 'ASIRA-2026-8812'}
+                        </code>
+                      </div>
+
+                      {currentCertReq.adminNotes && (
+                        <div style={{ marginTop: '0.6rem', fontSize: '0.82rem', color: 'var(--accent-emerald)', background: 'rgba(16, 185, 129, 0.1)', padding: '0.4rem 0.75rem', borderRadius: '4px', maxWidth: '600px' }}>
+                          <strong>ملاحظة العمادة:</strong> {currentCertReq.adminNotes}
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                      <button
+                        onClick={() => setIsCertificateModalOpen(true)}
+                        className="btn btn-outline"
+                        style={{ padding: '0.65rem 1.25rem', fontWeight: 700 }}
+                        id="view-certificate-btn"
+                      >
+                        <Award size={16} />
+                        <span>استعراض وثيقة الشهادة</span>
+                      </button>
+
+                      {currentCertReq.signedPdfUrl ? (
+                        <a
+                          href={currentCertReq.signedPdfUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn btn-primary"
+                          style={{ padding: '0.65rem 1.4rem', fontWeight: 800, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+                          id="download-certificate-btn"
+                        >
+                          <Download size={16} />
+                          <span>تحميل الشهادة الموقعة (Google Drive PDF)</span>
+                          <ExternalLink size={14} />
+                        </a>
+                      ) : (
+                        <button
+                          onClick={() => setIsCertificateModalOpen(true)}
+                          className="btn btn-primary"
+                          style={{ padding: '0.65rem 1.4rem', fontWeight: 800 }}
+                          id="download-certificate-btn"
+                        >
+                          <Download size={16} />
+                          <span>تحميل الشهادة الأكاديمية (PDF)</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            // الحالة 4: تم رفض الطلب
+            if (currentCertReq.status === 'rejected') {
+              return (
+                <div style={{ padding: '1.25rem', background: '#fef2f2', border: '1px solid #f87171', borderRadius: 'var(--radius-md)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                    <div>
+                      <span className="badge" style={{ background: '#fee2e2', color: '#b91c1c', marginBottom: '0.35rem' }}>
+                        تم رفض طلب الشهادة
+                      </span>
+                      <h4 style={{ margin: '0.2rem 0', color: '#991b1b', fontSize: '1rem', fontWeight: 800 }}>ملاحظات الإدارة الأكاديمية:</h4>
+                      <p style={{ margin: 0, fontSize: '0.85rem', color: '#7f1d1d' }}>
+                        {currentCertReq.adminNotes || 'لم يتم استيفاء المتطلبات المقررة في الحضور والتطبيقات العملية.'}
+                      </p>
+                    </div>
+                    <button onClick={handleRequestCert} className="btn btn-outline" style={{ borderColor: '#ef4444', color: '#b91c1c' }}>
+                      إعادة تقديم الطلب
+                    </button>
+                  </div>
+                </div>
+              );
+            }
+
+            return null;
+          })()}
         </div>
       )}
 
@@ -924,6 +1214,12 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
           studentName={studentName}
           course={currentCourse}
           totalScore={totalScore}
+          verificationCode={
+            certRequests.find((r) => r.studentUid === studentUid && (r.courseId === currentCourse?.id || r.courseTitle === currentCourse?.title))?.verificationCode || 'ASIRA-2026-8812'
+          }
+          signedPdfUrl={
+            certRequests.find((r) => r.studentUid === studentUid && (r.courseId === currentCourse?.id || r.courseTitle === currentCourse?.title))?.signedPdfUrl
+          }
         />
       )}
     </div>

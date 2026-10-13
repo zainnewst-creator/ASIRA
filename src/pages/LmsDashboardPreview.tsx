@@ -140,11 +140,62 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
     setEnrollments((prev) => prev.map((e) => e.id === id ? { ...e, status: 'rejected' } : e));
   };
 
-  // 8. إصدار وتوقيع شهادة من قبل المدير
-  const handleIssueCertificate = (id: string, code: string, pdfUrl: string) => {
-    setCertRequests((prev) =>
-      prev.map((c) => c.id === id ? { ...c, status: 'issued', verificationCode: code, signedPdfUrl: pdfUrl } : c)
+  // 8. تقديم طلب شهادة أكاديمية من قبل الطالب
+  const handleRequestCertificate = (courseId: string) => {
+    const course = courses.find((c) => c.id === courseId);
+    const existing = certRequests.find(
+      (c) => c.studentUid === 'student-1' && (c.courseId === courseId || c.courseTitle === course?.title)
     );
+    if (existing) return;
+
+    const newReq: MockCertificateRequest = {
+      id: `cert-req-${Date.now()}`,
+      studentUid: 'student-1',
+      studentName: initialName,
+      university: 'جامعة الملك سعود',
+      courseId: courseId,
+      courseTitle: course?.title || 'منهجية وأساسيات البحث العلمي والنشر الدولي',
+      courseCode: course?.code || 'RES-101',
+      totalScore: 86,
+      requestedAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      status: 'pending',
+      verificationCode: `ASIRA-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+    };
+
+    setCertRequests((prev) => [newReq, ...prev]);
+    appendAuditLog(
+      'تقديم طلب شهادة أكاديمية',
+      `قام الطالب (${initialName}) بطلب إصدار شهادة معتمدة لكورس: ${course?.title || courseId}`
+    );
+  };
+
+  // 9. تعديل حالة الشهادة ورفع الرابط من قبل المدير
+  const handleUpdateCertificate = (
+    id: string,
+    status: 'pending' | 'processing' | 'issued' | 'rejected',
+    code?: string,
+    pdfUrl?: string,
+    notes?: string
+  ) => {
+    setCertRequests((prev) =>
+      prev.map((c) =>
+        c.id === id
+          ? {
+              ...c,
+              status,
+              verificationCode: code !== undefined ? code : c.verificationCode,
+              signedPdfUrl: pdfUrl !== undefined ? pdfUrl : c.signedPdfUrl,
+              adminNotes: notes !== undefined ? notes : c.adminNotes,
+              issuedAt: status === 'issued' ? new Date().toISOString().split('T')[0] : c.issuedAt,
+            }
+          : c
+      )
+    );
+  };
+
+  // 10. إصدار وتوقيع شهادة من قبل المدير (توافق خلفي)
+  const handleIssueCertificate = (id: string, code: string, pdfUrl: string) => {
+    handleUpdateCertificate(id, 'issued', code, pdfUrl, 'تم توقيع الشهادة ورفع النسخة المعتمدة');
   };
 
   return (
@@ -246,6 +297,8 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
             examAttempts={examAttempts}
             curriculum={curriculum}
             practicalGrades={practicalGrades}
+            certRequests={certRequests}
+            onRequestCertificate={handleRequestCertificate}
             onLogAudit={appendAuditLog}
           />
         )}
@@ -276,6 +329,7 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
             onApproveEnrollment={handleApproveEnrollment}
             onRejectEnrollment={handleRejectEnrollment}
             certRequests={certRequests}
+            onUpdateCertificate={handleUpdateCertificate}
             onIssueCertificate={handleIssueCertificate}
             auditLogs={auditLogs}
             onLogAudit={appendAuditLog}

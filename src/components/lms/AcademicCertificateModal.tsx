@@ -10,6 +10,7 @@ interface AcademicCertificateModalProps {
   verificationCode?: string;
   totalScore?: number;
   issueDate?: string;
+  signedPdfUrl?: string;
 }
 
 export const AcademicCertificateModal: React.FC<AcademicCertificateModalProps> = ({
@@ -20,6 +21,7 @@ export const AcademicCertificateModal: React.FC<AcademicCertificateModalProps> =
   verificationCode = 'ASIRA-2026-8812',
   totalScore = 86,
   issueDate = '2026-10-13',
+  signedPdfUrl,
 }) => {
   if (!isOpen) return null;
 
@@ -49,7 +51,22 @@ export const AcademicCertificateModal: React.FC<AcademicCertificateModalProps> =
             </h3>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            {signedPdfUrl && (
+              <a
+                href={signedPdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-primary"
+                style={{ fontSize: '0.85rem', padding: '0.45rem 1rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none' }}
+                title="فتح وتحميل ملف الـ PDF الأصلي الموقع من العميد"
+                id="modal-signed-pdf-link"
+              >
+                <Download size={16} />
+                <span>تحميل PDF الموقع من العميد</span>
+                <ExternalLink size={14} />
+              </a>
+            )}
             <button
               onClick={handlePrint}
               className="btn btn-outline"

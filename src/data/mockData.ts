@@ -580,23 +580,50 @@ export interface MockCertificateRequest {
   id: string;
   studentUid: string;
   studentName: string;
+  university?: string;
+  courseId: string;
   courseTitle: string;
+  courseCode?: string;
+  totalScore?: number;
   requestedAt: string;
-  status: 'pending' | 'issued';
+  status: 'pending' | 'processing' | 'issued' | 'rejected';
   signedPdfUrl?: string;
   verificationCode?: string;
+  adminNotes?: string;
+  issuedAt?: string;
 }
 
 export const INITIAL_CERT_REQUESTS: MockCertificateRequest[] = [
   {
-    id: 'cert-req-1',
-    studentUid: 'student-1',
-    studentName: 'أحمد محمد الصالح',
-    courseTitle: 'منهجية وأساسيات البحث العلمي والنشر الدولي',
-    requestedAt: '2026-10-12 13:00',
-    status: 'pending',
+    id: 'cert-req-2',
+    studentUid: 'student-2',
+    studentName: 'سارة خالد الكيلاني',
+    university: 'جامعة العلوم والتكنولوجيا',
+    courseId: 'course-2',
+    courseTitle: 'المراجعات المنهجية والتحليل التلوي',
+    courseCode: 'SR-201',
+    totalScore: 92,
+    requestedAt: '2026-10-12 11:30',
+    status: 'processing',
+    verificationCode: 'ASIRA-2026-9041',
     signedPdfUrl: undefined,
-    verificationCode: undefined,
+    adminNotes: 'جاري إعداد وثيقة الشهادة وتوقيعها من العميد د. إبراهيم يحيى خارج المنصة',
+  },
+  {
+    id: 'cert-req-3',
+    studentUid: 'student-3',
+    studentName: 'محمد عبد الله القحطاني',
+    university: 'جامعة الملك فيصل',
+    courseId: 'course-1',
+    courseTitle: 'منهجية وأساسيات البحث العلمي والنشر الدولي',
+    courseCode: 'RES-101',
+    totalScore: 88,
+    requestedAt: '2026-10-10 14:00',
+    status: 'issued',
+    verificationCode: 'ASIRA-2026-7731',
+    signedPdfUrl: 'https://drive.google.com/file/d/DeanSignedCertAlqahtani/view',
+    adminNotes: 'تم تدقيق الدرجات واعتماد وتوقيع الشهادة من العميد ورفع نسخة Google Drive',
+    issuedAt: '2026-10-11',
   }
 ];
 
