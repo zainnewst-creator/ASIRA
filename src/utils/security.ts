@@ -36,8 +36,14 @@ export const sanitizeInput = (input: string, maxLength: number = 1000): string =
  */
 export const isTrustedStorageUrl = (url?: string | null): boolean => {
   if (!url || typeof url !== 'string') return false;
-  const trimmed = url.trim();
-  return /^(https:\/\/)(drive\.google\.com|docs\.google\.com|firebasestorage\.googleapis\.com)/i.test(trimmed);
+  try {
+    const parsed = new URL(url.trim());
+    if (parsed.protocol !== 'https:') return false;
+    const trustedHosts = ['drive.google.com', 'docs.google.com', 'firebasestorage.googleapis.com'];
+    return trustedHosts.includes(parsed.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
 };
 
 /**

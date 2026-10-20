@@ -1,0 +1,1793 @@
+ASIRA RESEARCH LEARNING PLATFORM
+
+PHASE 3 — FINAL SECURITY VALIDATION, GAP REMEDIATION & PRODUCTION READINESS
+
+1. Mission
+
+Project: ASIRA Research Learning Platform (منصة أسيرا لتعليم البحث العلمي)
+
+You are continuing an existing application after:
+
+- Phase 1: Project inspection, safe cleanup, TypeScript/build fixes, and initial regression checks.
+- Phase 2: Reported security hardening of Firestore Rules, exam grading, role authorization, certificates, URL sanitization, audit records, and security-related code.
+
+Phase 2 reported successful TypeScript validation and production builds, but this does not independently establish that the application is secure or production-ready.
+
+Your mission is to perform the final independent validation, close remaining security gaps, add missing automated tests, verify GitHub/Vercel/Firebase deployment readiness, and produce evidence-based release recommendations.
+
+Do not rebuild the application. Do not blindly repeat completed work. Do not claim that the platform is 100% secure.
+
+Work only on the existing project, preserving its architecture, functionality, educational workflows, Arabic/English support, and RTL experience.
+
+The final objective is a demonstrably tested and deployable application with clearly documented residual risks.
+
+---
+
+2. Mandatory Safety Rules
+
+Before changing anything:
+
+1. Inspect the repository, current branch, Git status, recent commits, package files, environment configuration, and project documentation.
+2. Identify all uncommitted changes. Never overwrite, discard, reset, or silently replace work from previous phases.
+3. Preserve the existing "phase-2-security-hardening" branch and its history.
+4. Create a dedicated Phase 3 working branch only after confirming the current Git state and selecting a safe branching strategy.
+5. Never expose secrets in terminal output, reports, screenshots, test logs, or generated files.
+6. Never print actual API keys, access tokens, passwords, private credentials, service-account private keys, or complete sensitive environment files.
+7. Do not run destructive tests against production data or production services.
+8. Use Firebase Emulator Suite or an isolated test project for authorization, database, and integration testing wherever possible.
+9. Never deploy to production, change live access permissions, rotate production credentials, delete production data, or modify production infrastructure without explicit authorization.
+10. Do not create paid infrastructure or enable paid services without authorization.
+11. Do not upgrade or replace major dependencies blindly. Evaluate compatibility, security impact, and regression risk first.
+12. Never suppress a security issue merely to make tests pass.
+13. Never weaken Firestore Rules, disable security checks, or add permissive fallback rules to restore broken functionality.
+14. If a test cannot safely or technically be performed, mark it "NOT TESTED" or "BLOCKED" and explain why.
+15. Do not invent test results, coverage figures, vulnerability findings, or deployment status.
+
+Before every significant remediation, identify the root cause and the smallest safe correction.
+
+---
+
+3. Establish the Actual Current State
+
+Inspect the repository directly.
+
+Determine and document:
+
+- Actual frontend framework and versions.
+- Actual build system and TypeScript configuration.
+- Authentication providers and authentication flows.
+- Firestore collections, document structures, and security rules.
+- Firebase Storage usage and its security rules, if present.
+- Cloud Functions or other trusted backend components, if present.
+- Exam creation, answer-key storage, exam submission, grading, and attempt management.
+- Practical grading and assignment submission workflows.
+- Certificate request, issuance, storage, and verification workflows.
+- Role assignment and role enforcement.
+- Audit logging.
+- File upload and external-link handling.
+- Administrative workflows and account management.
+- GitHub repository configuration and CI workflows, if present.
+- Vercel configuration, build settings, and deployment configuration, if present.
+- Existing automated tests and their execution commands.
+- All external services and third-party integrations actually used.
+
+Read the Phase 2 report and inspect the corresponding implementation.
+
+Pay special attention to:
+
+- "firestore.rules"
+- "src/utils/security.ts"
+- "index.html"
+- Exam-related models and services.
+- Grade-related models and services.
+- Certificate verification code.
+- Authentication and authorization code.
+- Any backend functions that perform privileged operations.
+- Existing security and regression tests.
+
+File names are starting points, not proof that a feature exists or is correctly implemented.
+
+Create:
+
+"PHASE_3_INITIAL_STATE.md"
+
+Include:
+
+- Repository state and branch.
+- Existing implementation and tests.
+- Phase 2 claims verified directly from code.
+- Claims that still lack independent test evidence.
+- Existing blockers and unresolved risks.
+- A list of already completed work that must not be needlessly duplicated.
+
+Do not begin broad refactoring before completing this inspection.
+
+---
+
+4. Security Finding and Evidence Classification
+
+Every security-related claim must have a verifiable basis.
+
+Classify each finding as one of:
+
+- "CONFIRMED VULNERABILITY"
+- "POTENTIAL VULNERABILITY"
+- "VERIFIED PROTECTED"
+- "NOT TESTED"
+- "BLOCKED"
+- "NOT APPLICABLE"
+
+For each confirmed or potential vulnerability, record:
+
+- Unique ID.
+- Affected component.
+- Severity and justification.
+- Attack preconditions.
+- The exact security boundary involved.
+- Evidence from the implementation.
+- Reproduction procedure using a safe test environment.
+- Expected result.
+- Actual result.
+- Remediation applied, if any.
+- Regression tests added.
+- Retest result.
+- Residual risk.
+
+Do not label a vulnerability as fixed merely because a helper function was added or a build succeeds.
+
+A finding is considered fixed only after the correction has been tested against the original attack scenario and relevant regression cases.
+
+---
+
+5. Firestore Security Rules — Independent Adversarial Testing
+
+Review the actual current "firestore.rules" and validate the effective authorization behavior using the Firebase Emulator Suite where feasible.
+
+Do not merely repeat the previous line-by-line review.
+
+Create or extend automated tests covering:
+
+A. Identity and ownership
+
+- Unauthenticated users attempting protected reads and writes.
+- A student reading another student's private profile.
+- A student modifying another user's profile.
+- A student changing ownership fields such as "uid", owner ID, or enrollment identifiers.
+- An instructor accessing a course they do not teach.
+- An instructor accessing unrelated students or courses.
+- A user attempting to gain access by changing client-side state or request fields.
+- Cross-user and cross-course document access.
+
+B. Privileged roles
+
+- Students attempting to become instructors or administrators.
+- Users attempting to modify their own role, permissions, approval status, or privileged claims through client-accessible paths.
+- Users forging role fields in request bodies.
+- Users attempting to modify trusted role-assignment records.
+- Deleted, disabled, or otherwise unauthorized accounts attempting privileged operations, where the configured architecture supports these states.
+
+Verify whether authorization relies on trusted server-issued claims, securely controlled database records, email-based checks, or combinations of these mechanisms.
+
+Email verification must not be treated as a substitute for trusted role assignment.
+
+If administrator authorization has an email-based fallback, determine whether that fallback can independently grant administrative access. Eliminate insecure fallback paths if present, while preserving the legitimate administrator workflow.
+
+Do not invent an administrator email or credentials.
+
+C. Field-level authorization
+
+Test unauthorized changes to:
+
+- Grades and calculated scores.
+- Official and practical grades.
+- Approval and completion states.
+- Course membership.
+- Instructor assignments.
+- Certificate issuance status.
+- Audit actor identity and role.
+- Administrative metadata.
+- Created/updated timestamps and ownership fields.
+- Any other sensitive fields discovered in the actual schema.
+
+Test both forbidden-field injection and unauthorized updates to existing documents.
+
+D. Query and document-level access
+
+Test whether security rules correctly enforce access for:
+
+- Direct document reads.
+- Collection queries.
+- Nested subcollections.
+- Alternate document IDs.
+- Unexpected but valid query patterns.
+- Documents with missing or malformed ownership fields.
+
+Remember that Firestore Rules are not ordinary post-query filters. Confirm that authorized queries can actually satisfy the rules without requiring insecure changes.
+
+E. Data validation
+
+Check enforcement of:
+
+- Required fields.
+- Allowed field sets.
+- Data types.
+- Valid enum values.
+- String and array length limits.
+- Numeric ranges.
+- Valid state transitions.
+- Immutable fields.
+- Timestamp constraints where relevant.
+- Unexpected nested objects and additional fields.
+
+Use "hasOnly", "hasAll", "diff().affectedKeys()", or equivalent appropriate mechanisms when necessary and compatible with the existing design.
+
+Do not rely on frontend validation for authorization or integrity.
+
+F. Security Rules test matrix
+
+For each important collection and operation, cover:
+
+- Anonymous user.
+- Student acting on their own data.
+- Student acting on another user's data.
+- Authorized instructor.
+- Unauthorized instructor.
+- Administrator.
+- Malicious authenticated user attempting privilege escalation.
+
+Add missing automated tests using the repository's existing testing framework or the appropriate Firebase Rules testing libraries.
+
+Run the tests against the emulator. Do not claim emulator verification unless the tests actually ran successfully.
+
+---
+
+6. Trusted Grading and Examination Integrity
+
+This is a release-critical area.
+
+Inspect the complete exam lifecycle, from authoring through submission and final grade display.
+
+A. Answer-key confidentiality
+
+Verify that students cannot retrieve correct answers, scoring weights, hidden explanations, answer keys, or equivalent sensitive data through:
+
+- Firestore reads.
+- Nested documents.
+- Client-side query responses.
+- Exam objects returned by services.
+- Publicly bundled frontend assets.
+- Debug output or logs.
+- Alternate API or backend responses.
+
+Inspect the actual data returned to students rather than relying exclusively on "sanitizeExamForStudent".
+
+A frontend sanitizer is not an authorization boundary.
+
+B. Grade calculation and persistence
+
+Determine exactly where official exam grades are calculated.
+
+Verify that the authoritative grade cannot be supplied or modified by an untrusted client.
+
+Test attempts to:
+
+- Inject "score", "grade", "officialGrade", or "calculatedScore".
+- Modify grade fields after submission.
+- Change submission status to a privileged state.
+- Alter exam identifiers or ownership.
+- Replay submissions.
+- Submit another student's answers.
+- Modify a previously graded attempt.
+- Forge grading metadata or grader identity.
+- Bypass required validation by using alternate document IDs.
+
+If grading is performed only on the client, document the trust-boundary weakness.
+
+Where necessary and compatible with the existing architecture, implement or prepare a trusted grading path using an existing trusted backend or an appropriate secured server-side component.
+
+Do not add an expensive service or change the application's architecture unnecessarily.
+
+If a secure server-side grading implementation is necessary but cannot be completed safely, mark the feature as a release blocker rather than pretending Firestore Rules alone solve the issue.
+
+C. Attempts, timing, and replay
+
+Inspect how the platform manages:
+
+- Exam start time.
+- Submission deadlines.
+- Attempt limits.
+- Repeated submissions.
+- Concurrent submissions.
+- Resuming interrupted exams.
+- Duplicate requests.
+- Final submission state.
+- Server-authoritative timestamps.
+- Exam availability and enrollment eligibility.
+
+Test concurrent or repeated submissions where feasible.
+
+A client-generated timestamp must not be treated as authoritative proof of submission time.
+
+Determine which controls can actually be enforced with the existing architecture. Do not claim that a browser-based timer prevents all cheating.
+
+D. Practical grades and assignments
+
+Test whether a student can:
+
+- Assign their own practical grade.
+- Change "gradedBy" or "gradedAt".
+- Alter a finalized practical grade.
+- Submit work on behalf of another student.
+- Change the ownership of a submission.
+- Modify an approved assignment.
+- Access another student's submitted file.
+
+Confirm that only the authorized instructor or administrator can perform the intended grading actions.
+
+---
+
+7. Authentication and Authorization Workflows
+
+Inspect the authentication provider and existing account-management implementation.
+
+Test, where applicable:
+
+- Sign-up and sign-in validation.
+- Authentication state changes.
+- Session persistence and logout behavior.
+- Password reset and recovery flows.
+- Email verification.
+- Account deletion and re-registration.
+- Role assignment and revocation.
+- Disabled or blocked account behavior.
+- Stale client state after role changes.
+- Access to privileged pages through direct URLs.
+- API and database access after a user loses privileges.
+- Redirect handling after login and password recovery.
+- Duplicate account creation or conflicting account records.
+
+Frontend route guards are usability controls, not a replacement for backend authorization.
+
+If the platform supports administrator-created users, invitations, approvals, or manual enrollment, test those actual flows.
+
+Use test accounts only.
+
+Do not send repeated recovery emails to real users or perform destructive actions against live accounts.
+
+---
+
+8. Certificate Issuance and Verification
+
+Independently verify the complete certificate lifecycle.
+
+Test:
+
+- Forged certificate codes.
+- Nonexistent certificate codes.
+- Valid-looking but unissued certificates.
+- Revoked or invalidated certificates, if revocation exists.
+- Unauthorized issuance.
+- Unauthorized changes to issued certificates.
+- Changing certificate ownership.
+- Altering course, student identity, issue date, or signing metadata.
+- Access to another student's private certificate data.
+- Enumeration of certificate IDs and codes.
+- Repeated issuance requests.
+- Forged verification responses.
+- Invalid, malicious, or unexpected certificate URLs.
+
+Public verification should disclose only the minimum information needed to verify authenticity.
+
+Confirm that the verification result comes from the actual authoritative certificate record or trusted backend, rather than a string prefix or client-generated assertion.
+
+Preserve legitimate public verification functionality.
+
+---
+
+9. XSS, Injection, and Frontend Security
+
+Review all security-sensitive frontend sinks and external input paths.
+
+Do not limit the audit to "src/utils/security.ts".
+
+Inspect:
+
+- HTML rendering.
+- Rich-text rendering.
+- "dangerouslySetInnerHTML" or equivalent mechanisms, if used.
+- URL construction.
+- "window.open".
+- External navigation.
+- Redirect parameters.
+- DOI and PubMed links.
+- Google Drive links.
+- Firebase Storage URLs.
+- Uploaded filenames and metadata.
+- Student submissions.
+- Instructor feedback.
+- Course descriptions and announcements.
+- Certificate display.
+- Any markdown or HTML parsing libraries.
+
+Test safe, non-destructive payloads representing:
+
+- HTML injection.
+- Stored and reflected XSS.
+- Malicious URL schemes such as "javascript:".
+- Protocol-relative URLs.
+- URL encoding and normalization edge cases.
+- Unexpected data types.
+- Unicode and whitespace tricks.
+- Open redirects.
+- Unsafe external links and "target="_blank"" behavior.
+
+Validate URLs using an allowlist where appropriate. Do not accept a URL merely because its text contains a trusted domain.
+
+If arbitrary HTTPS URLs are allowed, verify that this is intentional and safe for the particular feature.
+
+Sanitize or encode data according to the destination context. Generic string replacement is not a complete XSS defense.
+
+Inspect dependency usage for unsafe rendering patterns.
+
+Add regression tests for every confirmed issue.
+
+---
+
+10. HTTP Security Headers and Deployment Configuration
+
+Inspect the actual response headers produced by the configured hosting platform.
+
+Do not assume HTML meta tags provide equivalent protection to HTTP response headers.
+
+Check the relevant hosting configuration, such as "vercel.json" or equivalent existing deployment configuration.
+
+Where compatible with the application, evaluate and configure appropriate headers:
+
+- "Content-Security-Policy".
+- "X-Content-Type-Options".
+- "Referrer-Policy".
+- "Strict-Transport-Security" for the HTTPS production domain.
+- "frame-ancestors" through CSP or another appropriate framing control.
+- "Permissions-Policy".
+- Appropriate cache controls for sensitive responses, where applicable.
+
+Do not blindly add headers that break Firebase authentication, legitimate embedded resources, or required third-party integrations.
+
+For CSP:
+
+1. Inventory the actual scripts, styles, fonts, images, API connections, and other required origins.
+2. Create a policy compatible with the real application.
+3. Prefer restrictive policies.
+4. Avoid unsafe exceptions unless their necessity is established.
+5. Test the policy against actual application workflows.
+6. Report any remaining exceptions.
+
+Do not expose secrets or use source-code modifications as a substitute for server-side header configuration.
+
+If a real production domain is not available, validate the deployment configuration statically and mark live header verification as "BLOCKED" or "NOT TESTED".
+
+---
+
+11. Dependency and Supply-Chain Security
+
+Independently revisit the dependency warnings reported in Phase 2.
+
+Run the repository's appropriate dependency audit commands and inspect the lockfile.
+
+For each relevant finding, record:
+
+- Package name.
+- Installed version.
+- Direct or transitive dependency status.
+- Vulnerability identifier, when available.
+- Affected version range.
+- Fixed version, if one exists.
+- Whether the vulnerable component is included in the production client bundle.
+- Whether the vulnerable code path is reachable in the actual deployment.
+- Practical impact.
+- Recommended remediation.
+
+Do not dismiss a vulnerability merely because the package is described as a Node.js dependency.
+
+Conversely, do not assume that every vulnerable development or transitive dependency is exploitable in production.
+
+Distinguish development/build-time exposure from production runtime exposure.
+
+Inspect:
+
+- Production dependencies.
+- Development dependencies.
+- Lockfile consistency.
+- Deprecated packages.
+- Known malicious or compromised packages, if indicated by available evidence.
+- Unnecessary dependencies.
+- Build scripts and lifecycle scripts where relevant.
+
+Do not blindly upgrade Firebase or perform major-version migrations.
+
+Prefer the smallest compatible security fix, and rerun the relevant build, type checks, and regression tests.
+
+If a dependency cannot safely be upgraded, document the exact residual risk and compensating controls.
+
+---
+
+12. Secrets, Environment Variables, and Client Bundle Inspection
+Inspect the codebase and build configuration for accidentally exposed credentials.
+Check for:
+Committed .env files.
+Private service-account credentials.
+Private keys.
+Hardcoded privileged tokens.
+API secrets incorrectly embedded in frontend code.
+Credentials written to logs.
+Sensitive configuration exposed through source maps or generated assets.
+Secrets accidentally included in test fixtures or reports.
+Unnecessary debug output.
+Remember that frontend environment variables and client-bundled code are not secret storage.
+Firebase client configuration values may be public by design; evaluate them in context rather than incorrectly labeling every Firebase configuration value as a leaked secret.
+Check whether Firebase API-key restrictions, App Check, authentication, and security rules are appropriately configured for the actual project, where applicable.
+If the application uses Firebase App Check, verify its actual enforcement status and coverage rather than merely checking whether the SDK is present.
+If a genuine secret leak is discovered:
+Do not reproduce the secret in the report.
+Determine the affected service and possible exposure window.
+Document the required remediation.
+Do not rotate or revoke production credentials without authorization.
+Treat a publicly exposed privileged credential as a potential release blocker until appropriately remediated.
+Inspect the production build output using secret-safe methods.
+13. Storage, Uploads, and External Integrations
+If Firebase Storage or another file-storage service is used, independently inspect its security configuration.
+Test, where applicable:
+Unauthorized downloads.
+Unauthorized uploads.
+Cross-user access.
+Cross-course access.
+MIME-type spoofing.
+Excessive file sizes.
+Unexpected file extensions.
+Malicious filenames.
+Ownership changes.
+Unauthorized deletion or replacement.
+Public access to private educational documents.
+Signed URL or download-token exposure.
+Determine whether file size, content type, ownership, and access permissions are validated by a trusted layer.
+Do not assume a file is safe because its extension is permitted.
+If the application uses Drive links, verify that the platform does not accidentally expose private Drive documents or allow arbitrary unsafe URLs to be treated as trusted storage.
+For other integrations, inspect the actual access-control boundary and credentials model.
+Mark absent features as NOT APPLICABLE only after verifying that they are not used.
+14. Cloud Functions and Trusted Backend
+If Firebase Cloud Functions, server APIs, or another trusted backend exist, inspect their actual implementation.
+Check:
+Authentication requirements.
+Role authorization.
+Input validation.
+Ownership checks.
+Privileged operations.
+Secret handling.
+Error disclosure.
+Request replay.
+Duplicate event handling.
+Resource exhaustion.
+Rate limiting or abuse controls.
+Idempotency for critical writes.
+Correct handling of retries.
+Logging of sensitive information.
+Appropriate use of privileged database access.
+Privileged backend code must perform its own authorization checks because administrative SDKs may bypass Firestore Rules.
+If no trusted backend exists, document which operations currently depend on the client and whether this creates a material security weakness.
+Do not add Cloud Functions or other paid infrastructure without authorization.
+If a trusted backend is required for secure grading or another critical operation, propose the minimum viable solution and identify deployment prerequisites. Do not represent an unimplemented backend as complete.
+15. Abuse Resistance, Rate Limiting, and Availability
+Review practical abuse scenarios affecting:
+Authentication and account creation.
+Password recovery.
+Certificate verification.
+Exam submissions.
+Repeated attempts.
+Public queries.
+File uploads.
+Expensive backend operations.
+Any AI or third-party API calls actually used.
+Determine which controls are available in the current architecture.
+Potential controls include:
+Server-side rate limiting.
+Request quotas.
+App Check.
+Authentication and authorization.
+Bounded query sizes.
+Pagination.
+Input-size limits.
+Duplicate-request protection.
+Idempotency.
+Abuse monitoring.
+Provider-side quotas.
+Do not assume frontend throttling is an effective security boundary.
+Do not claim that App Check alone prevents all abuse.
+Use isolated test accounts and safe test limits. Do not generate uncontrolled request floods or denial-of-service traffic.
+For controls that cannot be verified locally, document the required configuration and mark them as unverified.
+16. Privacy, Data Minimization, and Audit Integrity
+Inspect the data model and actual access paths for:
+Student profiles.
+Enrollment information.
+Grades.
+Exam attempts.
+Assignments.
+Certificates.
+Instructor feedback.
+Administrative records.
+Audit logs.
+Verify that users receive only the information required for their role and workflow.
+Review whether audit records can be forged, modified, or deleted by unauthorized users.
+Determine whether audit logging is generated by trusted code or can be directly fabricated by clients.
+Check whether sensitive data is unnecessarily included in public verification responses, browser logs, or error messages.
+If account deletion is supported, determine whether associated data is deleted, retained, or anonymized according to the actual implementation and documented requirements.
+Do not delete real user data during testing.
+Do not invent legal compliance claims. Document observable technical controls and any policy questions that require owner review.
+17. Automated Security and Regression Test Suite
+Create or extend a repeatable security-test suite using the existing project tooling.
+Prioritize tests for:
+Firestore authorization.
+Role escalation.
+Cross-user data access.
+Grade manipulation.
+Answer-key confidentiality.
+Certificate forgery.
+URL sanitization and XSS.
+Authentication and account workflows.
+Storage authorization, if applicable.
+Trusted backend authorization, if present.
+Critical educational workflows.
+Build and type correctness.
+Tests must assert expected outcomes. They must not merely execute code without validating results.
+Use Firebase Emulator Suite and isolated test credentials where applicable.
+Keep the test suite deterministic, reproducible, and safe to run repeatedly.
+If a full automated test cannot be implemented, explain the missing capability and provide a precise manual verification procedure.
+Do not claim full penetration testing merely because automated unit tests exist.
+Do not install an invasive scanner or run broad external scans against a live site without authorization.
+18. GitHub Repository Security
+Inspect the actual repository configuration and available GitHub settings without exposing secrets.
+Review, where available:
+Branch protection.
+Pull request requirements.
+Required CI checks.
+Dependency update automation.
+Secret scanning.
+Push protection.
+Dependency vulnerability alerts.
+GitHub Actions permissions.
+Third-party workflow actions and their pinning.
+Workflow triggers and untrusted input handling.
+Build artifacts and deployment credentials.
+Accidental credential exposure in repository history.
+Distinguish between settings visible in repository files and settings that require access to GitHub's remote configuration.
+Do not claim a remote setting is enabled unless you can verify it.
+Do not rewrite Git history, delete branches, force-push, or change repository visibility.
+If a repository security setting requires manual owner action, provide the exact setting and recommended value.
+19. Vercel and Production Deployment Readiness
+Inspect the actual Vercel configuration and build setup.
+Verify, where possible:
+Correct build command.
+Correct output directory.
+Correct project framework settings.
+Correct environment-variable names and scopes.
+Preview versus production environment separation.
+No production secrets in client-visible variables.
+SPA routing and refresh behavior.
+Required rewrite rules.
+Security headers.
+HTTPS expectations.
+Error handling.
+Source-map exposure and associated risk.
+Build reproducibility.
+Deployment branch configuration.
+Rollback readiness.
+Do not expose environment values in logs or reports.
+Do not assume that successful local builds prove Vercel deployment success.
+If Vercel access is unavailable, validate the repository configuration and mark remote verification as NOT TESTED.
+Do not initiate a production deployment.
+Prepare a deployment-readiness checklist that can be completed before an authorized release.
+20. GitHub–Vercel–Firebase Integration
+Review the complete intended deployment path.
+Determine:
+Which GitHub branch is intended for production.
+Which branch or environment is used for previews.
+Which Firebase project is used for development and testing.
+Which Firebase project is intended for production.
+How environment configuration is selected.
+Whether preview builds can accidentally access production data.
+Whether privileged operations are restricted to the correct environment.
+Whether Firebase Rules and other configuration files are deployed through a controlled process.
+Whether the build can accidentally publish development configuration.
+Whether an unreviewed commit could trigger a production deployment.
+Do not invent project IDs, domains, credentials, or deployment settings.
+Do not change live deployment mappings or production Firebase configuration without authorization.
+Document the minimum safe release procedure and rollback strategy.
+21. Final Functional Regression Testing
+Security fixes must not break legitimate platform functionality.
+Re-test the actual supported workflows, including:
+Student
+Sign-in and account access.
+Course enrollment and approval status.
+Access to authorized course materials.
+Exam availability and submission.
+Assignment submission.
+Viewing permitted grades and feedback.
+Certificate requests.
+Public certificate verification, where applicable.
+Instructor
+Access to assigned courses only.
+Managing permitted course content.
+Viewing authorized student submissions.
+Grading assignments.
+Recording practical grades.
+Reviewing permitted student progress.
+Administrator
+Managing authorized users and roles.
+Reviewing enrollment requests.
+Managing courses and instructors.
+Reviewing and issuing certificates.
+Performing supported administrative operations.
+Accessing audit logs.
+Using backup and restore workflows, if present.
+These are verification targets, not permission to redesign the workflows.
+Use isolated test data.
+Do not use real student accounts or alter production academic records.
+Check Arabic and English rendering, RTL layouts, browser console errors, and basic responsive behavior for any affected areas.
+Record actual pass/fail results.
+22. Backup and Rollback Readiness
+Inspect existing backup and restore mechanisms.
+Determine:
+Which collections or records are included.
+Whether sensitive data is handled safely.
+Whether backups can be imported without overwriting unintended records.
+Whether the process validates data before writing.
+Whether restore operations require explicit confirmation.
+Whether backup files could expose credentials or private information.
+Whether rollback can restore the code to the pre-Phase-3 state.
+Whether database changes require a separate rollback strategy.
+Do not perform a destructive restore test against production.
+Where feasible, perform a safe dry run or restore test using isolated data.
+A Git rollback does not automatically roll back Firestore data or production configuration. Document these separately.
+23. Remediation Rules
+For every confirmed issue:
+Reproduce it safely.
+Identify the root cause.
+Apply the smallest effective fix.
+Add a regression test.
+Run the relevant security test.
+Run the affected functional tests.
+Run TypeScript validation and the production build.
+Inspect the resulting Git diff.
+Confirm that no secrets or unrelated changes were introduced.
+Record the evidence.
+Do not perform broad architectural rewrites merely to simplify the code.
+Do not change database schemas or security rules without evaluating their effect on existing users and workflows.
+If a fix requires a migration, document the migration and rollback implications before applying it.
+If a critical issue cannot be safely fixed, preserve the evidence and mark it as a release blocker.
+24. Final Verification Commands
+Inspect package.json and existing project documentation before choosing commands.
+Run the actual available commands for:
+TypeScript validation.
+Production build.
+Unit tests.
+Integration tests.
+Firebase Rules tests.
+Security regression tests.
+Dependency auditing.
+Examples may include:
+npx tsc --noEmit
+npm run build
+npm test
+npm audit
+Only run commands supported by the actual project. Do not add fake scripts or report success for commands that were not executed.
+For every command, record:
+Exact command.
+Exit code.
+Pass/fail status.
+Important non-sensitive output.
+Any warning or limitation.
+Do not conceal unresolved dependency findings simply because the build passes.
+25. Required Final Deliverables
+Create the following documentation files in the existing repository, adapting names only if the project already uses an equivalent naming convention.
+A. PHASE_3_COMPLETION_REPORT.md
+Include:
+Executive summary.
+Repository and branch state.
+Scope of work actually completed.
+Security findings and their evidence.
+Fixes applied.
+Tests executed and exact outcomes.
+Tests not performed and why.
+Remaining vulnerabilities and residual risks.
+Dependency findings.
+GitHub security review.
+Vercel deployment-readiness findings.
+Firebase configuration and authorization findings.
+Functional regression results.
+Rollback instructions.
+Final release recommendation.
+B. PHASE_3_SECURITY_TEST_MATRIX.md
+Include:
+Each important security boundary.
+Test ID.
+Attacker role.
+Target resource.
+Attack scenario.
+Expected result.
+Actual result.
+Test status.
+Evidence or test file reference.
+Associated vulnerability ID.
+C. PRODUCTION_RELEASE_CHECKLIST.md
+Include explicit checkboxes for:
+Required local validation.
+Security test completion.
+Firebase project selection.
+Firestore Rules deployment review.
+Environment-variable verification.
+GitHub security configuration.
+Vercel configuration.
+Production header verification.
+Final owner approval.
+Deployment execution.
+Post-deployment smoke tests.
+Rollback readiness.
+Clearly separate completed tasks from owner actions still required.
+D. PHASE_3_REMAINING_RISKS.md
+Include every unresolved security issue, unverified deployment assumption, blocked test, and operational risk.
+Assign severity, explain the impact, and state whether it blocks production release.
+Never omit a material unresolved issue to make the final report appear successful.
+26. Release Decision Criteria
+Use the following decision categories:
+RELEASE BLOCKED
+Use this when a material unresolved issue could permit unauthorized access to sensitive student data, privilege escalation, grade manipulation, answer-key disclosure, certificate forgery, secret exposure, or another serious compromise.
+Also use it when a critical trust boundary has not been implemented or cannot be adequately verified.
+CONDITIONAL RELEASE
+Use this only when no known critical or high-risk unresolved issue remains, essential controls have been verified, and the remaining limitations are explicitly documented and accepted by the project owner.
+State all required conditions.
+READY FOR AUTHORIZED DEPLOYMENT
+Use this only when:
+No known unresolved critical or high-severity security issue remains.
+Essential authorization and grading controls have been tested.
+Relevant security and regression tests pass.
+Build and TypeScript checks pass.
+Required deployment configuration has been verified.
+No unresolved secret exposure remains.
+Remaining risks and owner actions are documented.
+Production deployment and post-deployment verification steps are defined.
+A local build alone cannot satisfy these criteria.
+If a required remote configuration or live deployment check is unavailable, state that limitation and choose the appropriate release category.
+Never claim that a system is completely secure or free from every vulnerability.
+27. Final Execution Instructions
+Proceed in this order:
+Inspect repository and current state.
+Produce the initial-state report.
+Verify Phase 2 security claims against the implementation.
+Build the missing test matrix.
+Run safe tests and identify gaps.
+Fix confirmed issues using minimal changes.
+Add and run regression tests.
+Review dependencies, secrets, and deployment configuration.
+Verify GitHub/Vercel/Firebase readiness to the extent access permits.
+Run the complete relevant validation suite.
+Review the final Git diff and repository status.
+Produce the required reports and release recommendation.
+Do not stop after writing a plan. Execute the safe, feasible work and clearly identify anything that remains blocked.
+Do not deploy to production.
+Do not change production infrastructure.
+Do not claim success without evidence.
+The final response must summarize what was actually changed, what was actually tested, what passed, what failed, what remains unverified, and whether production release is blocked, conditional, or ready for authorized deployment.
+
+Comprehensive Security Assessment, Penetration Testing & Attack Simulation
+
+1. Mission and Mandatory Requirements
+
+Extend Phase 3 into a comprehensive, evidence-based security assessment of the existing ASIRA Research Learning Platform.
+
+The objective is to identify, safely validate, document, and remediate exploitable vulnerabilities across the application's code, authentication, authorization, database, APIs, cloud configuration, deployment pipeline, dependencies, and business logic.
+
+Do not limit the assessment to common vulnerabilities or previously identified issues.
+
+Think like an experienced application-security engineer conducting an adversarial review of the platform.
+
+Mandatory rules:
+
+- Inspect the existing repository and deployed architecture before choosing tests.
+- Test the actual implementation rather than relying on assumptions, checklists, or code appearance alone.
+- Do not rebuild the application or remove existing features.
+- Preserve unrelated user changes and the existing Git history.
+- Use Firebase Emulator, isolated test projects, or explicitly authorized test environments.
+- Do not perform destructive testing, uncontrolled traffic generation, attacks against third parties, or unauthorized testing of production.
+- Do not expose real student data, credentials, tokens, API keys, or other secrets in reports.
+- Never report a vulnerability as fixed or verified without appropriate evidence.
+- Do not claim complete security or zero vulnerabilities.
+
+2. Build an Attack Surface Inventory
+
+Inspect the repository and identify every applicable attack surface, including:
+
+- Public and authenticated routes.
+- Student, instructor, administrator, and super-administrator functionality.
+- Firebase Authentication flows and account lifecycle.
+- Firestore collections, documents, nested collections, queries, and security rules.
+- Firebase Storage buckets and upload/download flows, if present.
+- Cloud Functions, callable functions, scheduled jobs, HTTP endpoints, and other backend services, if present.
+- Certificate generation and public certificate verification.
+- Exam creation, answer delivery, exam attempts, automatic grading, manual grading, and result publication.
+- Course enrollment, progress, completion, and access control.
+- File import/export, backup/restore, and administrative data operations.
+- Search, rich-text rendering, external links, and user-controlled URLs.
+- Environment variables, client-side configuration, build artifacts, and source maps.
+- GitHub repository settings, CI/CD workflows, Vercel configuration, and deployment secrets, where accessible.
+- External services and plugins discovered in the actual implementation.
+
+Produce an attack surface inventory and map each entry to its relevant trust boundaries, permissions, and security controls.
+
+Do not assume a feature or service exists simply because it appears in this checklist.
+
+3. Authentication, Identity, and Account Security
+
+Investigate:
+
+- Weak or missing authentication checks.
+- Account enumeration and information leakage.
+- Brute-force protection and credential-stuffing resistance.
+- Password reset and email-verification abuse.
+- Authentication state inconsistencies and stale sessions.
+- Token expiration, revocation, misuse, and inappropriate trust in client-supplied identity claims.
+- Account takeover paths involving weak recovery or verification flows.
+- Duplicate accounts, account deletion, and re-registration edge cases.
+- Unauthorized access following role changes, account suspension, or deletion.
+- Insecure handling of privileged accounts.
+- Trust in email addresses, user profiles, local storage, or client-side flags as proof of authorization.
+- Missing server-side verification of Firebase ID tokens where a trusted backend is involved.
+
+Verify whether a user who loses a role or has an account disabled immediately loses the corresponding privileges across all relevant access paths.
+
+Do not treat email verification alone as sufficient authorization to become an administrator.
+
+4. Authorization and Access-Control Attacks
+
+Test for:
+
+- Broken Access Control.
+- IDOR and BOLA.
+- Horizontal privilege escalation between users.
+- Vertical privilege escalation from student to instructor or administrator.
+- Broken Function-Level Authorization.
+- Missing authorization on individual documents and nested collections.
+- Unauthorized access through alternate queries or collection-group queries.
+- Unauthorized reads, writes, updates, and deletes.
+- Mass assignment and unauthorized modification of protected fields.
+- Trust in client-supplied UIDs, roles, ownership identifiers, or tenant identifiers.
+- Inconsistent authorization between the UI, Firestore Rules, and backend functions.
+- Permission bypass through alternate application routes or direct API requests.
+- Data exposure through error messages, exports, backups, and administrative endpoints.
+
+Construct a role-and-resource authorization matrix.
+
+Test every relevant operation for each role and for unauthenticated users. Include attempts to access another user's records by changing identifiers and submitting requests directly rather than using the UI.
+
+Verify authorization independently of whether the frontend hides a button or page.
+
+5. Firestore and Database Security
+
+Review Firestore Rules and validate their behavior with automated tests.
+
+Test:
+
+- Default-deny behavior for unmatched paths.
+- Cross-user reads and writes.
+- Privilege escalation through user-controlled role fields.
+- Unauthorized modification of ownership, grades, roles, timestamps, and audit fields.
+- Partial updates that modify protected fields.
+- Unexpected fields and malformed data.
+- Type confusion, boundary values, oversized values, and unexpected document structures.
+- Missing validation of relationships between documents.
+- Unauthorized nested-document and collection-group access.
+- Query authorization and data exposure through permitted queries.
+- Deletes, recreations, and ownership changes.
+- Rule conditions that behave differently for missing fields, null values, or unexpected types.
+- Reliance on application-side validation when database-side enforcement is required.
+- Excessive data access and opportunities for resource or cost exhaustion.
+
+Pay particular attention to any Firestore Rules that permit broad access based on a generic instructor or administrator check.
+
+Confirm that an instructor's permissions are restricted to the courses, students, and records they are actually authorized to manage.
+
+Use Firebase Emulator tests wherever possible. Do not modify production data to prove a vulnerability.
+
+6. Examination, Grading, and Certificate Integrity
+
+Treat the platform's educational records as high-value assets.
+
+Test whether a student can:
+
+- Obtain correct answers or hidden answer keys before an exam.
+- Modify scores, grades, completion status, or attempt counts.
+- Submit answers on behalf of another student.
+- Bypass attempt limits or examination availability windows.
+- Replay submissions or create duplicate attempts.
+- Manipulate client-side timers or timestamps.
+- Exploit concurrent requests to bypass limits or submit conflicting results.
+- Access another student's submissions or feedback.
+- Modify instructor-assigned grades or grading metadata.
+- Forge practical assessment results.
+- Obtain certificates without meeting completion or grading requirements.
+- Forge certificate identifiers or exploit predictable verification codes.
+- Reactivate revoked or invalidated certificates.
+- Exploit discrepancies between certificate records and public verification results.
+
+Verify where authoritative grading occurs.
+
+If grading is performed entirely on the client, document the resulting integrity risk and determine the safest compatible remediation. Do not assume that preventing a "score" field in Firestore Rules makes client-calculated scores trustworthy.
+
+7. API and Backend Security
+
+For every discovered API, Cloud Function, or backend endpoint, inspect:
+
+- Authentication and authorization enforcement.
+- Trust in caller-supplied identities and roles.
+- Input validation and schema enforcement.
+- Injection vulnerabilities relevant to the actual implementation.
+- Unsafe deserialization or parsing.
+- Excessive request payloads.
+- Missing request-size limits.
+- Resource-intensive operations.
+- Insecure error handling and information leakage.
+- Replay and duplicate-request handling.
+- Race conditions and concurrent state changes.
+- Insecure direct references to database documents or external resources.
+- Missing quotas, rate limits, or abuse controls.
+- Improper handling of upstream service failures.
+- Secrets exposed in responses, logs, or exceptions.
+
+Do not invent APIs that do not exist. If the application has no traditional backend, explicitly assess the security implications of its client-to-Firebase architecture.
+
+8. Injection and Browser-Side Attacks
+
+Assess applicable variants of:
+
+- Reflected, stored, and DOM-based Cross-Site Scripting (XSS).
+- HTML injection.
+- JavaScript injection.
+- SQL or NoSQL injection, where relevant to the actual data-access stack.
+- Command injection, if operating-system commands are invoked by any component.
+- Template injection, if a relevant template engine exists.
+- Path traversal and unsafe file path handling.
+- Open redirects.
+- Unsafe URL schemes and external-link handling.
+- Content injection through course descriptions, announcements, submissions, and rich-text content.
+- Prototype pollution and unsafe object merging, where applicable.
+- Insecure DOM manipulation and unsafe HTML rendering.
+- Malicious SVG or HTML uploads, if these formats are accepted.
+- Content Security Policy gaps and other relevant browser security weaknesses.
+
+Use harmless test payloads in the authorized test environment. Do not execute destructive payloads or access unrelated systems.
+
+Review "sanitizeInput", "sanitizeUrl", "isTrustedStorageUrl", and related utilities to establish whether they are used correctly at security-sensitive sinks. Do not assume that a sanitizer's existence proves that the application is protected.
+
+9. File, Storage, and Upload Security
+
+If uploads or Firebase Storage are present, test:
+
+- Unauthorized upload, download, overwrite, and deletion.
+- Cross-user and cross-course file access.
+- Incorrect MIME-type and extension validation.
+- Oversized files and resource exhaustion.
+- Path traversal and unsafe filenames.
+- Public exposure of private educational records.
+- Reuse or leakage of download tokens and signed URLs.
+- Insecure object ownership and permission inheritance.
+- Malicious file content and unsafe browser rendering.
+- Inadequate retention and deletion behavior.
+
+Verify actual storage rules and access permissions.
+
+Do not upload malware or conduct destructive file tests.
+
+10. Availability, Abuse Resistance, and Cost Security
+
+Evaluate resilience against:
+
+- Application-level denial of service.
+- Distributed denial-of-service exposure and dependence on provider-level protections.
+- Brute-force and automated abuse.
+- Rate-limit bypass.
+- Excessive Firestore reads, writes, and queries.
+- Repeated invocation of expensive functions.
+- Unbounded loops or computationally expensive operations.
+- Oversized requests and unusually large documents.
+- Abuse of authentication, email, notification, and external-service workflows.
+- Repeated certificate verification or export requests.
+- Automated account creation and other abuse relevant to the platform.
+
+Use bounded tests in an isolated environment with explicit request limits and stop conditions.
+
+Inspect actual hosting-provider protections, quotas, monitoring, and configuration where authorized.
+
+Do not perform uncontrolled load tests or claim DDoS protection based on local tests alone.
+
+Assess whether an attacker could cause significant unexpected usage or financial costs, and recommend practical controls such as quotas, limits, monitoring, and alerts.
+
+11. Race Conditions and Business-Logic Exploitation
+
+Look for security failures that occur only through particular sequences of actions.
+
+Examples include:
+
+- Simultaneous exam submissions.
+- Duplicate grading operations.
+- Concurrent certificate issuance and revocation.
+- Repeated course completion requests.
+- Account deletion while privileged operations remain in progress.
+- Role changes during active sessions.
+- Replayed administrative requests.
+- Conflicting updates to the same record.
+- Time-of-check/time-of-use inconsistencies.
+- Operations that partially succeed and leave security-sensitive state inconsistent.
+
+Use controlled concurrency tests in the isolated environment.
+
+Verify whether critical operations are atomic, idempotent where appropriate, and protected against unauthorized state transitions.
+
+12. Cross-Site Request Forgery and Server-Side Request Forgery
+
+Assess CSRF only where the application's authentication mechanism and request architecture make it relevant.
+
+Assess SSRF if any component fetches user-controlled URLs, processes remote resources, or makes server-side HTTP requests.
+
+For SSRF testing, use controlled test endpoints and safe indicators. Do not probe cloud metadata services, internal networks, or third-party systems without explicit authorization.
+
+Document why either category is not applicable when the relevant attack surface does not exist.
+
+13. Secrets, Privacy, and Information Disclosure
+
+Inspect for:
+
+- Credentials, private keys, tokens, and API secrets committed to Git.
+- Secrets embedded in client-side bundles or source maps.
+- Sensitive environment variables exposed to browser code.
+- Excessive Firebase permissions or exposed administrative credentials.
+- Personal data returned unnecessarily to clients.
+- Sensitive records leaked through logs, errors, backups, exports, or analytics.
+- Public access to private course materials, submissions, grades, or student information.
+- Excessive retention of deleted-account data.
+- Insecure handling of backups and exported records.
+- Information disclosure through predictable identifiers or verbose responses.
+
+Distinguish public client configuration from actual secrets. Do not report a Firebase client configuration value as a secret merely because it is visible in the browser; assess the associated access controls and exposure.
+
+If a real secret is discovered, do not print it in the report. Identify its location safely and recommend the appropriate revocation or rotation procedure.
+
+14. Dependency and Software Supply-Chain Security
+
+Review:
+
+- Known vulnerable direct and transitive dependencies.
+- Vulnerable versions of Firebase and related SDKs.
+- Package lifecycle scripts and suspicious installation behavior.
+- Dependency confusion and package-name risks where relevant.
+- Unpinned or unexpectedly changing CI dependencies.
+- GitHub Actions with excessive permissions.
+- Untrusted pull-request workflows.
+- Exposure of deployment secrets to untrusted builds.
+- Build artifact integrity and deployment provenance.
+- Accidental publication of ".env" files, source maps, or private artifacts.
+- Insecure preview deployments and environment separation.
+
+Use supported dependency-audit tools and investigate the actual impact of each finding.
+
+Do not perform blind upgrades or introduce breaking changes simply to remove audit warnings.
+
+15. Deployment, Hosting, and Configuration Security
+
+Inspect the actual GitHub, Vercel, Firebase, and DNS-related configuration that is accessible and relevant.
+
+Assess:
+
+- Missing or incorrectly configured HTTP security headers.
+- Content Security Policy quality.
+- Clickjacking protections.
+- MIME-sniffing protections.
+- HTTPS and transport-security configuration.
+- Cookie attributes if cookies are used.
+- Cross-origin resource sharing (CORS), where relevant.
+- Publicly accessible debug endpoints.
+- Exposed development servers and preview deployments.
+- Incorrect SPA routing and accidental exposure of sensitive files.
+- Environment separation between development, preview, and production.
+- Source-map and build-artifact exposure.
+- CI/CD permission scope.
+- Branch protection and deployment authorization.
+- Unintended deployment triggers and unsafe rollback procedures.
+
+Verify HTTP response headers against the actual deployed test environment when access is authorized. HTML meta tags are not substitutes for HTTP security headers.
+
+Do not claim that hosting-provider settings are secure unless they were actually inspected.
+
+16. Logging, Monitoring, and Incident Readiness
+
+Assess whether security-relevant events are recorded appropriately, including:
+
+- Failed privileged access attempts.
+- Role changes and administrator actions.
+- Unauthorized access attempts.
+- Suspicious exam submission patterns.
+- Certificate issuance and revocation.
+- Account deletion and recovery.
+- Rate-limit violations.
+- Unusual resource consumption.
+
+Check that logs do not expose passwords, tokens, API secrets, or unnecessary personal data.
+
+Verify whether alerts, retention, and incident-response procedures exist. Clearly distinguish implemented controls from recommendations.
+
+17. Chained Attacks and Adversarial Scenarios
+
+Do not test vulnerabilities only in isolation.
+
+Construct realistic, application-specific attack chains, such as:
+
+- A compromised student account attempting to reach instructor functionality.
+- A manipulated user profile combined with weak Firestore Rules.
+- A leaked identifier combined with a missing ownership check.
+- A client-side grading weakness combined with unauthorized result submission.
+- An exposed certificate endpoint combined with predictable identifiers.
+- A vulnerable dependency combined with an exposed reachable attack surface.
+- A permissive upload rule combined with unsafe content rendering.
+- A weak administrative workflow combined with missing audit protections.
+- Repeated inexpensive requests combined with expensive downstream operations.
+
+For each chain, document every required precondition, the security boundary crossed, the potential impact, and the controls that prevent or fail to prevent exploitation.
+
+Do not assume a chain is exploitable simply because its individual components exist. Validate the relevant conditions safely.
+
+18. Automated Testing and Evidence Requirements
+
+Create or extend automated security tests using the tools and frameworks compatible with the existing project.
+
+Prefer:
+
+- Firebase Emulator Suite and Firestore Rules tests.
+- Unit tests for security-sensitive utility functions.
+- Integration tests for authentication and authorization.
+- API tests for relevant backend endpoints.
+- Browser-based tests for applicable client-side attack surfaces.
+- Dependency and secret scanning.
+- Regression tests for each confirmed vulnerability.
+
+For each test, record:
+
+1. Test identifier.
+2. Attack category.
+3. Relevant endpoint, feature, or resource.
+4. Required role and preconditions.
+5. Test method.
+6. Expected secure behavior.
+7. Actual observed behavior.
+8. Result and supporting evidence.
+9. Remediation, if required.
+10. Regression test added, if applicable.
+
+Never use a passing build or typecheck as evidence that a security vulnerability is absent.
+
+19. Required Classification
+Assign each finding one of the following statuses:
+CONFIRMED VULNERABILITY
+POTENTIAL VULNERABILITY
+VERIFIED PROTECTED
+NOT TESTED
+BLOCKED
+NOT APPLICABLE
+FIXED — PENDING RETEST
+FIXED — VERIFIED BY RETEST
+For confirmed findings, provide severity, impact, exploit prerequisites, affected components, safe reproduction steps, and a remediation recommendation.
+Use a recognized severity methodology, such as CVSS, where applicable. Explain the reasoning behind severity ratings and distinguish technical severity from business impact.
+Do not mark a finding as fixed merely because code was changed. Retest the original failure and confirm the security property now holds.
+20. Final Deliverables
+In addition to the existing Phase 3 deliverables, produce:
+PHASE_3_ATTACK_SURFACE_INVENTORY.md
+PHASE_3_ADVANCED_SECURITY_FINDINGS.md
+PHASE_3_ATTACK_CHAIN_ANALYSIS.md
+PHASE_3_SECURITY_REGRESSION_TESTS.md
+Update the existing security test matrix to cover every applicable category in this addendum.
+Include a summary showing:
+Categories assessed.
+Categories successfully tested.
+Confirmed vulnerabilities.
+Potential vulnerabilities.
+Fixed findings and successful retests.
+Findings that remain open.
+Tests blocked by unavailable access or infrastructure.
+Categories not tested.
+Provider-level protections that could not be verified.
+21. Release Gate
+Do not declare the platform fully secure merely because the build succeeds, the application opens, or a checklist has been completed.
+Recommend one of:
+RELEASE BLOCKED
+CONDITIONAL RELEASE
+READY FOR AUTHORIZED DEPLOYMENT
+A critical or high-risk confirmed vulnerability affecting real student data, privileged access, grading integrity, or other sensitive functions must receive explicit attention before release.
+If a meaningful risk cannot be remediated within this phase, document the residual risk and the decision required from the project owner.
+Final requirement: Perform a real, evidence-based assessment within the authorized scope. Be transparent about limitations. Prioritize the most consequential attack paths, preserve the existing application, and never claim that an attack category has been tested when it has only been discussed.
+
+
+ASIRA PHASE 3 — COMPREHENSIVE SECURITY AUDIT
+
+Full-Spectrum Vulnerability Assessment, Penetration Testing, Attack Simulation & Production Security Validation
+
+1. المهمة الأساسية
+
+وسّع المرحلة الثالثة لتصبح مراجعة أمنية شاملة للتطبيق الحالي ASIRA Research Learning Platform، تغطي أكبر نطاق عملي من الثغرات والهجمات الحديثة، مع التركيز على حماية حسابات المستخدمين وبيانات الطلاب والاختبارات والدرجات والشهادات وحسابات المدرسين والإدارة.
+
+لا تكتفِ بمراجعة الكود أو تشغيل أدوات الفحص الآلي. نفّذ اختبارات أمنية فعلية وآمنة ضمن النطاق المصرح به، واستخدم نتائجها لتحديد الثغرات القابلة للاستغلال والتحقق من الإصلاحات.
+
+شروط إلزامية:
+
+- افحص المشروع وتقنياته وخدماته الفعلية قبل تحديد الاختبارات.
+- لا تعِد بناء التطبيق ولا تحذف ميزاته أو تغيّر بنيته دون ضرورة مثبتة.
+- لا تفترض أن وجود حماية في الواجهة يعني وجود حماية في قاعدة البيانات أو الخادم.
+- اختبر الصلاحيات مباشرة، وليس من خلال الواجهة فقط.
+- استخدم بيئة اختبار معزولة أو Firebase Emulator للاختبارات التي قد تغيّر البيانات.
+- لا تنفذ هجمات إغراق أو اختبارات تدميرية على الإنتاج.
+- لا تستهدف أنظمة أو حسابات أو خدمات خارج النطاق المصرح به.
+- لا تعرض الأسرار أو بيانات الطلاب الحقيقية في التقارير.
+- لا تعتبر أي ثغرة مغلقة قبل إعادة اختبارها وإثبات نجاح الإصلاح.
+- لا تدّعِ اختبار أي فئة لمجرد إدراجها في هذه الخطة.
+
+---
+
+2. اختبارات حجب الخدمة واستنزاف الموارد
+
+اختبر صراحةً الفئات التالية، مع مراعاة اختلاف أساليب الهجوم وآليات الحماية:
+
+A. DoS — Denial of Service
+
+- استنزاف موارد التطبيق بطلبات متكررة.
+- استنزاف الذاكرة أو المعالجة بسبب مدخلات أو عمليات مكلفة.
+- إرسال طلبات أو ملفات أو مستندات بأحجام غير متوقعة.
+- استغلال الاستعلامات المكلفة أو غير المحدودة.
+- التسبب في بطء الوظائف الأساسية أو فشلها.
+- استغلال العمليات التي تستغرق وقتًا طويلًا أو تتكرر دون حاجة.
+
+B. DDoS — Distributed Denial of Service
+
+- تقييم مدى تعرض الخدمات لهجمات موزعة من مصادر متعددة.
+- التحقق من وجود حماية مناسبة لدى مزود الاستضافة، إذا كانت متاحة للفحص.
+- مراجعة حدود الطلبات والموارد وإعدادات الحماية والمراقبة.
+- تحديد ما إذا كانت الحماية تعتمد على التطبيق وحده أم على البنية التحتية أيضًا.
+
+لا تنفذ هجوم DDoS فعليًا أو ترسل حركة مرور ضخمة إلى الإنتاج. اختبر ضوابط التطبيق بأحمال محدودة في بيئة معزولة، وافحص إعدادات المزود والأدلة المتاحة، وسجّل أي جانب لا يمكن التحقق منه.
+
+C. Resource Exhaustion and Cost Abuse
+
+- استنزاف حصص Firestore وCloud Functions والخدمات الخارجية.
+- تكرار عمليات القراءة والكتابة والاستعلامات المكلفة.
+- إساءة استخدام إرسال الإشعارات والبريد والتحقق من الشهادات.
+- إنشاء طلبات تؤدي إلى استدعاءات متكررة لخدمات مدفوعة.
+- استغلال حلقات غير محدودة أو وظائف يمكن استدعاؤها دون قيود كافية.
+- تقييم مخاطر تضخم الفواتير أو استنفاد الحصص المجانية.
+
+D. Rate-Limit Bypass
+
+- التحقق من إمكانية تجاوز حدود الطلبات بتغيير الحساب أو تكرار الجلسات أو استخدام مسارات بديلة.
+- التحقق من تطبيق الحدود على الوظائف الحساسة وليس الواجهة فقط.
+- فحص وجود حدود مناسبة لتسجيل الدخول والاختبارات ورفع الملفات وإصدار الشهادات.
+
+لكل اختبار، حدّد آلية الحماية المطلوبة، ونفّذ اختبارًا محدودًا وآمنًا حيثما أمكن، وسجّل النتيجة والأدلة.
+
+---
+
+3. هجمات الحسابات والمصادقة
+
+اختبر صراحةً:
+
+- Brute-Force Attacks: تخمين كلمات المرور.
+- Credential Stuffing: تجربة بيانات دخول مسربة.
+- Password Reset Abuse: إساءة استخدام استعادة كلمة المرور.
+- Account Enumeration: كشف وجود الحسابات.
+- Session Hijacking: الاستيلاء على الجلسات، حيث ينطبق.
+- Token Theft and Replay: إساءة استخدام الرموز أو إعادة إرسالها.
+- Authentication Bypass: تجاوز التحقق من الهوية.
+- Account Takeover: الاستيلاء على الحسابات عبر مسارات الاستعادة أو التحقق الضعيفة.
+- Weak Session Invalidation: استمرار الصلاحيات بعد تعطيل الحساب أو تغيير دوره.
+- Insecure Account Recovery: ضعف إجراءات استعادة الحساب.
+- Unauthorized Account Creation: إنشاء حسابات أو هويات بطرق غير مصرح بها.
+- Email Verification Abuse: استغلال تدفقات التحقق من البريد.
+
+تحقق من سلوك التطبيق عند حذف الحساب، وتعطيله، وتغيير كلمة المرور، وسحب صلاحيات المستخدم.
+
+افحص تحديدًا ما إذا كانت الجلسات والرموز القديمة تتيح الاحتفاظ بصلاحيات لم تعد مستحقة.
+
+---
+
+4. ثغرات التحكم في الوصول والصلاحيات
+
+اختبر:
+
+- Broken Access Control.
+- IDOR — Insecure Direct Object Reference.
+- BOLA — Broken Object Level Authorization.
+- BFLA — Broken Function Level Authorization.
+- Horizontal Privilege Escalation.
+- Vertical Privilege Escalation.
+- Privilege Escalation عبر تعديل بيانات المستخدم.
+- Mass Assignment.
+- تجاوز الصلاحيات من خلال الطلبات المباشرة.
+- الوصول إلى بيانات المستخدمين الآخرين بتغيير المعرفات.
+- تجاوز صلاحيات المدرس والوصول إلى مقررات أو طلاب غير مخولين.
+- انتحال دور المدير أو المشرف.
+- تجاوز الصلاحيات من خلال مسارات API أو Firebase البديلة.
+- الوصول غير المصرح به إلى المجموعات الفرعية في Firestore.
+
+أنشئ مصفوفة اختبارات تشمل المستخدم غير المسجل، والطالب، والمدرس، والمدير، والمشرف الأعلى، إذا كانت هذه الأدوار موجودة فعلًا.
+
+اختبر عمليات القراءة والإنشاء والتعديل والحذف لكل نوع من البيانات، باستخدام الحسابات التجريبية.
+
+تحقق من أن تغيير الدور أو المعرّف في الواجهة أو الطلب لا يمنح صلاحيات إضافية.
+
+---
+
+5. هجمات Firebase وقواعد البيانات
+
+راجع واختبر:
+
+- Firestore Security Rules Bypass.
+- Unauthorized Read and Write.
+- Cross-User Data Exposure.
+- Insecure Collection and Subcollection Access.
+- Query-Based Data Leakage.
+- Unauthorized Collection-Group Queries.
+- Role Escalation Through User Documents.
+- Ownership Manipulation.
+- Protected-Field Modification.
+- Mass Assignment Against Database Documents.
+- Validation Bypass.
+- Unexpected Fields and Data Types.
+- Missing-Field and Null-Value Edge Cases.
+- Unauthorized Deletion and Recreation.
+- Insecure Storage Rules.
+- Public Exposure of Private Files.
+- Trust in Client-Supplied UIDs or Roles.
+- Client-Side Authorization Without Database Enforcement.
+- Abuse of Firebase Callable or HTTP Functions، إذا كانت موجودة.
+- Improper Trust in Custom Claims or Stale Authorization State.
+
+اختبر القواعد من خلال Firebase Emulator واكتب اختبارات آلية تغطي السماح والمنع لكل دور.
+
+لا تعتبر نجاح اختبارات البناء دليلًا على أمان Firestore Rules.
+
+---
+
+6. هجمات الاختبارات والدرجات والشهادات
+
+هذه من أعلى الأولويات في منصة ASIRA.
+
+اختبر:
+
+- تسريب إجابات الاختبارات قبل بدء الامتحان.
+- الوصول إلى مفاتيح الإجابات من ملفات JavaScript أو الشبكة أو قاعدة البيانات.
+- تزوير الدرجات أو إرسال درجات محسوبة من العميل.
+- تعديل درجات الاختبارات العملية.
+- تجاوز عدد المحاولات المسموح بها.
+- تجاوز توقيت الاختبار أو موعد إتاحته.
+- إعادة إرسال إجابة أو طلب سابق.
+- إرسال محاولات متزامنة لتجاوز القيود.
+- انتحال هوية طالب عند تسليم الإجابات.
+- تعديل حالة إكمال الدورة.
+- تزوير حالة النجاح أو استحقاق الشهادة.
+- تزوير أكواد الشهادات أو تخمينها.
+- إصدار شهادة دون استيفاء المتطلبات.
+- إعادة تفعيل شهادة ملغاة.
+- اختلاف نتيجة التحقق العام من الشهادة عن السجل الحقيقي.
+- تعديل سجل المحاولات أو التغذية الراجعة.
+- الوصول إلى إجابات أو درجات طالب آخر.
+
+تحقق من أن احتساب الدرجات والتحقق من استحقاق الشهادات يتمان في موضع موثوق، وليس اعتمادًا على بيانات يرسلها العميل دون تحقق مستقل.
+
+---
+
+7. هجمات الحقن وتنفيذ المحتوى الضار
+
+اختبر جميع أنواع الحقن التي تنطبق على التقنيات المستخدمة:
+
+- Reflected XSS.
+- Stored XSS.
+- DOM-Based XSS.
+- HTML Injection.
+- JavaScript Injection.
+- NoSQL Injection، حيث ينطبق.
+- SQL Injection، إذا كانت هناك قاعدة بيانات SQL.
+- Command Injection، إذا كانت هناك عمليات تنفذ أوامر نظام.
+- Template Injection، إذا كانت هناك محركات قوالب مناسبة لهذا النوع.
+- Path Traversal.
+- Local File Inclusion / Remote File Inclusion، إذا كان التصميم يسمح بهما.
+- Prototype Pollution.
+- Unsafe Deserialization.
+- Open Redirect.
+- Unsafe URL Schemes.
+- HTML/SVG Injection.
+
+افحص المدخلات التي تظهر في أسماء المستخدمين، وأوصاف الدورات، والإعلانات، والتعليقات، والتسليمات، والملفات، ورسائل النظام.
+
+اختبر أيضًا نقاط استخدام HTML غير الآمن وعمليات DOM التي قد تسمح بتنفيذ محتوى أدخله المستخدم.
+
+استخدم مدخلات اختبار غير ضارة، وأثبت ما إذا كان المحتوى يُعرض كنص آمن أم يُفسر ككود.
+
+---
+
+8. SSRF وCSRF والهجمات المرتبطة بالطلبات
+
+SSRF — Server-Side Request Forgery
+
+- افحص أي وظيفة تجلب روابط أو موارد يحددها المستخدم.
+- تحقق من قيود البروتوكولات والوجهات وإعادة التوجيه.
+- اختبر في بيئة معزولة باستخدام نقاط اختبار آمنة.
+- لا تستهدف عناوين الخدمات الداخلية أو بيانات تعريف السحابة أو الأنظمة الخارجية دون تصريح صريح.
+
+CSRF — Cross-Site Request Forgery
+
+- تحقق مما إذا كان أسلوب المصادقة يسمح بتزوير الطلبات عبر المواقع.
+- افحص الطلبات التي تغير البيانات أو الأدوار أو الدرجات.
+- قيّم الحاجة إلى رموز CSRF أو ضوابط Origin/SameSite المناسبة للبنية الفعلية.
+
+HTTP Request Abuse
+
+- HTTP Parameter Pollution.
+- Request Replay.
+- Duplicate Request Abuse.
+- Content-Type Confusion.
+- Host Header Injection، حيث ينطبق.
+- CORS Misconfiguration.
+- HTTP Method Misconfiguration.
+- Request Smuggling، فقط إذا كانت البنية الفعلية تتيح اختبارًا مناسبًا ومصرحًا به.
+
+لا تصنّف أي فئة على أنها ثغرة مؤكدة دون دليل على انطباقها وقابلية استغلالها.
+
+---
+
+9. رفع الملفات وتخزينها
+
+اختبر:
+
+- Unrestricted File Upload.
+- تجاوز قيود أنواع الملفات.
+- MIME-Type Spoofing.
+- رفع ملفات تتجاوز الحدود.
+- Path Traversal عبر أسماء الملفات.
+- الوصول إلى ملفات مستخدمين آخرين.
+- استبدال الملفات دون صلاحية.
+- تسريب روابط التخزين أو رموز الوصول.
+- الملفات العامة التي ينبغي أن تكون خاصة.
+- عرض HTML أو SVG أو محتوى نشط بطريقة غير آمنة.
+- تجاوز قيود حجم الملف أو عدد مرات الرفع.
+- حذف الملفات أو تعديلها من حساب غير مخول.
+
+اختبر قواعد Firebase Storage إذا كانت مستخدمة فعلًا، وتحقق من أن الصلاحيات تُفرض على التخزين نفسه.
+
+---
+
+10. أخطاء التهيئة والبنية التحتية
+
+راجع:
+
+- Security Misconfiguration.
+- Exposed Development Endpoints.
+- Publicly Exposed Sensitive Files.
+- Insecure HTTP Security Headers.
+- Missing or Weak Content Security Policy.
+- Clickjacking.
+- MIME Sniffing.
+- Insecure CORS.
+- TLS/HTTPS Misconfiguration، ضمن ما يمكن التحقق منه.
+- Source Map Exposure.
+- Debug Information Disclosure.
+- Public Preview Deployment Exposure.
+- Insecure Environment Separation.
+- Overly Permissive Hosting Configuration.
+- Misconfigured Firebase Services.
+- Exposed Administrative Interfaces.
+- Insecure DNS or Domain Configuration، فقط ضمن النطاق المتاح.
+- Backup Exposure.
+- Improper Error Handling.
+
+افحص استجابات HTTP الفعلية عند توفر بيئة اختبار مصرح بها. لا تعتمد على وجود meta tags باعتبارها بديلًا عن ترويسات HTTP الأمنية.
+
+---
+
+11. الأسرار والخصوصية وتسريب البيانات
+
+ابحث عن:
+
+- Secrets in Source Code.
+- API Key Exposure، مع التمييز بين الإعدادات العامة والأسرار الحقيقية.
+- Private Key Leakage.
+- Tokens in Logs.
+- Credentials in Git History.
+- Secrets in Build Artifacts.
+- Sensitive Data in Source Maps.
+- Sensitive Data in Error Messages.
+- Excessive Personal Data Exposure.
+- Unauthorized Data Export.
+- Backup Leakage.
+- Insecure Logging.
+- Improper Deletion of User Data.
+- Exposure of Student Grades or Submissions.
+- Unauthorized Access to Administrative Data.
+
+استخدم أدوات فحص الأسرار المناسبة، ولا تطبع قيمة أي سر في التقرير.
+
+إذا اكتُشف سر حقيقي، وثّق موقعه بأمان وحدد الإجراء المطلوب لإبطاله أو تدويره.
+
+---
+
+12. هجمات الاعتماديات وسلسلة التوريد
+
+افحص:
+
+- Known Vulnerable Dependencies.
+- Transitive Dependency Vulnerabilities.
+- Dependency Confusion.
+- Typosquatting Risks.
+- Suspicious Package Lifecycle Scripts.
+- Compromised or Untrusted Dependencies، بحسب الأدلة المتاحة.
+- Insecure GitHub Actions.
+- Excessive CI/CD Permissions.
+- Pull Request Workflow Abuse.
+- Secret Exposure During Builds.
+- Unauthorized Deployment Triggers.
+- Build Artifact Integrity.
+- Unpinned Dependencies.
+- Vulnerable Firebase or Frontend Packages.
+
+استخدم أدوات التدقيق المتاحة، وحدد قابلية الاستغلال الفعلية ومدى تعرض التطبيق للثغرة.
+
+لا تُجرِ ترقيات عشوائية قد تكسر المشروع؛ وثّق المخاطر والتوافق قبل أي تغيير.
+
+---
+
+13. الهجمات المنطقية والتزامن
+
+اختبر:
+
+- Race Conditions.
+- Time-of-Check to Time-of-Use.
+- Duplicate Operations.
+- Replay Attacks.
+- Inconsistent State Transitions.
+- Concurrent Grade Updates.
+- Concurrent Exam Submissions.
+- Concurrent Certificate Issuance and Revocation.
+- Account Deletion During Active Operations.
+- Role Changes During Active Sessions.
+- Incomplete Transactions.
+- Unauthorized Workflow Transitions.
+
+استخدم اختبارات تزامن محدودة في البيئة التجريبية، وتحقق من سلامة النتائج وعدم تكرار العمليات الحساسة أو تجاوز الصلاحيات.
+
+---
+
+14. إساءة استخدام وظائف المنصة
+
+افحص إمكان استغلال الوظائف الشرعية بطريقة غير شرعية، بما في ذلك:
+
+- إنشاء عدد كبير من الحسابات.
+- إرسال دعوات أو إشعارات بصورة مفرطة.
+- استنزاف عمليات البحث والتصدير.
+- استغلال عمليات النسخ الاحتياطي والاستعادة.
+- الوصول إلى وظائف إدارية مخفية.
+- تجاوز شروط الالتحاق بالدورات.
+- تغيير التقدم الدراسي مباشرة.
+- التلاعب بسجلات النشاط.
+- استغلال اختلاف الحالة بين الواجهة وقاعدة البيانات.
+- تكرار عمليات مكلفة أو غير محدودة.
+- إساءة استخدام عمليات إصدار الشهادات والتحقق منها.
+
+لا تكتفِ بفحص كل وظيفة منفردة؛ افحص أيضًا إمكانية دمج عدة نقاط ضعف للوصول إلى أثر أمني أكبر.
+
+---
+
+15. تحليل سلاسل الهجوم المركبة
+
+أنشئ سيناريوهات هجومية واقعية خاصة بمنصة ASIRA، مثل:
+
+1. طالب يغيّر معرف سجل للوصول إلى درجات طالب آخر.
+2. مستخدم يعبث ببيانات ملفه لمحاولة اكتساب دور إداري.
+3. تجاوز قواعد الواجهة ثم محاولة الوصول مباشرة إلى Firestore.
+4. استغلال ضعف احتساب الدرجات لإرسال نتيجة غير مستحقة.
+5. الجمع بين رفع ملفات غير مقيد وعرض محتوى غير آمن.
+6. الجمع بين غياب حدود الطلبات وعمليات مكلفة لاستنزاف الموارد.
+7. استغلال إعداد نشر ضعيف للوصول إلى معلومات حساسة.
+8. الاستفادة من جلسة قديمة بعد إلغاء الصلاحيات.
+9. الجمع بين تسريب بيانات وغياب التحقق من ملكية السجل.
+10. إساءة استخدام وظيفة إدارية عبر حساب مخترق محدود الصلاحيات.
+
+هذه أمثلة وليست افتراضات بوجود ثغرات. اختبر السيناريوهات المنطبقة فقط، ووثّق المتطلبات والأدلة والنتائج.
+
+---
+
+16. منهجية الاختبار المطلوبة
+
+لكل فئة:
+
+1. حدد سطح الهجوم الفعلي.
+2. حدد الأصل الذي يحتاج إلى الحماية.
+3. راجع الضوابط الموجودة.
+4. صمم اختبارًا مناسبًا وآمنًا.
+5. نفّذ الاختبار في بيئة مصرح بها.
+6. سجل النتيجة الفعلية والأدلة.
+7. حدد الأثر واحتمال الاستغلال.
+8. أصلح الثغرة إذا أمكن دون كسر ميزات المشروع.
+9. أعد تنفيذ الاختبار الأصلي.
+10. أضف اختبار Regression يمنع تكرار الثغرة.
+
+استخدم اختبارات آلية واختبارات يدوية موجهة عند الحاجة، بما يتوافق مع بنية المشروع وإمكانات البيئة.
+
+---
+
+17. تصنيف النتائج
+
+استخدم التصنيفات التالية:
+
+- CONFIRMED VULNERABILITY
+- POTENTIAL VULNERABILITY
+- VERIFIED PROTECTED
+- FIXED — PENDING RETEST
+- FIXED — VERIFIED BY RETEST
+- NOT TESTED
+- BLOCKED
+- NOT APPLICABLE
+
+لكل ثغرة مؤكدة، وثّق:
+
+- المعرّف والعنوان.
+- الشدة والأثر.
+- المكون المتأثر.
+- شروط الاستغلال.
+- خطوات إعادة إنتاج آمنة.
+- الأدلة.
+- سبب الثغرة.
+- الإصلاح المقترح.
+- نتيجة إعادة الاختبار.
+
+استخدم CVSS عند ملاءمته، مع شرح التقييم وعدم المبالغة في الشدة.
+
+---
+
+18. المخرجات المطلوبة
+
+أنشئ أو حدّث الملفات التالية:
+
+- "PHASE_3_COMPLETION_REPORT.md"
+- "PHASE_3_SECURITY_TEST_MATRIX.md"
+- "PRODUCTION_RELEASE_CHECKLIST.md"
+- "PHASE_3_REMAINING_RISKS.md"
+- "PHASE_3_ATTACK_SURFACE_INVENTORY.md"
+- "PHASE_3_ADVANCED_SECURITY_FINDINGS.md"
+- "PHASE_3_ATTACK_CHAIN_ANALYSIS.md"
+- "PHASE_3_SECURITY_REGRESSION_TESTS.md"
+
+يجب أن يوضح التقرير النهائي:
+
+- أنواع الهجمات التي اختُبرت بالفعل.
+- الاختبارات التي نجحت أو فشلت.
+- الثغرات المؤكدة والمحتملة.
+- الإصلاحات التي اجتازت إعادة الاختبار.
+- الاختبارات التي تعذر تنفيذها وسبب ذلك.
+- الخدمات أو الإعدادات التي لم يتوفر الوصول للتحقق منها.
+- المخاطر المتبقية.
+- قرار الجاهزية للإطلاق.
+
+19. شرط الإنهاء والإطلاق
+
+لا تعلن أن المنصة آمنة بالكامل لمجرد نجاح البناء أو اجتياز بعض الاختبارات.
+
+اختر نتيجة واحدة:
+
+- RELEASE BLOCKED
+- CONDITIONAL RELEASE
+- READY FOR AUTHORIZED DEPLOYMENT
+
+لا توصي بإطلاق الإنتاج قبل معالجة المخاطر الحرجة أو العالية التي تهدد حسابات الإدارة أو بيانات الطلاب أو سلامة الدرجات والشهادات، أو توثيق قرار صريح بشأن المخاطر المتبقية.
+
+القاعدة النهائية: كل فئة هجوم قابلة للتطبيق يجب أن تحصل على نتيجة اختبار فعلية أو تُصنّف بوضوح على أنها لم تُختبر أو تعذر اختبارها. لا تختلق نتائج، ولا تعتبر عدم اكتشاف ثغرة دليلًا على عدم وجودها.
