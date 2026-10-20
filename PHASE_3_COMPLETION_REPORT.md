@@ -17,15 +17,15 @@
 - **الفروع السابقة المحفوظة:** `phase-2-security-hardening`, `master`
 - **حالة البناء والأنواع:**
   - `npx tsc --noEmit` ← **0 أخطاء (Zero Errors)**
-  - `npm run build` ← **نجاح تام في 10.16s وبدون أي تحذيرات**
-  - `npm test` ← **اجتياز 32 من 32 اختباراً أمنياً بنسبة 100%**
+  - `npm run build` ← **نجاح تام في 11.46s وبدون أي تحذيرات**
+  - `npm test` ← **اجتياز 42 من 42 اختباراً أمنياً بنسبة 100%**
 
 ---
 
 ## 3. نطاق العمل المنجز في المرحلة الثالثة (Scope of Work Completed)
 
-### 3.1 إنشاء حزمة الاختبارات الأمنية الآلية (`tests/security_suite.mjs`)
-تم إنشاء حزمة اختبارات آلية معيارية تغطي:
+### 3.1 إنشاء وتوسيع حزمة الاختبارات الأمنية الآلية (`tests/security_suite.mjs`)
+تم إنشاء حزمة اختبارات آلية معيارية تغطي 10 أقسام و 42 فحصاً أمنياً مؤتمتاً:
 1. اختبارات تعقيم الروابط وحظر بروتوكولات `javascript:` و `data:` و `vbscript:`.
 2. اختبارات التحقق من صحة نطاقات Google Drive و Docs و Firebase Storage ومنع انتحال النطاقات الفرعية.
 3. اختبارات عزل مفاتيح حلول الاختبارات عن متصفح الطالب (`sanitizeExamForStudent`).
@@ -33,6 +33,9 @@
 5. اختبارات ثبات قواعد أمان فايربيس (عدم السماح بقراءة وثائق المستخدمين للعامة، حظر حقن الدرجات، وحصر التقييم بالمدير والمدرس).
 6. اختبارات محرك التحقق من كود الشهادات الأكاديمية ورفض الأكواد المزورة.
 7. اختبارات ترويسات الأمان في `index.html`.
+8. اختبارات إعدادات نشر Vercel وترويسات HTTP الصارمة (`vercel.json`).
+9. اختبارات حالات انتحال النطاقات المتقدمة ومحلل العناوين (URL Parser Edge Cases).
+10. اختبارات المناعة ضد تلويث النماذج الأولية (Prototype Pollution Resistance).
 
 ### 3.2 معالجة فجوة التحقق من نطاقات التخزين السحابي (`isTrustedStorageUrl`)
 - **الثغرة المكتشفة بالاختبار الآلي:** كانت الدالة السابقة تعتمد على تعبير نمطي قد يسمح بنطاق مخادع مثل `https://drive.google.com.attacker.com`.
@@ -106,10 +109,20 @@
 --- 7. Testing Security Headers in index.html ---
   ✓ PASS: index.html includes X-Content-Type-Options: nosniff meta header
   ✓ PASS: index.html includes Referrer-Policy: strict-origin-when-cross-origin meta header
+  ✓ PASS: vercel.json configures SPA routing catch-all rewrite rule
+  ✓ PASS: vercel.json enforces X-Content-Type-Options: nosniff
+  ✓ PASS: vercel.json enforces X-Frame-Options: DENY (clickjacking protection)
+  ✓ PASS: vercel.json enforces Referrer-Policy: strict-origin-when-cross-origin
+  ✓ PASS: vercel.json CSP includes frame-ancestors none
+  ✓ PASS: vercel.json enforces restricted Permissions-Policy
+  ✓ PASS: isTrustedStorageUrl blocks userinfo auth URL spoofing (drive.google.com@attacker.com)
+  ✓ PASS: isTrustedStorageUrl blocks multi-subdomain phishing
+  ✓ PASS: isTrustedStorageUrl safely handles non-URL strings without throwing
+  ✓ PASS: sanitizeExamForStudent does not pollute Object prototype
 
 ======================================================
-  Total Tests Run : 32
-  Passed Tests    : 32
+  Total Tests Run : 42
+  Passed Tests    : 42
   Failed Tests    : 0
 ======================================================
 ```

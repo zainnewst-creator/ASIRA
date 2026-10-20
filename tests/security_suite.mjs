@@ -276,6 +276,80 @@ assert(
 );
 
 // -----------------------------------------------------------------------------
+// 8. Testing Hosting Security Configuration (vercel.json)
+// -----------------------------------------------------------------------------
+console.log(bold('\n--- 8. Testing Vercel Deployment & HTTP Security Headers ---'));
+
+const vercelJsonPath = path.join(rootDir, 'vercel.json');
+const vercelContent = JSON.parse(fs.readFileSync(vercelJsonPath, 'utf8'));
+
+assert(
+  Array.isArray(vercelContent.rewrites) && vercelContent.rewrites.some(r => r.source === '/(.*)' && r.destination === '/'),
+  'vercel.json configures SPA routing catch-all rewrite rule'
+);
+
+const vercelHeaders = vercelContent.headers?.[0]?.headers || [];
+const getHeader = (key) => vercelHeaders.find(h => h.key.toLowerCase() === key.toLowerCase())?.value;
+
+assert(
+  getHeader('X-Content-Type-Options') === 'nosniff',
+  'vercel.json enforces X-Content-Type-Options: nosniff'
+);
+
+assert(
+  getHeader('X-Frame-Options') === 'DENY',
+  'vercel.json enforces X-Frame-Options: DENY (clickjacking protection)'
+);
+
+assert(
+  getHeader('Referrer-Policy') === 'strict-origin-when-cross-origin',
+  'vercel.json enforces Referrer-Policy: strict-origin-when-cross-origin'
+);
+
+assert(
+  getHeader('Content-Security-Policy')?.includes("frame-ancestors 'none'"),
+  'vercel.json CSP includes frame-ancestors none'
+);
+
+assert(
+  getHeader('Permissions-Policy')?.includes('camera=()'),
+  'vercel.json enforces restricted Permissions-Policy'
+);
+
+// -----------------------------------------------------------------------------
+// 9. Testing Advanced URL Spoofing & Edge Cases
+// -----------------------------------------------------------------------------
+console.log(bold('\n--- 9. Testing Advanced URL Spoofing & Parser Edge Cases ---'));
+
+assert(
+  isTrustedStorageUrl('https://drive.google.com@attacker.com/evil.pdf') === false,
+  'isTrustedStorageUrl blocks userinfo auth URL spoofing (drive.google.com@attacker.com)'
+);
+
+assert(
+  isTrustedStorageUrl('https://docs.google.com.phishing.io/doc') === false,
+  'isTrustedStorageUrl blocks multi-subdomain phishing'
+);
+
+assert(
+  isTrustedStorageUrl('not-a-valid-url') === false,
+  'isTrustedStorageUrl safely handles non-URL strings without throwing'
+);
+
+// -----------------------------------------------------------------------------
+// 10. Testing Prototype Pollution Resistance
+// -----------------------------------------------------------------------------
+console.log(bold('\n--- 10. Testing Prototype Pollution Resistance ---'));
+
+const maliciousPayload = JSON.parse('{"__proto__": {"polluted": true}, "questions": []}');
+const sanitizedMalicious = sanitizeExamForStudent(maliciousPayload);
+
+assert(
+  Object.prototype.polluted === undefined,
+  'sanitizeExamForStudent does not pollute Object prototype'
+);
+
+// -----------------------------------------------------------------------------
 // Summary Report
 // -----------------------------------------------------------------------------
 console.log(bold(cyan('\n======================================================')));
