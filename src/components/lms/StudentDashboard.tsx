@@ -33,7 +33,7 @@ import {
 } from '../../data/mockData';
 import { Course } from '../../types';
 import { AcademicCertificateModal } from './AcademicCertificateModal';
-import { sanitizeUrl } from '../../utils/security';
+import { sanitizeUrl, sanitizeExamForStudent } from '../../utils/security';
 
 export interface StudentDashboardProps {
   courses?: Course[];
@@ -84,7 +84,16 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   const [localSubmissions, setLocalSubmissions] = useState<MockStudentSubmission[]>(propSubmissions || INITIAL_STUDENT_SUBMISSIONS);
   const submissions = propSubmissions || localSubmissions;
   const examAttempts = propExamAttempts || INITIAL_EXAM_ATTEMPTS;
-  const curriculum = propCurriculum || INITIAL_CURRICULUM;
+  const rawCurriculum = propCurriculum || INITIAL_CURRICULUM;
+  const curriculum = React.useMemo(() => {
+    return {
+      ...rawCurriculum,
+      modules: (rawCurriculum.modules || []).map((m) => ({
+        ...m,
+        exams: (m.exams || []).map((ex) => sanitizeExamForStudent(ex)),
+      })),
+    };
+  }, [rawCurriculum]);
   const practicalGrades = propPracticalGrades || {
     'student-1': { score: 42, notes: 'أداء ممتاز في اختبار تحليل البيانات الإحصائية الحضوري' }
   };

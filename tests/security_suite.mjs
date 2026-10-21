@@ -246,6 +246,18 @@ assert(
   'Firestore rules enforce default-deny catch-all rule'
 );
 
+// Test 5.8: Course instructorIds modification protection
+assert(
+  rulesContent.includes("!request.resource.data.diff(resource.data).affectedKeys().hasAny(['instructorIds', 'id'])"),
+  'Courses rule blocks instructors from modifying instructorIds or id'
+);
+
+// Test 5.9: Course creation and deletion admin-only
+assert(
+  rulesContent.includes("allow create, delete: if isAdmin();"),
+  'Course creation and deletion is strictly restricted to administrators'
+);
+
 // -----------------------------------------------------------------------------
 // 6. Testing Academic Certificate Eligibility & Code Verification Logic
 // -----------------------------------------------------------------------------
@@ -528,6 +540,36 @@ assert(
 assert(
   evalCertRead(personas.studentA, { status: 'requested', studentUid: 'student-A' }) === true,
   '[Rules Logic] Student A CAN read their own pending certificate'
+);
+
+// 11.6 Course update and deletion authorization (instructorIds protection)
+const evalCourseUpdate = (auth, courseId, existingDoc, requestData) => {
+  if (evalIsAdmin(auth)) return true;
+  if (!evalIsCourseInstructor(auth, courseId)) return false;
+  const modifiesProtectedKeys = ['instructorIds', 'id'].some(k => k in requestData && JSON.stringify(requestData[k]) !== JSON.stringify(existingDoc[k]));
+  return !modifiesProtectedKeys;
+};
+const evalCourseDelete = (auth) => {
+  return evalIsAdmin(auth);
+};
+
+const sampleCourse1 = dbState.courses['course-1'];
+
+assert(
+  evalCourseUpdate(personas.instructorA, 'course-1', sampleCourse1, { instructorIds: ['inst-A', 'hacker'] }) === false,
+  '[Rules Logic] Instructor A is BLOCKED from modifying instructorIds in course-1'
+);
+assert(
+  evalCourseUpdate(personas.instructorA, 'course-1', sampleCourse1, { summary: 'Updated course description' }) === true,
+  '[Rules Logic] Instructor A CAN update course content for assigned course-1'
+);
+assert(
+  evalCourseDelete(personas.instructorA) === false,
+  '[Rules Logic] Instructor A is BLOCKED from deleting course-1'
+);
+assert(
+  evalCourseDelete(personas.adminUser) === true,
+  '[Rules Logic] Administrator is ALLOWED to delete course-1'
 );
 
 // -----------------------------------------------------------------------------

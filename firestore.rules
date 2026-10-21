@@ -78,9 +78,17 @@ service cloud.firestore {
     // 2. الكورسات (Courses) والمحتوى التعليمي
     // ==========================================
     match /courses/{courseId} {
-      // الكورسات المنشورة عامة، والمسودات فقط للمدير والمدرس
+      // الكورسات المنشورة عامة، والمسودات فقط للمدير ومدرس المساق
       allow read: if resource.data.status == 'published' || isAdmin() || isCourseInstructor(courseId);
-      allow write: if isAdmin() || isCourseInstructor(courseId);
+
+      // إنشاء الكورسات وحذفها حصري للمدير فقط
+      allow create, delete: if isAdmin();
+
+      // التعديل: المدير يعدل كل شيء، بينما المدرس المعتمد يعدل المحتوى دون المساس بـ instructorIds
+      allow update: if isAdmin() || (
+        isCourseInstructor(courseId) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['instructorIds', 'id'])
+      );
 
       // أ. الوحدات والمديولات (Modules)
       match /modules/{moduleId} {

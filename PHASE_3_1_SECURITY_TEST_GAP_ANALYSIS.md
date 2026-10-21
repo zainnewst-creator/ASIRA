@@ -34,22 +34,22 @@
 
 ---
 
-## 2. جدول توزيع الاختبارات الـ 63 في المشروع (Inventory of the 63 Tests)
+## 2. جدول توزيع الاختبارات الـ 69 في المشروع (Inventory of the 69 Tests)
 
-| فئة الاختبار | عدد الاختبارات | الملف / الكود | قوة الإثبات | الملاحظات الفنية |
+| فئة الاختبار (القسم في security_suite) | عدد الاختبارات | الملف / الكود | قوة الإثبات | الملاحظات الفنية |
 | :--- | :---: | :--- | :---: | :--- |
-| **تعقيم الروابط وحظر XSS** | 10 | `src/utils/security.ts` | Unit Test | تنفيذ حي لاختبار حمولات `javascript:` و `data:` و `vbscript:`. |
-| **فحص نطاقات التخزين المعتمدة** | 5 | `src/utils/security.ts` | Unit Test | تنفيذ حي ضد انتحال النطاقات وبروتوكولات HTTP. |
-| **تجريد مفاتيح حلول الاختبارات** | 2 | `src/utils/security.ts` | Unit Test | تنفيذ حي لتنظيف كائنات الأسئلة في الذاكرة. |
-| **تطهير المدخلات وسقف الأطوال** | 2 | `src/utils/security.ts` | Unit Test | تنفيذ حي لقيود الأطوال وإزالة الفراغات. |
-| **ثوابت ومحددات قواعد الأمان** | 10 | `firestore.rules` | Static Assertion | فحص وجود قواعد منع الدرجات، عزل المفاتيح، والرفض التلقائي. |
-| **شروط خدمة الشهادات الأكاديمية** | 3 | `certificateService.ts` | Static Assertion | فحص منع القبول الوهمي واشتراط حالة `issued`. |
-| **ترويسات أمان HTML الأساسية** | 2 | `index.html` | Static Assertion | فحص وسوم meta لـ `nosniff` و `strict-origin`. |
-| **ترويسات استضافة Vercel** | 5 | `vercel.json` | Static Config Test | فحص ترويسات CSP و X-Frame-Options و SPA rewrites. |
-| **انتحال الروابط المتقدم (Userinfo)** | 3 | `src/utils/security.ts` | Unit Test | تنفيذ حي لحظر حيل `@attacker.com` و phishing. |
-| **مناعة تلويث النماذج الأولية** | 1 | `src/utils/security.ts` | Unit Test | تنفيذ حي لحظر `__proto__` و constructor pollution. |
-| **محرك محاكاة منطق Firestore للشخصيات الـ 7** | 19 | `tests/security_suite.mjs` (قسم 11) | Rules Logic Engine | محاكاة برمجية قطعية لكافة سيناريوهات الخصوصية والدرجات والتصعيد. |
-| **المجموع الكلي** | **63** | — | — | **جميع الاختبارات الـ 63 ناجحة بنسبة 100%**. |
+| **1. تعقيم الروابط وحظر XSS** | 10 | `src/utils/security.ts` | Unit Test | تنفيذ حي لاختبار حمولات `javascript:` و `data:` و `vbscript:`. |
+| **2. فحص نطاقات التخزين المعتمدة** | 5 | `src/utils/security.ts` | Unit Test | تنفيذ حي ضد انتحال النطاقات وبروتوكولات HTTP. |
+| **3. تجريد مفاتيح حلول الاختبارات** | 2 | `src/utils/security.ts` | Unit Test | تنفيذ حي لتنظيف كائنات الأسئلة في الذاكرة. |
+| **4. تطهير المدخلات وسقف الأطوال** | 2 | `src/utils/security.ts` | Unit Test | تنفيذ حي لقيود الأطوال وإزالة الفراغات. |
+| **5. ثوابت ومحددات قواعد الأمان** | 12 | `firestore.rules` | Static Assertion | فحص قواعد منع الدرجات، عزل المفاتيح، حظر instructorIds، والرفض التلقائي. |
+| **6. شروط خدمة الشهادات الأكاديمية** | 3 | `certificateService.ts` | Static Assertion | فحص منع القبول الوهمي واشتراط حالة `issued`. |
+| **7. ترويسات أمان HTML الأساسية** | 2 | `index.html` | Static Assertion | فحص وسوم meta لـ `nosniff` و `strict-origin`. |
+| **8. ترويسات استضافة Vercel** | 6 | `vercel.json` | Static Config Test | فحص SPA rewrites, nosniff, DENY, Referrer, CSP, Permissions. |
+| **9. انتحال الروابط المتقدم (Userinfo)** | 3 | `src/utils/security.ts` | Unit Test | تنفيذ حي لحظر حيل `@attacker.com` و phishing. |
+| **10. مناعة تلويث النماذج الأولية** | 1 | `src/utils/security.ts` | Unit Test | تنفيذ حي لحظر `__proto__` و constructor pollution. |
+| **11. محرك محاكاة منطق Firestore للشخصيات الـ 7** | 23 | `tests/security_suite.mjs` | Rules Logic Engine | محاكاة برمجية قطعية لسيناريوهات الخصوصية والدرجات والتصعيد وعزل المساقات. |
+| **المجموع الكلي** | **69** | — | — | **جميع الاختبارات الـ 69 ناجحة بنسبة 100% (69/69 PASS)**. |
 
 ---
 
