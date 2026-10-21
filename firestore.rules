@@ -14,14 +14,15 @@ service cloud.firestore {
     }
 
     // فحص صلاحية المدير (Admin Verification)
-    // يعتمد على Custom Claims أولاً، ثم البريد المعتمد الموثق، ثم دور قاعدة البيانات
+    // يعتمد حصرياً على Custom Claims الموثقة أو وثيقة قاعدة البيانات المعتمدة مع اشتراط توثيق البريد الإلكتروني
+    // تم إلغاء الاعتماد المستقل على نص البريد الإلكتروني لمنع الثغرات
     function isAdmin() {
       return isSignedIn() && (
         request.auth.token.admin == true ||
         request.auth.token.role == 'admin' ||
-        (request.auth.token.email == 'admin@asira-research.org' && request.auth.token.email_verified == true) ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' &&
+         request.auth.token.email_verified == true)
       );
     }
 
@@ -53,8 +54,9 @@ service cloud.firestore {
     // 1. المستخدمون (Users) - حماية الخصوصية ومنع تصعيد الصلاحيات
     // ==========================================
     match /users/{uid} {
-      // حماية الخصوصية: الطالب يقرأ ملفه فقط، والمدير والمدرس يقرؤون للأغراض الأكاديمية
-      allow read: if isOwner(uid) || isAdmin() || isInstructor();
+      // حماية الخصوصية: الطالب يقرأ ملفه فقط، والمدير يقرأ لإدارة الحسابات
+      // تم حظر قراءة المدرس العشوائية لحسابات الطلاب غير المسجلين لديه
+      allow read: if isOwner(uid) || isAdmin();
 
       // إنشاء الحساب: إجباري دور student وحالة active، ومطابقة uid الوثيقة
       allow create: if isOwner(uid) && 
@@ -213,8 +215,8 @@ service cloud.firestore {
     // 3. الشهادات والتحقق العام (Certificates)
     // ==========================================
     match /certificates/{certId} {
-      // القراءة متاحة للجميع للتحقق من كود الشهادة الأكاديمي
-      allow read: if true;
+      // قراءة الشهادات الصادرة فقط للعامة للتحقق الأكاديمي، بينما الطلبات المعلقة محصورة بصاحبها والمدير
+      allow read: if resource.data.status == 'issued' || isAdmin() || (isSignedIn() && request.auth.uid == resource.data.studentUid);
 
       // إنشاء طلب شهادة: الطالب يقدم طلباً بحالة requested فقط دون تزوير رابط أو اعتماد
       allow create: if isAdmin() || (

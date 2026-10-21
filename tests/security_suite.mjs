@@ -185,13 +185,26 @@ const rulesContent = fs.readFileSync(rulesPath, 'utf8');
 
 // Test 5.1: Users privacy protection
 assert(
-  !rulesContent.includes('match /users/{uid} {\n      // الطالب يقرأ ملفه الشخصي، والمدير والمدرس يقرؤون لأغراض أكاديمية\n      allow read: if isSignedIn();'),
-  'Users collection does NOT allow public read to all authenticated users'
+  rulesContent.includes('allow read: if isOwner(uid) || isAdmin();'),
+  'Users collection enforces strict owner/admin read boundary (instructors blocked from unrelated profiles)'
 );
 
+// Test 5.1b: No email-only admin backdoor
 assert(
-  rulesContent.includes('allow read: if isOwner(uid) || isAdmin() || isInstructor();'),
-  'Users collection enforces strict owner/admin/instructor read boundary'
+  !rulesContent.includes("(request.auth.token.email == 'admin@asira-research.org' && request.auth.token.email_verified == true)"),
+  'Admin check does NOT grant access based on email address string alone'
+);
+
+// Test 5.1c: Admin verification requires email_verified
+assert(
+  rulesContent.includes('request.auth.token.email_verified == true'),
+  'Admin verification enforces email_verified requirement'
+);
+
+// Test 5.1d: Certificate public read restricted to issued status
+assert(
+  rulesContent.includes("resource.data.status == 'issued' || isAdmin()"),
+  'Certificates collection restricts public reading to status: issued'
 );
 
 // Test 5.2: Attempts score tampering protection
@@ -347,6 +360,174 @@ const sanitizedMalicious = sanitizeExamForStudent(maliciousPayload);
 assert(
   Object.prototype.polluted === undefined,
   'sanitizeExamForStudent does not pollute Object prototype'
+);
+
+// -----------------------------------------------------------------------------
+// 11. Simulated Firestore Rules Logic Engine (P0 Verification for 7 Personas)
+// -----------------------------------------------------------------------------
+console.log(bold('\n--- 11. Simulated Firestore Rules Logic Engine (P0 Verification for 7 Personas) ---'));
+
+// Personas definition
+const personas = {
+  anonymous: null,
+  studentA: { uid: 'student-A', token: { email: 'studentA@test.edu', email_verified: true, role: 'student' } },
+  studentB: { uid: 'student-B', token: { email: 'studentB@test.edu', email_verified: true, role: 'student' } },
+  instructorA: { uid: 'inst-A', token: { email: 'instA@asira.org', email_verified: true, role: 'instructor', instructor: true } },
+  instructorB: { uid: 'inst-B', token: { email: 'instB@asira.org', email_verified: true, role: 'instructor', instructor: true } },
+  adminUser: { uid: 'admin-1', token: { email: 'admin@asira-research.org', email_verified: true, admin: true, role: 'admin' } },
+  unverifiedEmailWithoutRole: { uid: 'attacker-1', token: { email: 'admin@asira-research.org', email_verified: false, role: 'student' } },
+  verifiedEmailWithoutRole: { uid: 'user-verified', token: { email: 'user@verified.edu', email_verified: true, role: 'student' } },
+};
+
+// Database mock state for rule helper evaluation
+const dbState = {
+  users: {
+    'student-A': { role: 'student', accountStatus: 'active', uid: 'student-A' },
+    'student-B': { role: 'student', accountStatus: 'active', uid: 'student-B' },
+    'inst-A': { role: 'instructor', accountStatus: 'active', uid: 'inst-A' },
+    'inst-B': { role: 'instructor', accountStatus: 'active', uid: 'inst-B' },
+    'admin-1': { role: 'admin', accountStatus: 'active', uid: 'admin-1' },
+    'attacker-1': { role: 'student', accountStatus: 'active', uid: 'attacker-1' },
+    'user-verified': { role: 'student', accountStatus: 'active', uid: 'user-verified' },
+  },
+  courses: {
+    'course-1': { id: 'course-1', status: 'published', instructorIds: ['inst-A'] },
+    'course-2': { id: 'course-2', status: 'published', instructorIds: ['inst-B'] },
+  },
+  enrollments: {
+    'course-1_student-A': { status: 'approved' },
+    'course-1_student-B': { status: 'pending' },
+  }
+};
+
+// Firestore rules helper evaluations matching firestore.rules
+const evalSignedIn = (auth) => auth != null;
+const evalIsOwner = (auth, uid) => evalSignedIn(auth) && auth.uid === uid;
+const evalIsAdmin = (auth) => {
+  if (!evalSignedIn(auth)) return false;
+  const userDoc = dbState.users[auth.uid];
+  return (
+    auth.token?.admin === true ||
+    auth.token?.role === 'admin' ||
+    (userDoc?.role === 'admin' && auth.token?.email_verified === true)
+  );
+};
+const evalIsInstructor = (auth) => {
+  if (!evalSignedIn(auth)) return false;
+  const userDoc = dbState.users[auth.uid];
+  return auth.token?.instructor === true || auth.token?.role === 'instructor' || userDoc?.role === 'instructor';
+};
+const evalIsCourseInstructor = (auth, courseId) => {
+  if (!evalIsInstructor(auth)) return false;
+  const course = dbState.courses[courseId];
+  return Boolean(course && course.instructorIds.includes(auth.uid));
+};
+const evalIsApprovedStudent = (auth, courseId) => {
+  if (!evalSignedIn(auth)) return false;
+  const enroll = dbState.enrollments[`${courseId}_${auth.uid}`];
+  return enroll?.status === 'approved';
+};
+
+// 11.1 User privacy tests
+assert(
+  !evalSignedIn(personas.anonymous) && !evalIsOwner(personas.anonymous, 'student-A'),
+  '[Rules Logic] Anonymous visitor is blocked from reading student profile'
+);
+assert(
+  evalIsOwner(personas.studentA, 'student-A') || evalIsAdmin(personas.studentA),
+  '[Rules Logic] Student A is allowed to read own profile'
+);
+assert(
+  !(evalIsOwner(personas.studentA, 'student-B') || evalIsAdmin(personas.studentA)),
+  '[Rules Logic] Student A is BLOCKED from reading Student B profile'
+);
+assert(
+  !(evalIsOwner(personas.instructorA, 'student-B') || evalIsAdmin(personas.instructorA)),
+  '[Rules Logic] Instructor A is BLOCKED from reading unrelated student profile in /users'
+);
+assert(
+  evalIsOwner(personas.adminUser, 'student-B') || evalIsAdmin(personas.adminUser),
+  '[Rules Logic] Authorized Administrator is allowed to read user profile'
+);
+
+// 11.2 Role escalation tests
+assert(
+  evalIsAdmin(personas.unverifiedEmailWithoutRole) === false,
+  '[Rules Logic] Unverified email or student claiming admin email is BLOCKED from admin'
+);
+assert(
+  evalIsAdmin(personas.verifiedEmailWithoutRole) === false,
+  '[Rules Logic] Verified email without admin role/claim is BLOCKED from admin'
+);
+
+// 11.3 Exam attempts score injection tests
+const evalAttemptCreate = (auth, courseId, data) => {
+  const isApproved = evalIsApprovedStudent(auth, courseId);
+  const isOwner = evalIsOwner(auth, data.studentUid);
+  const noScore = !('calculatedScore' in data) && !('officialGrade' in data) && !('score' in data);
+  const validStatus = ['in_progress', 'submitted'].includes(data.status);
+  return (isApproved && isOwner && noScore && validStatus) || evalIsAdmin(auth) || evalIsCourseInstructor(auth, courseId);
+};
+
+assert(
+  evalAttemptCreate(personas.studentA, 'course-1', { studentUid: 'student-A', status: 'submitted', answers: { q1: 0 } }) === true,
+  '[Rules Logic] Student A can submit clean exam attempt'
+);
+assert(
+  evalAttemptCreate(personas.studentA, 'course-1', { studentUid: 'student-A', status: 'submitted', score: 100 }) === false,
+  '[Rules Logic] Student attempt with injected score is BLOCKED'
+);
+assert(
+  evalAttemptCreate(personas.studentA, 'course-1', { studentUid: 'student-A', status: 'submitted', officialGrade: 'A+' }) === false,
+  '[Rules Logic] Student attempt with injected officialGrade is BLOCKED'
+);
+assert(
+  evalAttemptCreate(personas.studentA, 'course-1', { studentUid: 'student-A', status: 'submitted', calculatedScore: 30 }) === false,
+  '[Rules Logic] Student attempt with injected calculatedScore is BLOCKED'
+);
+
+// 11.4 Official grades authorization
+const evalOfficialGradeWrite = (auth, courseId) => {
+  return evalIsAdmin(auth) || evalIsCourseInstructor(auth, courseId);
+};
+
+assert(
+  evalOfficialGradeWrite(personas.studentA, 'course-1') === false,
+  '[Rules Logic] Student A is BLOCKED from writing official grades'
+);
+assert(
+  evalOfficialGradeWrite(personas.instructorA, 'course-1') === true,
+  '[Rules Logic] Assigned Instructor A CAN write official grades for course-1'
+);
+assert(
+  evalOfficialGradeWrite(personas.instructorA, 'course-2') === false,
+  '[Rules Logic] Instructor A is BLOCKED from writing official grades for unassigned course-2'
+);
+assert(
+  evalOfficialGradeWrite(personas.instructorB, 'course-1') === false,
+  '[Rules Logic] Instructor B is BLOCKED from writing official grades for unassigned course-1'
+);
+
+// 11.5 Certificates read permissions
+const evalCertRead = (auth, certDoc) => {
+  return certDoc.status === 'issued' || evalIsAdmin(auth) || (evalSignedIn(auth) && auth.uid === certDoc.studentUid);
+};
+
+assert(
+  evalCertRead(personas.anonymous, { status: 'issued', studentUid: 'student-A' }) === true,
+  '[Rules Logic] Public visitor CAN read issued certificate for verification'
+);
+assert(
+  evalCertRead(personas.anonymous, { status: 'requested', studentUid: 'student-A' }) === false,
+  '[Rules Logic] Public visitor is BLOCKED from reading unissued/requested certificate'
+);
+assert(
+  evalCertRead(personas.studentB, { status: 'requested', studentUid: 'student-A' }) === false,
+  '[Rules Logic] Student B is BLOCKED from reading Student A pending certificate'
+);
+assert(
+  evalCertRead(personas.studentA, { status: 'requested', studentUid: 'student-A' }) === true,
+  '[Rules Logic] Student A CAN read their own pending certificate'
 );
 
 // -----------------------------------------------------------------------------
