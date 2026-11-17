@@ -1,30 +1,194 @@
 import React, { useState } from 'react';
-import { BookOpen, ShieldCheck } from 'lucide-react';
+import { BookOpen, ShieldCheck, AlertTriangle, Loader2, Play } from 'lucide-react';
 import { UserRole } from '../types';
+import { auth, db } from '../services/firebaseConfig';
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+} from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { isDemoMode, demoLogin, demoRegister, DEMO_ACCOUNTS } from '../utils/demoMode';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onLogin: (user: { name: string; role: UserRole; email: string }) => void;
+  onLogin: (user: { uid?: string; name: string; role: UserRole; email: string }) => void;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }) => {
   const [isRegister, setIsRegister] = useState(false);
-  const [email, setEmail] = useState('student@asira-research.org');
-  const [name, setName] = useState('أحمد الصالح');
-  const [password, setPassword] = useState('••••••••');
-  const [demoRole, setDemoRole] = useState<UserRole>('student');
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const demoActive = isDemoMode();
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  // ============ تسجيل دخول سريع لوضع التجربة ============
+  const handleDemoQuickLogin = (account: typeof DEMO_ACCOUNTS[0]) => {
     onLogin({
-      name: name || (demoRole === 'admin' ? 'مدير المنصة' : demoRole === 'instructor' ? 'د. إبراهيم يحيى' : 'أحمد الصالح'),
-      role: isRegister ? 'student' : demoRole, // التسجيل الجديد دائماً طالب وفق القواعد
-      email: email || 'student@asira-research.org',
+      uid: account.uid,
+      name: account.name,
+      role: account.role,
+      email: account.email,
     });
+    resetForm();
     onClose();
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    try {
+      // ============ وضع التجربة (Demo Mode) ============
+      if (demoActive) {
+        if (isRegister) {
+          if (!name.trim()) {
+            setError('يرجى إدخال الاسم الأكاديمي.');
+            setLoading(false);
+            return;
+          }
+          if (!email.trim()) {
+            setError('يرجى إدخال البريد الإلكتروني.');
+            setLoading(false);
+            return;
+          }
+          const demoUser = demoRegister(name, email);
+          onLogin({
+            uid: demoUser.uid,
+            name: demoUser.name,
+            role: demoUser.role,
+            email: demoUser.email,
+          });
+          resetForm();
+          onClose();
+        } else {
+          if (!email.trim() || !password.trim()) {
+            setError('يرجى إدخال البريد الإلكتروني وكلمة المرور.');
+            setLoading(false);
+            return;
+          }
+          const demoUser = demoLogin(email, password);
+          if (demoUser) {
+            onLogin({
+              uid: demoUser.uid,
+              name: demoUser.name,
+              role: demoUser.role,
+              email: demoUser.email,
+            });
+            resetForm();
+            onClose();
+          } else {
+            setError('البريد أو كلمة المرور غير صحيحة. جرب حسابات التجربة أدناه.');
+          }
+        }
+        setLoading(false);
+        return;
+      }
+
+      // ============ وضع Firebase الحقيقي ============
+      if (isRegister) {
+        if (!name.trim()) {
+          setError('يرجى إدخال الاسم الأكاديمي.');
+          setLoading(false);
+          return;
+        }
+        if (!email.trim() || !password.trim()) {
+          setError('يرجى إدخال البريد الإلكتروني وكلمة المرور.');
+          setLoading(false);
+          return;
+        }
+        if (password.length < 6) {
+          setError('كلمة المرور يجب أن لا تقل عن 6 أحرف.');
+          setLoading(false);
+          return;
+        }
+
+        const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+        const uid = cred.user.uid;
+
+        await setDoc(doc(db, 'users', uid), {
+          uid,
+          email: email.trim(),
+          displayName: name.trim(),
+          role: 'student',
+          accountStatus: 'active',
+          createdAt: new Date().toISOString(),
+        });
+
+        onLogin({
+          uid,
+          name: name.trim(),
+          role: 'student',
+          email: email.trim(),
+        });
+        resetForm();
+        onClose();
+      } else {
+        if (!email.trim() || !password.trim()) {
+          setError('يرجى إدخال البريد الإلكتروني وكلمة المرور.');
+          setLoading(false);
+          return;
+        }
+
+        const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+        const uid = cred.user.uid;
+
+        let role: UserRole = 'student';
+        let displayName = cred.user.displayName || email.trim();
+
+        try {
+          const userDoc = await getDoc(doc(db, 'users', uid));
+          if (userDoc.exists()) {
+            const data = userDoc.data();
+            role = (data.role as UserRole) || 'student';
+            displayName = data.displayName || displayName;
+          }
+        } catch {
+          console.info('[Auth] Could not fetch user document, defaulting to student role.');
+        }
+
+        onLogin({
+          uid,
+          name: displayName,
+          role,
+          email: email.trim(),
+        });
+        resetForm();
+        onClose();
+      }
+    } catch (err: any) {
+      const code = err?.code || '';
+      if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
+        setError('البريد الإلكتروني أو كلمة المرور غير صحيحة.');
+      } else if (code === 'auth/email-already-in-use') {
+        setError('هذا البريد الإلكتروني مسجل مسبقاً. جرب تسجيل الدخول.');
+      } else if (code === 'auth/weak-password') {
+        setError('كلمة المرور ضعيفة جداً. يرجى اختيار كلمة أقوى.');
+      } else if (code === 'auth/invalid-email') {
+        setError('صيغة البريد الإلكتروني غير صحيحة.');
+      } else if (code === 'auth/too-many-requests') {
+        setError('تم تجاوز عدد المحاولات المسموح بها. حاول مرة أخرى لاحقاً.');
+      } else if (code.includes('network') || code.includes('unavailable')) {
+        setError('تعذر الاتصال بالخادم. تحقق من اتصال الإنترنت.');
+      } else {
+        setError(err?.message || 'حدث خطأ غير متوقع. حاول مرة أخرى.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetForm = () => {
+    setEmail('');
+    setName('');
+    setPassword('');
+    setError(null);
   };
 
   return (
@@ -61,11 +225,86 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
           </p>
         </div>
 
+        {/* بانر وضع التجربة */}
+        {demoActive && (
+          <div style={{
+            padding: '0.75rem',
+            background: 'linear-gradient(135deg, #fef3c7, #fde68a)',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid #f59e0b',
+            fontSize: '0.8rem',
+            color: '#92400e',
+            marginBottom: '1rem',
+            display: 'flex',
+            gap: '0.5rem',
+            alignItems: 'center',
+          }}>
+            <Play size={16} color="#d97706" />
+            <span><strong>وضع التجربة:</strong> Firebase غير مفعّل. استخدم الحسابات التجريبية أدناه لاستعراض المنصة.</span>
+          </div>
+        )}
+
         {/* تنبيه حماية الصلاحيات الصارم */}
-        {isRegister && (
+        {isRegister && !demoActive && (
           <div style={{ padding: '0.75rem', background: 'var(--primary-50)', borderRadius: 'var(--radius-md)', border: '1px solid var(--primary-100)', fontSize: '0.8rem', color: 'var(--primary-800)', marginBottom: '1rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <ShieldCheck size={18} color="var(--primary-600)" />
             <span>يُنشأ أي حساب جديد بصلاحية طالب (Student) افتراضياً وفق قواعد الأمان الصارمة.</span>
+          </div>
+        )}
+
+        {/* رسالة الخطأ */}
+        {error && (
+          <div style={{ padding: '0.75rem', background: '#fef2f2', borderRadius: 'var(--radius-md)', border: '1px solid #fecaca', fontSize: '0.8rem', color: '#991b1b', marginBottom: '1rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <AlertTriangle size={18} color="#dc2626" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {/* أزرار الدخول السريع في وضع التجربة */}
+        {demoActive && !isRegister && (
+          <div style={{ marginBottom: '1.25rem' }}>
+            <p style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.5rem' }}>
+              دخول سريع بحساب تجريبي:
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              {DEMO_ACCOUNTS.map((account) => (
+                <button
+                  key={account.uid}
+                  type="button"
+                  onClick={() => handleDemoQuickLogin(account)}
+                  className="btn btn-outline"
+                  style={{
+                    padding: '0.55rem 0.75rem',
+                    fontSize: '0.82rem',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    width: '100%',
+                  }}
+                >
+                  <span style={{ fontWeight: 700 }}>
+                    {account.role === 'student' ? '👨‍🎓 طالب' : account.role === 'instructor' ? '👨‍🏫 مدرس' : '🛡️ مدير'}
+                  </span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    {account.email}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <div style={{ borderTop: '1px solid var(--border-color)', margin: '1rem 0 0.5rem', position: 'relative' }}>
+              <span style={{
+                position: 'absolute',
+                top: '-0.6rem',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                background: 'var(--bg-card)',
+                padding: '0 0.75rem',
+                fontSize: '0.75rem',
+                color: 'var(--text-muted)',
+              }}>
+                أو سجل يدوياً
+              </span>
+            </div>
           </div>
         )}
 
@@ -79,7 +318,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="أحمد محمد الصالح"
+                placeholder="الاسم الكامل"
+                required
                 style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)', fontFamily: 'var(--font-arabic)' }}
               />
             </div>
@@ -93,7 +333,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="user@example.com"
+              placeholder={demoActive ? 'student@demo.asira.com' : 'user@example.com'}
+              required
               style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)', fontFamily: 'var(--font-arabic)' }}
             />
           </div>
@@ -106,49 +347,36 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
+              placeholder={demoActive ? 'demo123' : '••••••••'}
+              required={!demoActive || !isRegister}
+              minLength={demoActive ? undefined : 6}
               style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)', fontFamily: 'var(--font-arabic)' }}
             />
           </div>
 
-          {/* تبديل الأدوار في وضع التجربة لاختبار الواجهات الثلاث */}
-          {!isRegister && (
-            <div style={{ padding: '0.75rem', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', fontSize: '0.8rem' }}>
-              <label style={{ display: 'block', fontWeight: 700, marginBottom: '0.35rem', color: 'var(--text-main)' }}>
-                تجربة دور المستخدم في البوابة:
-              </label>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                {(['student', 'instructor', 'admin'] as UserRole[]).map((r) => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => setDemoRole(r)}
-                    className={`btn ${demoRole === r ? 'btn-primary' : 'btn-outline'}`}
-                    style={{ flex: 1, padding: '0.35rem', fontSize: '0.75rem' }}
-                    id={`role-btn-${r}`}
-                  >
-                    {r === 'student' ? 'طالب' : r === 'instructor' ? 'مدرس' : 'مدير'}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <button 
-            type="submit" 
-            className="btn btn-primary" 
-            style={{ padding: '0.75rem', marginTop: '0.5rem' }}
+          <button
+            type="submit"
+            className="btn btn-primary"
+            style={{ padding: '0.75rem', marginTop: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
             id="auth-submit-btn"
+            disabled={loading}
           >
-            {isRegister ? 'إنشاء حساب طالب' : 'تسجيل الدخول'}
+            {loading ? (
+              <>
+                <Loader2 size={18} className="spin-animation" />
+                <span>جاري المعالجة...</span>
+              </>
+            ) : (
+              <span>{isRegister ? 'إنشاء حساب طالب' : 'تسجيل الدخول'}</span>
+            )}
           </button>
         </form>
 
         <div style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
           {isRegister ? (
-            <span>لديك حساب بالفعل؟ <button onClick={() => setIsRegister(false)} style={{ background: 'none', border: 'none', color: 'var(--primary-600)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>سجل دخولك</button></span>
+            <span>لديك حساب بالفعل؟ <button onClick={() => { setIsRegister(false); setError(null); }} style={{ background: 'none', border: 'none', color: 'var(--primary-600)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>سجل دخولك</button></span>
           ) : (
-            <span>طالب جديد؟ <button onClick={() => setIsRegister(true)} style={{ background: 'none', border: 'none', color: 'var(--primary-600)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>أنشئ حسابك هنا</button></span>
+            <span>طالب جديد؟ <button onClick={() => { setIsRegister(true); setError(null); }} style={{ background: 'none', border: 'none', color: 'var(--primary-600)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>أنشئ حسابك هنا</button></span>
           )}
         </div>
       </div>

@@ -18,7 +18,7 @@ export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<string>('home');
   const [isDark, setIsDark] = useState<boolean>(false);
   const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
-  const [currentUser, setCurrentUser] = useState<{ name: string; role: UserRole; email: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ uid?: string; name: string; role: UserRole; email: string } | null>(null);
   const [enrollSuccessCourse, setEnrollSuccessCourse] = useState<Course | null>(null);
 
   // الحالة المركزية للكورسات والأبحاث والمناهج (Central Dynamic State)
@@ -172,7 +172,8 @@ export const App: React.FC = () => {
             curricula={curricula}
             onUpdateCurriculum={handleUpdateCurriculum}
             userRole={currentUser?.role || 'student'}
-            userName={currentUser?.name || 'أحمد الصالح'}
+            userName={currentUser?.name || 'طالب أسيرا'}
+            userUid={currentUser?.uid || ''}
             onLogout={() => {
               setCurrentUser(null);
               setCurrentTab('home');

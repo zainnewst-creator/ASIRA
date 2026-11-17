@@ -25,15 +25,12 @@ import {
   MockExamAttemptForInstructor, 
   MockCourseCurriculum,
   MockCertificateRequest,
-  INITIAL_STUDENT_SUBMISSIONS, 
-  INITIAL_EXAM_ATTEMPTS, 
   INITIAL_CURRICULUM,
-  INITIAL_COURSES,
-  INITIAL_CERT_REQUESTS
+  INITIAL_COURSES
 } from '../../data/mockData';
 import { Course } from '../../types';
 import { AcademicCertificateModal } from './AcademicCertificateModal';
-import { sanitizeUrl, sanitizeExamForStudent } from '../../utils/security';
+import { sanitizeUrl, sanitizeExamForStudent, isTrustedStorageUrl } from '../../utils/security';
 
 export interface StudentDashboardProps {
   courses?: Course[];
@@ -57,8 +54,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   courses = INITIAL_COURSES,
   activeCourseId: propActiveCourseId,
   onSelectCourseId,
-  studentName = 'أحمد محمد الصالح',
-  studentUid = 'student-1',
+  studentName = 'طالب أسيرا',
+  studentUid = '',
   submissions: propSubmissions,
   onSubmitAssignment,
   examAttempts: propExamAttempts,
@@ -73,7 +70,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   const [selectedCourseId, setSelectedCourseId] = useState<string>(propActiveCourseId || courses[0]?.id || 'course-1');
 
   // طلبات الشهادات الأكاديمية
-  const [localCertRequests, setLocalCertRequests] = useState<MockCertificateRequest[]>(INITIAL_CERT_REQUESTS);
+  const [localCertRequests, setLocalCertRequests] = useState<MockCertificateRequest[]>(propCertRequests || []);
   const certRequests = propCertRequests || localCertRequests;
   const [requestFeedback, setRequestFeedback] = useState<string | null>(null);
 
@@ -81,9 +78,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   const currentCourse = courses.find((c) => c.id === selectedCourseId) || courses[0];
 
   // استخدام البيانات الممررة أو الافتراضية
-  const [localSubmissions, setLocalSubmissions] = useState<MockStudentSubmission[]>(propSubmissions || INITIAL_STUDENT_SUBMISSIONS);
+  const [localSubmissions, setLocalSubmissions] = useState<MockStudentSubmission[]>(propSubmissions || []);
   const submissions = propSubmissions || localSubmissions;
-  const examAttempts = propExamAttempts || INITIAL_EXAM_ATTEMPTS;
+  const examAttempts = propExamAttempts || [];
   const rawCurriculum = propCurriculum || INITIAL_CURRICULUM;
   const curriculum = React.useMemo(() => {
     return {
@@ -94,12 +91,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
       })),
     };
   }, [rawCurriculum]);
-  const practicalGrades = propPracticalGrades || {
-    'student-1': { score: 42, notes: 'أداء ممتاز في اختبار تحليل البيانات الإحصائية الحضوري' }
-  };
+  const practicalGrades = propPracticalGrades || {};
 
   // تتبع التكليفات والاختبارات المنجزة لفتح الدروس اللاحقة فوراً
-  const [submittedAssignmentIds, setSubmittedAssignmentIds] = useState<string[]>(['asg-1']);
+  const [submittedAssignmentIds, setSubmittedAssignmentIds] = useState<string[]>([]);
   const [completedExamIds, setCompletedExamIds] = useState<string[]>([]);
 
   // تكليف الطالب الحالي
@@ -109,9 +104,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   const studentExamAttempt = examAttempts.find((a) => a.studentUid === studentUid) || examAttempts[0];
 
   // حالة مشغل الدروس
-  const [currentModuleIndex, setCurrentModuleIndex] = useState(1);
+  const [currentModuleIndex, setCurrentModuleIndex] = useState(0);
   const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
-  const [completedLessonIds, setCompletedLessonIds] = useState<string[]>(['les-1', 'les-2']);
+  const [completedLessonIds, setCompletedLessonIds] = useState<string[]>([]);
 
   // الأكورديون للوحدات الدراسية
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({
@@ -148,9 +143,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   };
 
   // نموذج تسليم التكليف
-  const [assignmentInputLink, setAssignmentInputLink] = useState(studentSubmission?.driveFileUrl || 'https://drive.google.com/file/d/1ExampleStudentSubmissionAhmed/view');
+  const [assignmentInputLink, setAssignmentInputLink] = useState(studentSubmission?.driveFileUrl || '');
   const [studentNotesInput, setStudentNotesInput] = useState('');
   const [submitSuccessNotice, setSubmitSuccessNotice] = useState(false);
+  const [assignmentError, setAssignmentError] = useState<string | null>(null);
 
   // إشعار قفل المتطلبات الأكاديمية
   const [lockedNotice, setLockedNotice] = useState<string | null>(null);
@@ -386,7 +382,13 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   // تسليم التكليف
   const handleAssignmentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setAssignmentError(null);
     if (!assignmentInputLink.trim()) return;
+
+    if (!isTrustedStorageUrl(assignmentInputLink.trim())) {
+      setAssignmentError('يرجى إدخال رابط مشاركة صالح يبدأ بـ https:// من Google Drive أو Google Docs. (تنبيه: فحص المنصة يتحقق فقط من صحة نطاق الرابط، ولا يضمن وجود الملف أو إمكانية وصول المشرف إليه؛ يرجى التأكد بنفسك من فتح صلاحية المشاهدة Viewer لأي شخص لديه الرابط).');
+      return;
+    }
 
     // استخراج التكليف المرتبط في مديول الكورس
     const firstAsg = curriculum.modules.flatMap((m) => m.assignments || [])[0];
@@ -394,16 +396,19 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
     const targetId = firstAsg?.id || 'asg-1';
 
     const nextVersion = studentSubmission ? (studentSubmission.version || 1) + 1 : 1;
+    const now = new Date();
+    const formattedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
     const updatedSub: MockStudentSubmission = {
       ...studentSubmission,
       id: studentSubmission?.id || `sub-${Date.now()}`,
       studentUid,
       studentName,
-      university: 'جامعة الملك سعود - كلية الطب',
+      university: 'باحث أكاديمي',
       assignmentTitle: targetTitle,
       version: nextVersion,
-      driveFileUrl: assignmentInputLink,
-      submittedAt: 'الآن (2026-10-13)',
+      driveFileUrl: assignmentInputLink.trim(),
+      submittedAt: formattedDate,
       status: 'submitted',
       grade: undefined,
       instructorFeedback: undefined,
@@ -425,11 +430,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
     setTimeout(() => setSubmitSuccessNotice(false), 6000);
   };
 
-
   // درجات السجل الأكاديمي
-  const assignmentScore = studentSubmission?.grade !== undefined ? studentSubmission.grade : 18;
-  const examScore = studentExamAttempt?.officialGrade !== undefined ? studentExamAttempt.officialGrade : (examSubmitted ? examCalculatedScore : 26);
-  const practicalScore = practicalGrades[studentUid]?.score || 42;
+  const assignmentScore = studentSubmission?.grade !== undefined ? studentSubmission.grade : 0;
+  const examScore = studentExamAttempt?.officialGrade !== undefined ? studentExamAttempt.officialGrade : (examSubmitted ? examCalculatedScore : 0);
+  const practicalScore = practicalGrades[studentUid]?.score || 0;
   const totalScore = assignmentScore + examScore + practicalScore;
 
   return (
@@ -1115,12 +1119,20 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
             {/* نموذج تسليم الرابط وملاحظات الطالب */}
             <form onSubmit={handleAssignmentSubmit} style={{ padding: '1.25rem', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', marginTop: '1rem' }}>
-              <h4 style={{ fontSize: '0.95rem', fontWeight: 800, marginBottom: '0.35rem' }}>
-                تسليم رابط ملف الحل على Google Drive:
-              </h4>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
-                تأكد من ضبط مشاركة الملف على: "Anyone with the link can view".
-              </p>
+              <div style={{ marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.85rem' }}>
+                <h4 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: '0.5rem', color: 'var(--text-main)' }}>
+                  خطوات تسليم التكليف عبر Google Drive:
+                </h4>
+                <ol style={{ paddingRight: '1.25rem', margin: '0 0 0.75rem', fontSize: '0.84rem', color: 'var(--text-muted)', lineHeight: '1.8' }}>
+                  <li>ارفع ملف الحل (PDF أو Word) إلى حسابك الشخصي في <strong>Google Drive</strong>.</li>
+                  <li>انقر بزر الفأرة الأيمن على الملف، ثم اختر <strong>مشاركة (Share)</strong>.</li>
+                  <li>من خيار الوصول العام (General access)، غيّر الحالة إلى <strong>"أي شخص لديه الرابط" (Anyone with the link)</strong>، وتأكد من تعيين الدور إلى <strong>"مشاهد" (Viewer)</strong> حتى يتمكن المشرف من فتح الملف وتصحيحه.</li>
+                  <li>انسخ الرابط الصحيح (Copy link) والصقه في الخانة أدناه.</li>
+                </ol>
+                <div style={{ padding: '0.65rem 0.85rem', background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: 'var(--radius-sm)', fontSize: '0.78rem', color: 'var(--primary-800)', lineHeight: '1.6' }}>
+                  <strong>⚠️ تنبيه هام حول صلاحيات الوصول:</strong> فحص النظام الآلي يتأكد فقط من أن الرابط يتبع نطاق Google Drive أو Docs الآمن والمعتمد؛ <em>وهذا الفحص لا يضمن وجود الملف ولا يضمن إمكانية وصول المشرف إليه</em>. إذا كان الملف مقفلاً أو لا يملك المشرف إذن عرضه، فسيطلب منك المشرف إعادة التسليم وتعديل صلاحيات المشاركة.
+                </div>
+              </div>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
                 <div>
@@ -1157,6 +1169,20 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                   </button>
                 </div>
               </div>
+
+              {assignmentError && (
+                <div style={{
+                  marginTop: '0.85rem',
+                  padding: '0.75rem 1rem',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid #ef4444',
+                  color: '#b91c1c',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: '0.85rem',
+                }}>
+                  {assignmentError}
+                </div>
+              )}
 
               {submitSuccessNotice && (
                 <div style={{
@@ -1617,7 +1643,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                       <div style={{ marginTop: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
                         <span style={{ color: 'var(--text-muted)' }}>رمز التحقق الأكاديمي المعتمد:</span>
                         <code style={{ padding: '0.2rem 0.5rem', background: 'var(--bg-subtle)', borderRadius: '4px', fontWeight: 800, color: 'var(--primary-600)', fontFamily: 'monospace' }}>
-                          {currentCertReq.verificationCode || 'ASIRA-2026-8812'}
+                          {currentCertReq.verificationCode || 'غير متوفر'}
                         </code>
                       </div>
 
@@ -1705,7 +1731,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
           course={currentCourse}
           totalScore={totalScore}
           verificationCode={
-            certRequests.find((r) => r.studentUid === studentUid && (r.courseId === currentCourse?.id || r.courseTitle === currentCourse?.title))?.verificationCode || 'ASIRA-2026-8812'
+            certRequests.find((r) => r.studentUid === studentUid && (r.courseId === currentCourse?.id || r.courseTitle === currentCourse?.title))?.verificationCode || ''
           }
           signedPdfUrl={
             certRequests.find((r) => r.studentUid === studentUid && (r.courseId === currentCourse?.id || r.courseTitle === currentCourse?.title))?.signedPdfUrl

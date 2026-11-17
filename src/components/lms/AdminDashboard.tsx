@@ -15,9 +15,6 @@ import {
   Database
 } from 'lucide-react';
 import { 
-  INITIAL_PENDING_ENROLLMENTS, 
-  INITIAL_AUDIT_LOGS, 
-  INITIAL_CERT_REQUESTS,
   MockPendingEnrollment, 
   MockAuditLogItem, 
   MockCertificateRequest
@@ -56,34 +53,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [activeTab, setActiveTab] = useState<'overview' | 'enrollments' | 'users' | 'certificates' | 'audit_logs' | 'backup'>('enrollments');
 
   // بيانات طلبات الالتحاق
-  const [localEnrollments, setLocalEnrollments] = useState<MockPendingEnrollment[]>(INITIAL_PENDING_ENROLLMENTS);
+  const [localEnrollments, setLocalEnrollments] = useState<MockPendingEnrollment[]>([]);
   const enrollments = propEnrollments || localEnrollments;
 
   // بيانات سجل التدقيق
-  const [localAuditLogs] = useState<MockAuditLogItem[]>(INITIAL_AUDIT_LOGS);
+  const [localAuditLogs] = useState<MockAuditLogItem[]>([]);
   const auditLogs = propAuditLogs || localAuditLogs;
 
   // بيانات وإدارة طلبات الشهادات الأكاديمية
-  const [localCertRequests, setLocalCertRequests] = useState<MockCertificateRequest[]>(INITIAL_CERT_REQUESTS);
+  const [localCertRequests, setLocalCertRequests] = useState<MockCertificateRequest[]>([]);
   const certRequests = propCertRequests || localCertRequests;
 
   const [certFilter, setCertFilter] = useState<'all' | 'pending' | 'processing' | 'issued' | 'rejected'>('all');
   const [certSearch, setCertSearch] = useState('');
   const [selectedCertForManage, setSelectedCertForManage] = useState<MockCertificateRequest | null>(null);
   const [certStatusInput, setCertStatusInput] = useState<'pending' | 'processing' | 'issued' | 'rejected'>('issued');
-  const [certCodeInput, setCertCodeInput] = useState('ASIRA-2026-8812');
-  const [certPdfUrlInput, setCertPdfUrlInput] = useState('https://drive.google.com/file/d/DeanSignedCertAhmed2026/view');
+  const [certCodeInput, setCertCodeInput] = useState('');
+  const [certPdfUrlInput, setCertPdfUrlInput] = useState('');
   const [certNotesInput, setCertNotesInput] = useState('');
-  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
 
   // إدارة المستخدمين
-  const [usersList, setUsersList] = useState<Array<{ uid: string; name: string; email: string; university: string; role: UserRole; status: 'active' | 'suspended' }>>([
-    { uid: 'u-1', name: 'أحمد محمد الصالح', email: 'ahmed.s@ksu.edu.sa', university: 'جامعة الملك سعود', role: 'student', status: 'active' },
-    { uid: 'u-2', name: 'سارة خالد الكيلاني', email: 'sara.k@ust.edu', university: 'جامعة العلوم والتكنولوجيا', role: 'student', status: 'active' },
-    { uid: 'u-3', name: 'د. إبراهيم يحيى', email: 'ibrahim.y@asira-research.org', university: 'عمادة منتدى أسيرا', role: 'instructor', status: 'active' },
-    { uid: 'u-4', name: 'د. يحيى المنصوري', email: 'mansouri@asira-research.org', university: 'اللجنة العلمية', role: 'instructor', status: 'active' },
-    { uid: 'u-5', name: 'مدير المنصة العام', email: 'admin@asira-research.org', university: 'إدارة أسيرا', role: 'admin', status: 'active' },
-  ]);
+  const [usersList, setUsersList] = useState<Array<{ uid: string; name: string; email: string; university: string; role: UserRole; status: 'active' | 'suspended' }>>([]);
 
   // الموافقة على طلب الالتحاق
   const handleApprove = (id: string) => {
@@ -118,9 +108,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setSelectedCertForManage(req);
     setCertStatusInput(req.status || 'pending');
     setCertCodeInput(req.verificationCode || `ASIRA-2026-${Math.floor(1000 + Math.random() * 9000)}`);
-    setCertPdfUrlInput(req.signedPdfUrl || 'https://drive.google.com/file/d/DeanSignedCertificate_2026/view');
+    setCertPdfUrlInput(req.signedPdfUrl || '');
     setCertNotesInput(req.adminNotes || '');
-    setUploadedFileName(null);
   };
 
   // حفظ التعديلات على حالة الشهادة ورابط الـ PDF الموقع
@@ -213,15 +202,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  // محاكاة رفع ملف PDF محلي
-  const handleSimulateFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setUploadedFileName(file.name);
-      const cleanName = encodeURIComponent(file.name.replace(/\.[^/.]+$/, ''));
-      setCertPdfUrlInput(`https://drive.google.com/file/d/${cleanName}_OfficialSigned_ASIRA/view`);
-    }
-  };
 
   // تغيير دور المستخدم
   const handleRoleChange = (uid: string, nextRole: UserRole) => {
@@ -411,56 +391,64 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {enrollments.map((enr) => (
-                  <tr key={enr.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                    <td style={{ padding: '0.85rem' }}>
-                      <strong style={{ display: 'block', color: 'var(--text-main)' }}>{enr.studentName}</strong>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{enr.studentEmail}</span>
-                    </td>
-                    <td style={{ padding: '0.85rem' }}>
-                      <strong style={{ display: 'block' }}>{enr.university}</strong>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{enr.specialty}</span>
-                    </td>
-                    <td style={{ padding: '0.85rem', fontSize: '0.85rem' }}>
-                      {enr.academicLevel}
-                    </td>
-                    <td style={{ padding: '0.85rem', fontSize: '0.85rem', fontWeight: 700 }}>
-                      {enr.courseTitle}
-                    </td>
-                    <td style={{ padding: '0.85rem', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                      {enr.requestedAt}
-                    </td>
-                    <td style={{ padding: '0.85rem' }}>
-                      {enr.status === 'approved' && <span className="badge badge-emerald">مقبول (Approved)</span>}
-                      {enr.status === 'rejected' && <span className="badge" style={{ background: '#fee2e2', color: '#b91c1c' }}>مرفوض</span>}
-                      {enr.status === 'pending' && <span className="badge badge-gold">معلق (Pending)</span>}
-                    </td>
-                    <td style={{ padding: '0.85rem' }}>
-                      {enr.status === 'pending' ? (
-                        <div style={{ display: 'flex', gap: '0.4rem' }}>
-                          <button
-                            onClick={() => handleApprove(enr.id)}
-                            className="btn btn-accent"
-                            style={{ padding: '0.4rem 0.75rem', fontSize: '0.82rem' }}
-                          >
-                            <Check size={14} />
-                            <span>قبول</span>
-                          </button>
-                          <button
-                            onClick={() => handleReject(enr.id)}
-                            className="btn btn-outline"
-                            style={{ padding: '0.4rem 0.75rem', fontSize: '0.82rem', color: '#ef4444' }}
-                          >
-                            <X size={14} />
-                            <span>رفض</span>
-                          </button>
-                        </div>
-                      ) : (
-                        <span style={{ fontSize: '0.82rem', color: 'var(--text-subtle)' }}>تم اتخاذ القرار</span>
-                      )}
+                {enrollments.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
+                      لا توجد طلبات التحاق مسجلة حالياً
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  enrollments.map((enr) => (
+                    <tr key={enr.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '0.85rem' }}>
+                        <strong style={{ display: 'block', color: 'var(--text-main)' }}>{enr.studentName}</strong>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{enr.studentEmail}</span>
+                      </td>
+                      <td style={{ padding: '0.85rem' }}>
+                        <strong style={{ display: 'block' }}>{enr.university}</strong>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{enr.specialty}</span>
+                      </td>
+                      <td style={{ padding: '0.85rem', fontSize: '0.85rem' }}>
+                        {enr.academicLevel}
+                      </td>
+                      <td style={{ padding: '0.85rem', fontSize: '0.85rem', fontWeight: 700 }}>
+                        {enr.courseTitle}
+                      </td>
+                      <td style={{ padding: '0.85rem', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                        {enr.requestedAt}
+                      </td>
+                      <td style={{ padding: '0.85rem' }}>
+                        {enr.status === 'approved' && <span className="badge badge-emerald">مقبول (Approved)</span>}
+                        {enr.status === 'rejected' && <span className="badge" style={{ background: '#fee2e2', color: '#b91c1c' }}>مرفوض</span>}
+                        {enr.status === 'pending' && <span className="badge badge-gold">معلق (Pending)</span>}
+                      </td>
+                      <td style={{ padding: '0.85rem' }}>
+                        {enr.status === 'pending' ? (
+                          <div style={{ display: 'flex', gap: '0.4rem' }}>
+                            <button
+                              onClick={() => handleApprove(enr.id)}
+                              className="btn btn-accent"
+                              style={{ padding: '0.4rem 0.75rem', fontSize: '0.82rem' }}
+                            >
+                              <Check size={14} />
+                              <span>قبول</span>
+                            </button>
+                            <button
+                              onClick={() => handleReject(enr.id)}
+                              className="btn btn-outline"
+                              style={{ padding: '0.4rem 0.75rem', fontSize: '0.82rem', color: '#ef4444' }}
+                            >
+                              <X size={14} />
+                              <span>رفض</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: '0.82rem', color: 'var(--text-subtle)' }}>تم اتخاذ القرار</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -492,55 +480,63 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {usersList.map((user) => (
-                  <tr key={user.uid} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                    <td style={{ padding: '0.85rem' }}>
-                      <strong style={{ display: 'block', color: 'var(--text-main)' }}>{user.name}</strong>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{user.email}</span>
-                    </td>
-                    <td style={{ padding: '0.85rem', fontSize: '0.85rem' }}>{user.university}</td>
-                    <td style={{ padding: '0.85rem' }}>
-                      <span className={`badge ${user.role === 'admin' ? 'badge-gold' : user.role === 'instructor' ? 'badge-emerald' : 'badge-primary'}`}>
-                        {user.role === 'admin' ? 'مدير (Admin)' : user.role === 'instructor' ? 'مدرس (Instructor)' : 'طالب (Student)'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '0.85rem' }}>
-                      {user.status === 'active' ? (
-                        <span className="badge badge-emerald">نشط</span>
-                      ) : (
-                        <span className="badge" style={{ background: '#fee2e2', color: '#b91c1c' }}>مجمّد</span>
-                      )}
-                    </td>
-                    <td style={{ padding: '0.85rem' }}>
-                      <select
-                        value={user.role}
-                        onChange={(e) => handleRoleChange(user.uid, e.target.value as UserRole)}
-                        style={{
-                          padding: '0.4rem 0.6rem',
-                          borderRadius: 'var(--radius-sm)',
-                          border: '1px solid var(--border-color)',
-                          background: 'var(--bg-main)',
-                          color: 'var(--text-main)',
-                          fontSize: '0.85rem',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <option value="student">طالب (Student)</option>
-                        <option value="instructor">مدرس (Instructor)</option>
-                        <option value="admin">مدير (Admin)</option>
-                      </select>
-                    </td>
-                    <td style={{ padding: '0.85rem' }}>
-                      <button
-                        onClick={() => toggleUserStatus(user.uid)}
-                        className="btn btn-outline"
-                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', color: user.status === 'active' ? '#ef4444' : '#10b981' }}
-                      >
-                        <span>{user.status === 'active' ? 'تجميد الحساب' : 'تنشيط'}</span>
-                      </button>
+                {usersList.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
+                      لا يوجد مستخدمون مسجلون حالياً
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  usersList.map((user) => (
+                    <tr key={user.uid} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '0.85rem' }}>
+                        <strong style={{ display: 'block', color: 'var(--text-main)' }}>{user.name}</strong>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{user.email}</span>
+                      </td>
+                      <td style={{ padding: '0.85rem', fontSize: '0.85rem' }}>{user.university}</td>
+                      <td style={{ padding: '0.85rem' }}>
+                        <span className={`badge ${user.role === 'admin' ? 'badge-gold' : user.role === 'instructor' ? 'badge-emerald' : 'badge-primary'}`}>
+                          {user.role === 'admin' ? 'مدير (Admin)' : user.role === 'instructor' ? 'مدرس (Instructor)' : 'طالب (Student)'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '0.85rem' }}>
+                        {user.status === 'active' ? (
+                          <span className="badge badge-emerald">نشط</span>
+                        ) : (
+                          <span className="badge" style={{ background: '#fee2e2', color: '#b91c1c' }}>مجمّد</span>
+                        )}
+                      </td>
+                      <td style={{ padding: '0.85rem' }}>
+                        <select
+                          value={user.role}
+                          onChange={(e) => handleRoleChange(user.uid, e.target.value as UserRole)}
+                          style={{
+                            padding: '0.4rem 0.6rem',
+                            borderRadius: 'var(--radius-sm)',
+                            border: '1px solid var(--border-color)',
+                            background: 'var(--bg-main)',
+                            color: 'var(--text-main)',
+                            fontSize: '0.85rem',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <option value="student">طالب (Student)</option>
+                          <option value="instructor">مدرس (Instructor)</option>
+                          <option value="admin">مدير (Admin)</option>
+                        </select>
+                      </td>
+                      <td style={{ padding: '0.85rem' }}>
+                        <button
+                          onClick={() => toggleUserStatus(user.uid)}
+                          className="btn btn-outline"
+                          style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', color: user.status === 'active' ? '#ef4444' : '#10b981' }}
+                        >
+                          <span>{user.status === 'active' ? 'تجميد الحساب' : 'تنشيط'}</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -669,8 +665,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {certRequests
-                  .filter((req) => {
+                {(() => {
+                  const filteredCerts = certRequests.filter((req) => {
                     const matchesFilter = certFilter === 'all' || req.status === certFilter;
                     const matchesSearch =
                       !certSearch ||
@@ -678,8 +674,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       req.courseTitle.toLowerCase().includes(certSearch.toLowerCase()) ||
                       (req.verificationCode && req.verificationCode.toLowerCase().includes(certSearch.toLowerCase()));
                     return matchesFilter && matchesSearch;
-                  })
-                  .map((req) => (
+                  });
+
+                  if (filteredCerts.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan={7} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
+                          لا توجد طلبات شهادات مطابقة للبحث أو الفلتر حالياً
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  return filteredCerts.map((req) => (
                     <tr key={req.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                       <td style={{ padding: '0.85rem' }}>
                         <strong style={{ color: 'var(--text-main)', display: 'block' }}>{req.studentName}</strong>
@@ -769,7 +776,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  ));
+                })()}
               </tbody>
             </table>
           </div>
@@ -908,41 +916,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       }}
                     />
 
-                    {/* خيارات مساعدة وروابط سريعة */}
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', marginTop: '0.5rem' }}>
-                      <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>روابط تجريبية سريعة:</span>
-                      <button
-                        type="button"
-                        onClick={() => setCertPdfUrlInput('https://drive.google.com/file/d/DeanSignedCert_AhmedAlSaleh_2026/view')}
-                        className="btn btn-ghost"
-                        style={{ fontSize: '0.74rem', padding: '0.2rem 0.5rem' }}
-                      >
-                        رابط Drive 1
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCertPdfUrlInput('https://drive.google.com/file/d/DeanSignedCert_SaraKelani_2026/view')}
-                        className="btn btn-ghost"
-                        style={{ fontSize: '0.74rem', padding: '0.2rem 0.5rem' }}
-                      >
-                        رابط Drive 2
-                      </button>
-
-                      <label
-                        className="btn btn-outline"
-                        style={{ fontSize: '0.74rem', padding: '0.25rem 0.6rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', marginRight: 'auto' }}
-                      >
-                        <Upload size={12} />
-                        <span>محاكاة رفع ملف PDF محلي</span>
-                        <input type="file" accept=".pdf" onChange={handleSimulateFileUpload} style={{ display: 'none' }} />
-                      </label>
-                    </div>
-
-                    {uploadedFileName && (
-                      <div style={{ fontSize: '0.78rem', color: '#059669', marginTop: '0.35rem', fontWeight: 700 }}>
-                        ✓ تم ربط الملف المرفوع: {uploadedFileName}
-                      </div>
-                    )}
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.35rem' }}>
+                      قم بلصق رابط ملف الشهادة الموقعة بصيغة PDF من Google Drive (مع التأكد من إتاحة المشاهدة لمن يملك الرابط).
+                    </span>
                   </div>
 
                   {/* ملاحظات الإدارة الأكاديمية */}
@@ -1008,26 +984,34 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {auditLogs.map((log) => (
-                  <tr key={log.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                    <td style={{ padding: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
-                      {log.timestamp}
-                    </td>
-                    <td style={{ padding: '0.75rem', fontWeight: 700 }}>{log.actorName}</td>
-                    <td style={{ padding: '0.75rem' }}>
-                      <span className="badge badge-primary">{log.actorRole}</span>
-                    </td>
-                    <td style={{ padding: '0.75rem', fontWeight: 700, color: 'var(--primary-700)' }}>
-                      {log.action}
-                    </td>
-                    <td style={{ padding: '0.75rem', color: 'var(--text-main)', maxWidth: '350px' }}>
-                      {log.details}
-                    </td>
-                    <td style={{ padding: '0.75rem' }}>
-                      <span className="badge badge-emerald">موثق (Append-Only)</span>
+                {auditLogs.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
+                      لا توجد سجلات تدقيق مسجلة حالياً
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  auditLogs.map((log) => (
+                    <tr key={log.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                        {log.timestamp}
+                      </td>
+                      <td style={{ padding: '0.75rem', fontWeight: 700 }}>{log.actorName}</td>
+                      <td style={{ padding: '0.75rem' }}>
+                        <span className="badge badge-primary">{log.actorRole}</span>
+                      </td>
+                      <td style={{ padding: '0.75rem', fontWeight: 700, color: 'var(--primary-700)' }}>
+                        {log.action}
+                      </td>
+                      <td style={{ padding: '0.75rem', color: 'var(--text-main)', maxWidth: '350px' }}>
+                        {log.details}
+                      </td>
+                      <td style={{ padding: '0.75rem' }}>
+                        <span className="badge badge-emerald">موثق (Append-Only)</span>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

@@ -19,9 +19,9 @@ export const AcademicCertificateModal: React.FC<AcademicCertificateModalProps> =
   onClose,
   studentName,
   course,
-  verificationCode = 'ASIRA-2026-8812',
-  totalScore = 86,
-  issueDate = '2026-10-13',
+  verificationCode = '',
+  totalScore = 0,
+  issueDate = '',
   signedPdfUrl,
 }) => {
   if (!isOpen) return null;

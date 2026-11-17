@@ -5,13 +5,13 @@ import {
   UserRole 
 } from '../types';
 import { 
-  INITIAL_STUDENT_SUBMISSIONS, 
-  INITIAL_EXAM_ATTEMPTS, 
-  INITIAL_PENDING_ENROLLMENTS, 
-  INITIAL_CERT_REQUESTS, 
-  INITIAL_AUDIT_LOGS, 
   INITIAL_COURSES, 
   INITIAL_RESEARCHES, 
+  INITIAL_STUDENT_SUBMISSIONS,
+  INITIAL_EXAM_ATTEMPTS,
+  INITIAL_PENDING_ENROLLMENTS,
+  INITIAL_CERT_REQUESTS,
+  INITIAL_AUDIT_LOGS,
   MockStudentSubmission, 
   MockExamAttemptForInstructor, 
   MockCourseCurriculum, 
@@ -20,6 +20,7 @@ import {
   MockAuditLogItem, 
   INITIAL_CURRICULA
 } from '../data/mockData';
+import { isDemoMode } from '../utils/demoMode';
 import { StudentDashboard } from '../components/lms/StudentDashboard';
 import { InstructorDashboard } from '../components/lms/InstructorDashboard';
 import { AdminDashboard } from '../components/lms/AdminDashboard';
@@ -42,6 +43,7 @@ interface LmsDashboardPreviewProps {
   onUpdateCurriculum?: (curriculum: MockCourseCurriculum) => void;
   userRole: UserRole;
   userName: string;
+  userUid?: string;
   onLogout: () => void;
   onBackToPortal: () => void;
 }
@@ -56,16 +58,18 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
   onUpdateCurriculum: propOnUpdateCurriculum,
   userRole: initialRole,
   userName: initialName,
+  userUid = '',
   onLogout,
   onBackToPortal,
 }) => {
-  // الدور النشط للتجربة الحية (مع إمكانية التبديل السريع بين الأدوار)
+  // الدور النشط
   const [activeRole, setActiveRole] = useState<UserRole>(initialRole);
   const [selectedCourseId, setSelectedCourseId] = useState<string>(courses[0]?.id || 'course-1');
 
-  // الحالة المركزية المشتركة بين الأدوار (Real-Time Synchronized State)
-  const [submissions, setSubmissions] = useState<MockStudentSubmission[]>(INITIAL_STUDENT_SUBMISSIONS);
-  const [examAttempts, setExamAttempts] = useState<MockExamAttemptForInstructor[]>(INITIAL_EXAM_ATTEMPTS);
+  // الحالة المركزية المشتركة بين الأدوار
+  const demoActive = isDemoMode();
+  const [submissions, setSubmissions] = useState<MockStudentSubmission[]>(demoActive ? INITIAL_STUDENT_SUBMISSIONS : []);
+  const [examAttempts, setExamAttempts] = useState<MockExamAttemptForInstructor[]>(demoActive ? INITIAL_EXAM_ATTEMPTS : []);
   const [localCurricula, setLocalCurricula] = useState<Record<string, MockCourseCurriculum>>(propCurricula || INITIAL_CURRICULA);
   const activeCurricula = propCurricula || localCurricula;
   const currentCurriculum = activeCurricula[selectedCourseId] || {
@@ -73,21 +77,21 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
     modules: []
   };
 
-  const [enrollments, setEnrollments] = useState<MockPendingEnrollment[]>(INITIAL_PENDING_ENROLLMENTS);
-  const [certRequests, setCertRequests] = useState<MockCertificateRequest[]>(INITIAL_CERT_REQUESTS);
-  const [auditLogs, setAuditLogs] = useState<MockAuditLogItem[]>(INITIAL_AUDIT_LOGS);
-  const [practicalGrades, setPracticalGrades] = useState<Record<string, { score: number; notes: string }>>({
+  const [enrollments, setEnrollments] = useState<MockPendingEnrollment[]>(demoActive ? INITIAL_PENDING_ENROLLMENTS : []);
+  const [certRequests, setCertRequests] = useState<MockCertificateRequest[]>(demoActive ? INITIAL_CERT_REQUESTS : []);
+  const [auditLogs, setAuditLogs] = useState<MockAuditLogItem[]>(demoActive ? INITIAL_AUDIT_LOGS : []);
+  const [practicalGrades, setPracticalGrades] = useState<Record<string, { score: number; notes: string }>>(demoActive ? {
     'student-1': { score: 42, notes: 'أداء ممتاز في اختبار تحليل البيانات الإحصائية الحضوري' },
     'student-2': { score: 38, notes: 'جيد جداً مع ملاحظة طفيفة في صياغة الفرضية' },
-  });
+  } : {});
 
   // إضافة عملية إلى سجل التدقيق غير القابل للتعديل
   const appendAuditLog = (action: string, details: string) => {
     const actorName = activeRole === 'admin' 
       ? 'مدير المنصة العام (Admin)' 
       : activeRole === 'instructor' 
-      ? 'د. إبراهيم يحيى (Instructor)' 
-      : 'أحمد محمد الصالح (Student)';
+      ? (initialName || 'المدرس الأكاديمي') 
+      : (initialName || 'طالب أسيرا');
     const actorRole = activeRole === 'admin' ? 'مدير المنصة' : activeRole === 'instructor' ? 'مدرس مسند' : 'طالب';
 
     const now = new Date();
@@ -159,16 +163,17 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
   // 8. تقديم طلب شهادة أكاديمية من قبل الطالب
   const handleRequestCertificate = (courseId: string) => {
     const course = courses.find((c) => c.id === courseId);
+    const currentStudentUid = userUid || 'student-current';
     const existing = certRequests.find(
-      (c) => c.studentUid === 'student-1' && (c.courseId === courseId || c.courseTitle === course?.title)
+      (c) => c.studentUid === currentStudentUid && (c.courseId === courseId || c.courseTitle === course?.title)
     );
     if (existing) return;
 
     const newReq: MockCertificateRequest = {
       id: `cert-req-${Date.now()}`,
-      studentUid: 'student-1',
+      studentUid: currentStudentUid,
       studentName: initialName,
-      university: 'جامعة الملك سعود',
+      university: 'باحث أكاديمي',
       courseId: courseId,
       courseTitle: course?.title || 'منهجية وأساسيات البحث العلمي والنشر الدولي',
       courseCode: course?.code || 'RES-101',
@@ -244,61 +249,63 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
           </div>
         </div>
 
-        {/* شريط تبديل الأدوار للتجربة الحية المتكاملة (Role Switcher Toolbar) */}
-        <div style={{
-          background: 'var(--bg-card)',
-          border: '1px solid var(--border-color)',
-          borderRadius: 'var(--radius-md)',
-          padding: '0.85rem 1.25rem',
-          marginBottom: '2rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '1rem',
-          boxShadow: 'var(--shadow-sm)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Sparkles size={18} color="var(--primary-600)" />
-            <div>
-              <strong style={{ fontSize: '0.92rem', color: 'var(--text-main)', display: 'block' }}>
-                تبديل الدور للتجربة الحية (Cross-Role Testing):
-              </strong>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                جرب رصد المدرس للدرجة أو كتابة تعليق، ثم انتقل لدور الطالب لترى التعليق والدرجة مباشرة في صفحته!
-              </span>
+        {/* شريط تبديل الأدوار الإداري مخصص للمدير فقط لاستعراض واجهات المنصة */}
+        {initialRole === 'admin' && (
+          <div style={{
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-color)',
+            borderRadius: 'var(--radius-md)',
+            padding: '0.85rem 1.25rem',
+            marginBottom: '2rem',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '1rem',
+            boxShadow: 'var(--shadow-sm)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <ShieldCheck size={18} color="var(--primary-600)" />
+              <div>
+                <strong style={{ fontSize: '0.92rem', color: 'var(--text-main)', display: 'block' }}>
+                  معاينة المنصة بصلاحيات أخرى (خاص بالمدير فقط):
+                </strong>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  يمكنك كمدير استعراض واجهة الطالب أو المدرس للتأكد من مظهر المنصة وسير المقررات.
+                </span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', background: 'var(--bg-subtle)', padding: '0.35rem', borderRadius: 'var(--radius-md)' }}>
+              <button
+                onClick={() => setActiveRole('student')}
+                className={`btn ${activeRole === 'student' ? 'btn-primary' : 'btn-ghost'}`}
+                style={{ fontSize: '0.85rem', padding: '0.45rem 1rem' }}
+              >
+                <GraduationCap size={15} />
+                <span>معاينة واجهة الطالب</span>
+              </button>
+
+              <button
+                onClick={() => setActiveRole('instructor')}
+                className={`btn ${activeRole === 'instructor' ? 'btn-primary' : 'btn-ghost'}`}
+                style={{ fontSize: '0.85rem', padding: '0.45rem 1rem' }}
+              >
+                <Users size={15} />
+                <span>معاينة واجهة المدرس</span>
+              </button>
+
+              <button
+                onClick={() => setActiveRole('admin')}
+                className={`btn ${activeRole === 'admin' ? 'btn-primary' : 'btn-ghost'}`}
+                style={{ fontSize: '0.85rem', padding: '0.45rem 1rem' }}
+              >
+                <ShieldCheck size={15} />
+                <span>لوحة تحكم المدير</span>
+              </button>
             </div>
           </div>
-
-          <div style={{ display: 'flex', gap: '0.5rem', background: 'var(--bg-subtle)', padding: '0.35rem', borderRadius: 'var(--radius-md)' }}>
-            <button
-              onClick={() => setActiveRole('student')}
-              className={`btn ${activeRole === 'student' ? 'btn-primary' : 'btn-ghost'}`}
-              style={{ fontSize: '0.85rem', padding: '0.45rem 1rem' }}
-            >
-              <GraduationCap size={15} />
-              <span>تجربة دور الطالب</span>
-            </button>
-
-            <button
-              onClick={() => setActiveRole('instructor')}
-              className={`btn ${activeRole === 'instructor' ? 'btn-primary' : 'btn-ghost'}`}
-              style={{ fontSize: '0.85rem', padding: '0.45rem 1rem' }}
-            >
-              <Users size={15} />
-              <span>تجربة دور المدرس</span>
-            </button>
-
-            <button
-              onClick={() => setActiveRole('admin')}
-              className={`btn ${activeRole === 'admin' ? 'btn-primary' : 'btn-ghost'}`}
-              style={{ fontSize: '0.85rem', padding: '0.45rem 1rem' }}
-            >
-              <ShieldCheck size={15} />
-              <span>تجربة دور المدير</span>
-            </button>
-          </div>
-        </div>
+        )}
 
         {/* عرض اللوحة المناسبة حسب الدور النشط */}
         {activeRole === 'student' && (
@@ -307,7 +314,7 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
             activeCourseId={selectedCourseId}
             onSelectCourseId={setSelectedCourseId}
             studentName={initialName}
-            studentUid="student-1"
+            studentUid={userUid || 'student-current'}
             submissions={submissions}
             onSubmitAssignment={handleSubmitAssignment}
             examAttempts={examAttempts}

@@ -1,9 +1,10 @@
 // ===================================================
 // أداة النسخ الاحتياطي والاستعادة ثنائية الاتجاه (Backup & Restore Engine)
 // ===================================================
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import { INITIAL_COURSES, INITIAL_RESEARCHES, INITIAL_TESTIMONIALS } from '../data/mockData';
+import { isDemoMode } from '../utils/demoMode';
 
 export interface BackupPackage {
   version: string;
@@ -19,39 +20,45 @@ export interface BackupPackage {
   };
 }
 
-// 1. تصدير كامل البيانات الأكاديمية إلى حزمة JSON
+// 1. تصدير كامل البيانات الأكاديمية من Firestore إلى حزمة JSON
 export const exportPlatformData = async (): Promise<BackupPackage> => {
+  // في وضع التجربة، أعد البيانات المحلية
+  if (isDemoMode()) {
+    return {
+      version: '1.0.0',
+      exportedAt: new Date().toISOString(),
+      source: 'ASIRA Research Learning Management Platform (Demo)',
+      collections: {
+        courses: INITIAL_COURSES,
+        researches: INITIAL_RESEARCHES,
+        testimonials: INITIAL_TESTIMONIALS,
+        officialGrades: [],
+        certificates: [],
+        auditLogs: [],
+      }
+    };
+  }
+
+  const fetchCollection = async (name: string): Promise<any[]> => {
+    try {
+      const snapshot = await getDocs(collection(db, name));
+      return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch {
+      return [];
+    }
+  };
+
   const backup: BackupPackage = {
     version: '1.0.0',
     exportedAt: new Date().toISOString(),
     source: 'ASIRA Research Learning Management Platform',
     collections: {
-      courses: INITIAL_COURSES,
-      researches: INITIAL_RESEARCHES,
-      testimonials: INITIAL_TESTIMONIALS,
-      officialGrades: [
-        {
-          id: 'student-1_exam-1',
-          studentUid: 'student-1',
-          courseId: 'course-1',
-          assessmentType: 'theory_exam',
-          rawScore: 85,
-          maxScore: 100,
-          status: 'approved',
-          approvedBy: 'inst-1',
-        }
-      ],
-      certificates: [
-        {
-          certId: 'CERT_course-1_student-1',
-          studentUid: 'student-1',
-          studentName: 'أحمد الصالح',
-          courseTitle: 'منهجية وأساسيات البحث العلمي والنشر الدولي',
-          verificationCode: 'ASIRA-2026-8812',
-          status: 'issued',
-        }
-      ],
-      auditLogs: []
+      courses: await fetchCollection('courses'),
+      researches: await fetchCollection('researches'),
+      testimonials: await fetchCollection('testimonials'),
+      officialGrades: await fetchCollection('officialGrades'),
+      certificates: await fetchCollection('certificates'),
+      auditLogs: await fetchCollection('auditLogs'),
     }
   };
 

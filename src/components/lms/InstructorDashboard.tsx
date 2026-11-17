@@ -17,8 +17,6 @@ import {
   FolderPlus
 } from 'lucide-react';
 import { 
-  INITIAL_STUDENT_SUBMISSIONS, 
-  INITIAL_EXAM_ATTEMPTS, 
   INITIAL_COURSES,
   INITIAL_CURRICULUM,
   MockStudentSubmission,
@@ -77,17 +75,17 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
   const currentCourse = courses.find((c) => c.id === selectedCourseId) || courses[0];
 
   // بيانات التكليفات
-  const [localSubmissions, setLocalSubmissions] = useState<MockStudentSubmission[]>(INITIAL_STUDENT_SUBMISSIONS);
+  const [localSubmissions, setLocalSubmissions] = useState<MockStudentSubmission[]>(propSubmissions || []);
   const submissions = propSubmissions || localSubmissions;
 
   const [selectedSubmission, setSelectedSubmission] = useState<MockStudentSubmission | null>(null);
-  const [gradeInput, setGradeInput] = useState<number>(18);
+  const [gradeInput, setGradeInput] = useState<number>(0);
   const [feedbackInput, setFeedbackInput] = useState<string>('');
   const [requestRevisionToggle, setRequestRevisionToggle] = useState<boolean>(false);
   const [revisionNotesInput, setRevisionNotesInput] = useState<string>('');
 
   // بيانات الاختبارات
-  const [localExamAttempts, setLocalExamAttempts] = useState<MockExamAttemptForInstructor[]>(INITIAL_EXAM_ATTEMPTS);
+  const [localExamAttempts, setLocalExamAttempts] = useState<MockExamAttemptForInstructor[]>(propExamAttempts || []);
   const examAttempts = propExamAttempts || localExamAttempts;
 
   const [selectedAttempt, setSelectedAttempt] = useState<MockExamAttemptForInstructor | null>(null);
@@ -143,10 +141,7 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
   const [previewLesson, setPreviewLesson] = useState<MockLessonItem | null>(null);
 
   // الدرجات العملية
-  const [localPracticalGrades, setLocalPracticalGrades] = useState<Record<string, { score: number; notes: string }>>({
-    'student-1': { score: 42, notes: 'أداء ممتاز في اختبار تحليل البيانات الإحصائية الحضوري' },
-    'student-2': { score: 38, notes: 'جيد جداً مع ملاحظة طفيفة في صياغة الفرضية' },
-  });
+  const [localPracticalGrades, setLocalPracticalGrades] = useState<Record<string, { score: number; notes: string }>>({});
   const practicalGrades = propPracticalGrades || localPracticalGrades;
   const [selectedPracticalStudent, setSelectedPracticalStudent] = useState<{ id: string; name: string; score: number; notes: string } | null>(null);
 
@@ -564,31 +559,6 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
     if (onUpdateCurriculum) onUpdateCurriculum(updatedCurriculum);
     else setLocalCurriculum(updatedCurriculum);
 
-    const newAttemptEntry: MockExamAttemptForInstructor = {
-      id: `attempt-new-${Date.now()}`,
-      studentUid: 'student-1',
-      studentName: 'أحمد محمد الصالح',
-      university: 'جامعة الملك سعود - كلية الطب',
-      examTitle: examTitle.trim(),
-      submittedAt: 'تم النشر الآن',
-      calculatedScore: examQuestions.reduce((sum, q) => sum + q.points, 0),
-      officialGrade: undefined,
-      maxScore: Number(examMaxScore) || 30,
-      status: 'pending_review',
-      instructorRemarks: undefined,
-      studentAnswers: examQuestions.map((q, idx) => ({
-        qId: `q-${idx}`,
-        questionText: q.qText,
-        studentAnswer: q[`opt${q.correctOpt}` as keyof typeof q] as string,
-        correctAnswer: q[`opt${q.correctOpt}` as keyof typeof q] as string,
-        points: q.points,
-        maxPoints: q.points,
-        isCorrect: true,
-      }))
-    };
-
-    if (onUpdateExamAttempt) onUpdateExamAttempt(newAttemptEntry);
-    else setLocalExamAttempts((prev) => [newAttemptEntry, ...prev]);
 
     if (onLogAudit) {
       onLogAudit('إضافة اختبار أكاديمي جديد', `تم إنشاء ونشر اختبار: "${examTitle}" (${examQuestions.length} أسئلة)`);
@@ -815,54 +785,61 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {filteredSubmissions.map((sub) => (
-                  <tr key={sub.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                    <td style={{ padding: '0.85rem' }}>
-                      <strong style={{ display: 'block', color: 'var(--text-main)' }}>{sub.studentName}</strong>
-                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{sub.university}</span>
+                {filteredSubmissions.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
+                      لا توجد تسليمات تكليفات مسجلة حالياً
                     </td>
-                    <td style={{ padding: '0.85rem', fontWeight: 600 }}>{sub.assignmentTitle}</td>
-                    <td style={{ padding: '0.85rem' }}>
-                      <span className="badge badge-primary">v{sub.version}</span>
-                    </td>
-                    <td style={{ padding: '0.85rem' }}>
-                      <a
-                        href={sanitizeUrl(sub.driveFileUrl)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="btn btn-outline"
-                        style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem' }}
-                      >
-                        <ExternalLink size={13} />
-                        <span>فتح ملف Drive</span>
-                      </a>
-                    </td>
-                    <td style={{ padding: '0.85rem' }}>
-                      {sub.status === 'graded' && <span className="badge badge-emerald">تم الرصد</span>}
-                      {sub.status === 'submitted' && <span className="badge badge-gold">بانتظار التصحيح</span>}
-                      {sub.status === 'revision_required' && <span className="badge" style={{ background: '#fee2e2', color: '#b91c1c' }}>مطلوب تعديل</span>}
-                    </td>
-                    <td style={{ padding: '0.85rem', fontWeight: 800, fontSize: '0.95rem' }}>
-                      {sub.grade !== undefined ? `${sub.grade} / ${sub.maxScore}` : '—'}
-                    </td>
-                    <td style={{ padding: '0.85rem', fontSize: '0.8rem', maxWidth: '220px', color: 'var(--text-muted)' }}>
-                      {sub.instructorFeedback ? (
-                        <span title={sub.instructorFeedback} style={{ display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                          "{sub.instructorFeedback}"
-                        </span>
-                      ) : (
-                        <span style={{ color: 'var(--text-subtle)' }}>لا يوجد تعليق</span>
-                      )}
-                    </td>
-                    <td style={{ padding: '0.85rem' }}>
-                      <button
-                        onClick={() => {
-                          setSelectedSubmission(sub);
-                          setGradeInput(sub.grade !== undefined ? sub.grade : 18);
-                          setFeedbackInput(sub.instructorFeedback || '');
-                          setRequestRevisionToggle(sub.status === 'revision_required');
-                          setRevisionNotesInput(sub.revisionNotes || '');
-                        }}
+                  </tr>
+                ) : (
+                  filteredSubmissions.map((sub) => (
+                    <tr key={sub.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '0.85rem' }}>
+                        <strong style={{ display: 'block', color: 'var(--text-main)' }}>{sub.studentName}</strong>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{sub.university}</span>
+                      </td>
+                      <td style={{ padding: '0.85rem', fontWeight: 600 }}>{sub.assignmentTitle}</td>
+                      <td style={{ padding: '0.85rem' }}>
+                        <span className="badge badge-primary">v{sub.version}</span>
+                      </td>
+                      <td style={{ padding: '0.85rem' }}>
+                        <a
+                          href={sanitizeUrl(sub.driveFileUrl)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn btn-outline"
+                          style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem' }}
+                        >
+                          <ExternalLink size={13} />
+                          <span>فتح ملف Drive</span>
+                        </a>
+                      </td>
+                      <td style={{ padding: '0.85rem' }}>
+                        {sub.status === 'graded' && <span className="badge badge-emerald">تم الرصد</span>}
+                        {sub.status === 'submitted' && <span className="badge badge-gold">بانتظار التصحيح</span>}
+                        {sub.status === 'revision_required' && <span className="badge" style={{ background: '#fee2e2', color: '#b91c1c' }}>مطلوب تعديل</span>}
+                      </td>
+                      <td style={{ padding: '0.85rem', fontWeight: 800, fontSize: '0.95rem' }}>
+                        {sub.grade !== undefined ? `${sub.grade} / ${sub.maxScore}` : '—'}
+                      </td>
+                      <td style={{ padding: '0.85rem', fontSize: '0.8rem', maxWidth: '220px', color: 'var(--text-muted)' }}>
+                        {sub.instructorFeedback ? (
+                          <span title={sub.instructorFeedback} style={{ display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                            "{sub.instructorFeedback}"
+                          </span>
+                        ) : (
+                          <span style={{ color: 'var(--text-subtle)' }}>لا يوجد تعليق</span>
+                        )}
+                      </td>
+                      <td style={{ padding: '0.85rem' }}>
+                        <button
+                          onClick={() => {
+                            setSelectedSubmission(sub);
+                            setGradeInput(sub.grade !== undefined ? sub.grade : 0);
+                            setFeedbackInput(sub.instructorFeedback || '');
+                            setRequestRevisionToggle(sub.status === 'revision_required');
+                            setRevisionNotesInput(sub.revisionNotes || '');
+                          }}
                         className="btn btn-primary"
                         style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }}
                       >
@@ -871,8 +848,9 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                       </button>
                     </td>
                   </tr>
-                ))}
-              </tbody>
+                ))
+              )}
+            </tbody>
             </table>
           </div>
 
@@ -896,18 +874,23 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                 </p>
 
                 {/* زر مباشر لفتح ملف الطالب في Google Drive */}
-                <div style={{ padding: '0.85rem', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>ملف حل التكليف على Google Drive:</span>
-                  <a
-                    href={sanitizeUrl(selectedSubmission.driveFileUrl)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="btn btn-outline"
-                    style={{ fontSize: '0.82rem', padding: '0.35rem 0.75rem' }}
-                  >
-                    <ExternalLink size={13} />
-                    <span>فتح الملف في نافذة جديدة</span>
-                  </a>
+                <div style={{ padding: '0.85rem', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', marginBottom: '1.25rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>ملف حل التكليف على Google Drive:</span>
+                    <a
+                      href={sanitizeUrl(selectedSubmission.driveFileUrl)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn btn-outline"
+                      style={{ fontSize: '0.82rem', padding: '0.35rem 0.75rem' }}
+                    >
+                      <ExternalLink size={13} />
+                      <span>فتح الملف في نافذة جديدة</span>
+                    </a>
+                  </div>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block' }}>
+                    💡 إذا تعذر فتح الملف أو ظهرت رسالة إذن بالدخول (Access Denied)، فعّل خيار "طلب إعادة تسليم وتعديل العمل" بالأسفل لتنبيه الطالب بفتح صلاحية العرض (Viewer).
+                  </span>
                 </div>
 
                 {/* خيار طلب إعادة التسليم والتعديل */}
@@ -1054,8 +1037,15 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {filteredExamAttempts.map((att) => (
-                  <tr key={att.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                {filteredExamAttempts.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
+                      لا توجد محاولات اختبارات مسجلة حالياً
+                    </td>
+                  </tr>
+                ) : (
+                  filteredExamAttempts.map((att) => (
+                    <tr key={att.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                     <td style={{ padding: '0.85rem' }}>
                       <strong style={{ display: 'block', color: 'var(--text-main)' }}>{att.studentName}</strong>
                       <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{att.university}</span>
@@ -1090,8 +1080,9 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                       </button>
                     </td>
                   </tr>
-                ))}
-              </tbody>
+                ))
+              )}
+            </tbody>
             </table>
           </div>
 

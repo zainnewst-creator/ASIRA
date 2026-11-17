@@ -13,10 +13,15 @@ import {
 import { db } from './firebaseConfig';
 import { Course, Enrollment, EnrollmentStatus, LessonProgress } from '../types';
 import { INITIAL_COURSES } from '../data/mockData';
+import { isDemoMode } from '../utils/demoMode';
 import { logAuditEvent } from './auditService';
 
 // جلب الكورسات المنشورة (مع كاش محلي لتوفير الحصص المجانية)
 export const getPublishedCourses = async (): Promise<Course[]> => {
+  // في وضع التجربة، أعد البيانات المحلية مباشرة
+  if (isDemoMode()) {
+    return INITIAL_COURSES;
+  }
   try {
     const q = query(collection(db, 'courses'), where('status', '==', 'published'));
     const snapshot = await getDocs(q);

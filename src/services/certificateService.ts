@@ -123,23 +123,5 @@ export const verifyCertificateByCode = async (
     console.info('[Certificate] Firestore lookup fallback:', err);
   }
 
-  // الكود المعتمد الافتراضي في البيانات التجريبية
-  if (code === 'ASIRA-2026-8812') {
-    return {
-      valid: true,
-      certificate: {
-        certId: 'CERT_course-1_student-1',
-        studentUid: 'student-1',
-        studentName: 'أحمد محمد الصالح',
-        courseId: 'course-1',
-        courseTitle: 'منهجية وأساسيات البحث العلمي والنشر الدولي',
-        issueDate: '2026-10-12',
-        status: 'issued',
-        verificationCode: 'ASIRA-2026-8812',
-        signedPdfDriveUrl: 'https://drive.google.com/file/d/sampleSignedCertificate/view',
-      },
-    };
-  }
-
   return { valid: false };
 };
