@@ -3,8 +3,6 @@
 // ===================================================
 import { doc, setDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from './firebaseConfig';
-import { INITIAL_COURSES, INITIAL_RESEARCHES, INITIAL_TESTIMONIALS } from '../data/mockData';
-import { isDemoMode } from '../utils/demoMode';
 
 export interface BackupPackage {
   version: string;
@@ -20,25 +18,8 @@ export interface BackupPackage {
   };
 }
 
-// 1. تصدير كامل البيانات الأكاديمية من Firestore إلى حزمة JSON
+// 1. تصدير كامل البيانات الأكاديمية الحقيقية من Firestore إلى حزمة JSON
 export const exportPlatformData = async (): Promise<BackupPackage> => {
-  // في وضع التجربة، أعد البيانات المحلية
-  if (isDemoMode()) {
-    return {
-      version: '1.0.0',
-      exportedAt: new Date().toISOString(),
-      source: 'ASIRA Research Learning Management Platform (Demo)',
-      collections: {
-        courses: INITIAL_COURSES,
-        researches: INITIAL_RESEARCHES,
-        testimonials: INITIAL_TESTIMONIALS,
-        officialGrades: [],
-        certificates: [],
-        auditLogs: [],
-      }
-    };
-  }
-
   const fetchCollection = async (name: string): Promise<any[]> => {
     try {
       const snapshot = await getDocs(collection(db, name));
@@ -51,7 +32,7 @@ export const exportPlatformData = async (): Promise<BackupPackage> => {
   const backup: BackupPackage = {
     version: '1.0.0',
     exportedAt: new Date().toISOString(),
-    source: 'ASIRA Research Learning Management Platform',
+    source: 'ASIRA Research Learning Management Platform (Production)',
     collections: {
       courses: await fetchCollection('courses'),
       researches: await fetchCollection('researches'),

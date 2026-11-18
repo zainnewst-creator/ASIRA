@@ -237,65 +237,7 @@ export interface MockStudentSubmission {
   revisionNotes?: string;
 }
 
-export const INITIAL_STUDENT_SUBMISSIONS: MockStudentSubmission[] = [
-  {
-    id: 'sub-1',
-    studentUid: 'student-1',
-    studentName: 'أحمد محمد الصالح',
-    university: 'جامعة الملك سعود - كلية الطب',
-    assignmentTitle: 'صياغة بروتوكول بحثي وتحديد استراتيجية MeSH',
-    version: 2,
-    driveFileUrl: 'https://drive.google.com/file/d/1ExampleStudentSubmissionAhmed/view',
-    submittedAt: '2026-10-12 14:30',
-    status: 'graded',
-    grade: 18,
-    maxScore: 20,
-    instructorFeedback: 'عمل متقن جداً في صياغة PICO، تم تعديل كلمات MeSH وفق الملاحظة السابقة. أحسنت!',
-  },
-  {
-    id: 'sub-2',
-    studentUid: 'student-2',
-    studentName: 'سارة خالد الكيلاني',
-    university: 'جامعة العلوم والتكنولوجيا - دكتور صيدلة',
-    assignmentTitle: 'صياغة بروتوكول بحثي وتحديد استراتيجية MeSH',
-    version: 1,
-    driveFileUrl: 'https://drive.google.com/file/d/1ExampleStudentSubmissionSara/view',
-    submittedAt: '2026-10-12 11:15',
-    status: 'submitted',
-    grade: undefined,
-    maxScore: 20,
-    instructorFeedback: undefined,
-  },
-  {
-    id: 'sub-3',
-    studentUid: 'student-3',
-    studentName: 'عمر ياسين الدوسري',
-    university: 'جامعة الملك فيصل - كلية الطب',
-    assignmentTitle: 'صياغة بروتوكول بحثي وتحديد استراتيجية MeSH',
-    version: 1,
-    driveFileUrl: 'https://drive.google.com/file/d/1ExampleStudentSubmissionOmar/view',
-    submittedAt: '2026-10-11 19:40',
-    status: 'revision_required',
-    grade: undefined,
-    maxScore: 20,
-    instructorFeedback: 'البروتوكول ممتاز، لكنك نسيت تحديد معايير الاستبعاد (Exclusion criteria). يرجى مراجعتها وإعادة إرسال الملف.',
-    revisionNotes: 'مطلوب توضيح معايير الاستبعاد في الصفحة 3.',
-  },
-  {
-    id: 'sub-4',
-    studentUid: 'student-4',
-    studentName: 'فاطمة الزهراء المنصور',
-    university: 'جامعة القاهرة - كلية التمريض',
-    assignmentTitle: 'صياغة بروتوكول بحثي وتحديد استراتيجية MeSH',
-    version: 1,
-    driveFileUrl: 'https://drive.google.com/file/d/1ExampleStudentSubmissionFatima/view',
-    submittedAt: '2026-10-12 16:05',
-    status: 'submitted',
-    grade: undefined,
-    maxScore: 20,
-    instructorFeedback: undefined,
-  }
-];
+export const INITIAL_STUDENT_SUBMISSIONS: MockStudentSubmission[] = [];
 
 export interface MockExamAttemptForInstructor {
   id: string;
@@ -320,146 +262,7 @@ export interface MockExamAttemptForInstructor {
   }[];
 }
 
-export const INITIAL_EXAM_ATTEMPTS: MockExamAttemptForInstructor[] = [
-  {
-    id: 'attempt-1',
-    studentUid: 'student-1',
-    studentName: 'أحمد محمد الصالح',
-    university: 'جامعة الملك سعود - كلية الطب',
-    examTitle: 'اختبار منتصف المسار النظري (Mid-term MCQ)',
-    submittedAt: '2026-10-12 12:20',
-    calculatedScore: 26,
-    officialGrade: 26,
-    maxScore: 30,
-    status: 'approved',
-    instructorRemarks: 'إجابات ممتازة، خطأ وحيد في سؤال حساب حجم العينة.',
-    studentAnswers: [
-      {
-        qId: 'q1',
-        questionText: 'أي من التصاميم يعتبر المعيار الذهبي لتقييم كفاءة الأدوية؟',
-        studentAnswer: 'التجارب السريرية العشوائية (RCT)',
-        correctAnswer: 'التجارب السريرية العشوائية (RCT)',
-        points: 5,
-        maxPoints: 5,
-        isCorrect: true,
-      },
-      {
-        qId: 'q2',
-        questionText: 'ما هو الإصدار الأحدث لدليل معايير المراجعات المنهجية؟',
-        studentAnswer: 'PRISMA 2020',
-        correctAnswer: 'PRISMA 2020',
-        points: 5,
-        maxPoints: 5,
-        isCorrect: true,
-      },
-      {
-        qId: 'q3',
-        questionText: 'في أي مرحلة يتم تسجيل البروتوكول في منصة PROSPERO؟',
-        studentAnswer: 'قبل بدء استخلاص البيانات وتصفية النتائج',
-        correctAnswer: 'قبل بدء استخلاص البيانات وتصفية النتائج',
-        points: 5,
-        maxPoints: 5,
-        isCorrect: true,
-      },
-      {
-        qId: 'q4',
-        questionText: 'ما الدلالة الإحصائية لقيمة p-value أقل من 0.05؟',
-        studentAnswer: 'رفض الفرضية الصفرية ووجود دلالة إحصائية',
-        correctAnswer: 'رفض الفرضية الصفرية ووجود دلالة إحصائية',
-        points: 5,
-        maxPoints: 5,
-        isCorrect: true,
-      },
-      {
-        qId: 'q5',
-        questionText: 'ما هو الاختبار الإحصائي المناسب لمقارنة متوسطين لعينتين مستقلتين؟',
-        studentAnswer: 'One-Way ANOVA',
-        correctAnswer: 'Independent Samples t-test',
-        points: 0,
-        maxPoints: 5,
-        isCorrect: false,
-      },
-      {
-        qId: 'q6',
-        questionText: 'ما هي الأداة المعتمدة لتقييم انحياز التجارب السريرية العشوائية؟',
-        studentAnswer: 'RoB 2 (Risk of Bias 2)',
-        correctAnswer: 'RoB 2 (Risk of Bias 2)',
-        points: 6,
-        maxPoints: 6,
-        isCorrect: true,
-      }
-    ]
-  },
-  {
-    id: 'attempt-2',
-    studentUid: 'student-2',
-    studentName: 'سارة خالد الكيلاني',
-    university: 'جامعة العلوم والتكنولوجيا - دكتور صيدلة',
-    examTitle: 'اختبار منتصف المسار النظري (Mid-term MCQ)',
-    submittedAt: '2026-10-12 15:45',
-    calculatedScore: 24,
-    officialGrade: undefined,
-    maxScore: 30,
-    status: 'pending_review',
-    instructorRemarks: undefined,
-    studentAnswers: [
-      {
-        qId: 'q1',
-        questionText: 'أي من التصاميم يعتبر المعيار الذهبي لتقييم كفاءة الأدوية؟',
-        studentAnswer: 'التجارب السريرية العشوائية (RCT)',
-        correctAnswer: 'التجارب السريرية العشوائية (RCT)',
-        points: 5,
-        maxPoints: 5,
-        isCorrect: true,
-      },
-      {
-        qId: 'q2',
-        questionText: 'ما هو الإصدار الأحدث لدليل معايير المراجعات المنهجية؟',
-        studentAnswer: 'PRISMA 2015',
-        correctAnswer: 'PRISMA 2020',
-        points: 0,
-        maxPoints: 5,
-        isCorrect: false,
-      },
-      {
-        qId: 'q3',
-        questionText: 'في أي مرحلة يتم تسجيل البروتوكول في منصة PROSPERO؟',
-        studentAnswer: 'قبل بدء استخلاص البيانات وتصفية النتائج',
-        correctAnswer: 'قبل بدء استخلاص البيانات وتصفية النتائج',
-        points: 5,
-        maxPoints: 5,
-        isCorrect: true,
-      },
-      {
-        qId: 'q4',
-        questionText: 'ما الدلالة الإحصائية لقيمة p-value أقل من 0.05؟',
-        studentAnswer: 'رفض الفرضية الصفرية ووجود دلالة إحصائية',
-        correctAnswer: 'رفض الفرضية الصفرية ووجود دلالة إحصائية',
-        points: 5,
-        maxPoints: 5,
-        isCorrect: true,
-      },
-      {
-        qId: 'q5',
-        questionText: 'ما هو الاختبار الإحصائي المناسب لمقارنة متوسطين لعينتين مستقلتين؟',
-        studentAnswer: 'Independent Samples t-test',
-        correctAnswer: 'Independent Samples t-test',
-        points: 5,
-        maxPoints: 5,
-        isCorrect: true,
-      },
-      {
-        qId: 'q6',
-        questionText: 'ما هي الأداة المعتمدة لتقييم انحياز التجارب السريرية العشوائية؟',
-        studentAnswer: 'ROBINS-I',
-        correctAnswer: 'RoB 2 (Risk of Bias 2)',
-        points: 0,
-        maxPoints: 6,
-        isCorrect: false,
-      }
-    ]
-  }
-];
+export const INITIAL_EXAM_ATTEMPTS: MockExamAttemptForInstructor[] = [];
 
 export interface MockLessonItem {
   id: string;
@@ -811,47 +614,7 @@ export interface MockPendingEnrollment {
   status: 'pending' | 'approved' | 'rejected';
 }
 
-export const INITIAL_PENDING_ENROLLMENTS: MockPendingEnrollment[] = [
-  {
-    id: 'enr-1',
-    studentUid: 'student-2',
-    studentName: 'سارة خالد الكيلاني',
-    studentEmail: 'sara.k@ust.edu',
-    university: 'جامعة العلوم والتكنولوجيا',
-    specialty: 'دكتور صيدلة (PharmD)',
-    academicLevel: 'سنة خامسة (امتياز)',
-    courseId: 'course-1',
-    courseTitle: 'منهجية وأساسيات البحث العلمي والنشر الدولي',
-    requestedAt: '2026-10-12 10:15',
-    status: 'pending',
-  },
-  {
-    id: 'enr-2',
-    studentUid: 'student-3',
-    studentName: 'عمر ياسين الدوسري',
-    studentEmail: 'omar.d@kfu.edu.sa',
-    university: 'جامعة الملك فيصل',
-    specialty: 'طب وجراحة',
-    academicLevel: 'سنة رابعة',
-    courseId: 'course-1',
-    courseTitle: 'منهجية وأساسيات البحث العلمي والنشر الدولي',
-    requestedAt: '2026-10-12 11:40',
-    status: 'pending',
-  },
-  {
-    id: 'enr-3',
-    studentUid: 'student-5',
-    studentName: 'يوسف عبد الرحمن العتيبي',
-    studentEmail: 'yousef.o@ksu.edu.sa',
-    university: 'جامعة الملك سعود',
-    specialty: 'الصيدلة الإكلينيكية',
-    academicLevel: 'دراسات عليا (ماجستير)',
-    courseId: 'course-2',
-    courseTitle: 'المراجعات المنهجية والتحليل التلوي',
-    requestedAt: '2026-10-12 09:20',
-    status: 'pending',
-  }
-];
+export const INITIAL_PENDING_ENROLLMENTS: MockPendingEnrollment[] = [];
 
 export interface MockCertificateRequest {
   id: string;
@@ -870,39 +633,7 @@ export interface MockCertificateRequest {
   issuedAt?: string;
 }
 
-export const INITIAL_CERT_REQUESTS: MockCertificateRequest[] = [
-  {
-    id: 'cert-req-2',
-    studentUid: 'student-2',
-    studentName: 'سارة خالد الكيلاني',
-    university: 'جامعة العلوم والتكنولوجيا',
-    courseId: 'course-2',
-    courseTitle: 'المراجعات المنهجية والتحليل التلوي',
-    courseCode: 'SR-201',
-    totalScore: 92,
-    requestedAt: '2026-10-12 11:30',
-    status: 'processing',
-    verificationCode: 'ASIRA-2026-9041',
-    signedPdfUrl: undefined,
-    adminNotes: 'جاري إعداد وثيقة الشهادة وتوقيعها من العميد د. إبراهيم يحيى خارج المنصة',
-  },
-  {
-    id: 'cert-req-3',
-    studentUid: 'student-3',
-    studentName: 'محمد عبد الله القحطاني',
-    university: 'جامعة الملك فيصل',
-    courseId: 'course-1',
-    courseTitle: 'منهجية وأساسيات البحث العلمي والنشر الدولي',
-    courseCode: 'RES-101',
-    totalScore: 88,
-    requestedAt: '2026-10-10 14:00',
-    status: 'issued',
-    verificationCode: 'ASIRA-2026-7731',
-    signedPdfUrl: 'https://drive.google.com/file/d/DeanSignedCertAlqahtani/view',
-    adminNotes: 'تم تدقيق الدرجات واعتماد وتوقيع الشهادة من العميد ورفع نسخة Google Drive',
-    issuedAt: '2026-10-11',
-  }
-];
+export const INITIAL_CERT_REQUESTS: MockCertificateRequest[] = [];
 
 export interface MockAuditLogItem {
   id: string;
@@ -913,37 +644,4 @@ export interface MockAuditLogItem {
   details: string;
 }
 
-export const INITIAL_AUDIT_LOGS: MockAuditLogItem[] = [
-  {
-    id: 'audit-1',
-    timestamp: '2026-10-12 15:40:12',
-    actorName: 'د. إبراهيم يحيى',
-    actorRole: 'مدرس مسند (Instructor)',
-    action: 'اعتماد درجة الاختبار النظري (Official Grade Commitment)',
-    details: 'اعتماد درجة الطالب أحمد الصالح: 26/30 في اختبار Mid-term MCQ.',
-  },
-  {
-    id: 'audit-2',
-    timestamp: '2026-10-12 14:10:05',
-    actorName: 'د. إبراهيم يحيى',
-    actorRole: 'مدرس مسند (Instructor)',
-    action: 'تصحيح تكليف بروتوكول PICO (Assignment Graded)',
-    details: 'رصد 18/20 للطالب أحمد الصالح مع ملاحظات التعديل النسخة 2.',
-  },
-  {
-    id: 'audit-3',
-    timestamp: '2026-10-12 11:30:45',
-    actorName: 'admin@asira-research.org',
-    actorRole: 'مدير المنصة (Admin)',
-    action: 'قبول طلب التحاق (Enrollment Approved)',
-    details: 'الموافقة على التحاق الطالب أحمد الصالح بكورس RES-101.',
-  },
-  {
-    id: 'audit-4',
-    timestamp: '2026-10-12 09:15:00',
-    actorName: 'admin@asira-research.org',
-    actorRole: 'مدير المنصة (Admin)',
-    action: 'نشر بحث علمي في المعرض العام (Research Published)',
-    details: 'اعتماد ونشر ورقة European Journal of Clinical Investigation في واجهة المنتدى.',
-  }
-];
+export const INITIAL_AUDIT_LOGS: MockAuditLogItem[] = [];

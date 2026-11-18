@@ -12,16 +12,10 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import { Course, Enrollment, EnrollmentStatus, LessonProgress } from '../types';
-import { INITIAL_COURSES } from '../data/mockData';
-import { isDemoMode } from '../utils/demoMode';
 import { logAuditEvent } from './auditService';
 
-// جلب الكورسات المنشورة (مع كاش محلي لتوفير الحصص المجانية)
+// جلب الكورسات المنشورة من Firestore
 export const getPublishedCourses = async (): Promise<Course[]> => {
-  // في وضع التجربة، أعد البيانات المحلية مباشرة
-  if (isDemoMode()) {
-    return INITIAL_COURSES;
-  }
   try {
     const q = query(collection(db, 'courses'), where('status', '==', 'published'));
     const snapshot = await getDocs(q);
@@ -29,9 +23,9 @@ export const getPublishedCourses = async (): Promise<Course[]> => {
       return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Course));
     }
   } catch (error) {
-    console.info('[CourseService] Using cached/initial courses:', error);
+    console.info('[CourseService] Error fetching courses from Firestore:', error);
   }
-  return INITIAL_COURSES;
+  return [];
 };
 
 // طلب التحاق طالب بكورس (معرف حتمي لمنع تكرار الطلب: studentUid)

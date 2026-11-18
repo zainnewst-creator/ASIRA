@@ -7,11 +7,6 @@ import {
 import { 
   INITIAL_COURSES, 
   INITIAL_RESEARCHES, 
-  INITIAL_STUDENT_SUBMISSIONS,
-  INITIAL_EXAM_ATTEMPTS,
-  INITIAL_PENDING_ENROLLMENTS,
-  INITIAL_CERT_REQUESTS,
-  INITIAL_AUDIT_LOGS,
   MockStudentSubmission, 
   MockExamAttemptForInstructor, 
   MockCourseCurriculum, 
@@ -20,7 +15,6 @@ import {
   MockAuditLogItem, 
   INITIAL_CURRICULA
 } from '../data/mockData';
-import { isDemoMode } from '../utils/demoMode';
 import { StudentDashboard } from '../components/lms/StudentDashboard';
 import { InstructorDashboard } from '../components/lms/InstructorDashboard';
 import { AdminDashboard } from '../components/lms/AdminDashboard';
@@ -66,10 +60,9 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
   const [activeRole, setActiveRole] = useState<UserRole>(initialRole);
   const [selectedCourseId, setSelectedCourseId] = useState<string>(courses[0]?.id || 'course-1');
 
-  // الحالة المركزية المشتركة بين الأدوار
-  const demoActive = isDemoMode();
-  const [submissions, setSubmissions] = useState<MockStudentSubmission[]>(demoActive ? INITIAL_STUDENT_SUBMISSIONS : []);
-  const [examAttempts, setExamAttempts] = useState<MockExamAttemptForInstructor[]>(demoActive ? INITIAL_EXAM_ATTEMPTS : []);
+  // الحالة المركزية المشتركة بين الأدوار (Clean Slate for Production)
+  const [submissions, setSubmissions] = useState<MockStudentSubmission[]>([]);
+  const [examAttempts, setExamAttempts] = useState<MockExamAttemptForInstructor[]>([]);
   const [localCurricula, setLocalCurricula] = useState<Record<string, MockCourseCurriculum>>(propCurricula || INITIAL_CURRICULA);
   const activeCurricula = propCurricula || localCurricula;
   const currentCurriculum = activeCurricula[selectedCourseId] || {
@@ -77,13 +70,10 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
     modules: []
   };
 
-  const [enrollments, setEnrollments] = useState<MockPendingEnrollment[]>(demoActive ? INITIAL_PENDING_ENROLLMENTS : []);
-  const [certRequests, setCertRequests] = useState<MockCertificateRequest[]>(demoActive ? INITIAL_CERT_REQUESTS : []);
-  const [auditLogs, setAuditLogs] = useState<MockAuditLogItem[]>(demoActive ? INITIAL_AUDIT_LOGS : []);
-  const [practicalGrades, setPracticalGrades] = useState<Record<string, { score: number; notes: string }>>(demoActive ? {
-    'student-1': { score: 42, notes: 'أداء ممتاز في اختبار تحليل البيانات الإحصائية الحضوري' },
-    'student-2': { score: 38, notes: 'جيد جداً مع ملاحظة طفيفة في صياغة الفرضية' },
-  } : {});
+  const [enrollments, setEnrollments] = useState<MockPendingEnrollment[]>([]);
+  const [certRequests, setCertRequests] = useState<MockCertificateRequest[]>([]);
+  const [auditLogs, setAuditLogs] = useState<MockAuditLogItem[]>([]);
+  const [practicalGrades, setPracticalGrades] = useState<Record<string, { score: number; notes: string }>>({});
 
   // إضافة عملية إلى سجل التدقيق غير القابل للتعديل
   const appendAuditLog = (action: string, details: string) => {

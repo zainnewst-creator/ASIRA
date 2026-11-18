@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookOpen, ShieldCheck, AlertTriangle, Loader2, Play } from 'lucide-react';
+import { BookOpen, ShieldCheck, AlertTriangle, Loader2 } from 'lucide-react';
 import { UserRole } from '../types';
 import { auth, db } from '../services/firebaseConfig';
 import {
@@ -7,7 +7,6 @@ import {
   createUserWithEmailAndPassword,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { isDemoMode, demoLogin, demoRegister, DEMO_ACCOUNTS } from '../utils/demoMode';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -23,21 +22,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const demoActive = isDemoMode();
-
   if (!isOpen) return null;
-
-  // ============ تسجيل دخول سريع لوضع التجربة ============
-  const handleDemoQuickLogin = (account: typeof DEMO_ACCOUNTS[0]) => {
-    onLogin({
-      uid: account.uid,
-      name: account.name,
-      role: account.role,
-      email: account.email,
-    });
-    resetForm();
-    onClose();
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,56 +30,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
     setLoading(true);
 
     try {
-      // ============ وضع التجربة (Demo Mode) ============
-      if (demoActive) {
-        if (isRegister) {
-          if (!name.trim()) {
-            setError('يرجى إدخال الاسم الأكاديمي.');
-            setLoading(false);
-            return;
-          }
-          if (!email.trim()) {
-            setError('يرجى إدخال البريد الإلكتروني.');
-            setLoading(false);
-            return;
-          }
-          const demoUser = demoRegister(name, email);
-          onLogin({
-            uid: demoUser.uid,
-            name: demoUser.name,
-            role: demoUser.role,
-            email: demoUser.email,
-          });
-          resetForm();
-          onClose();
-        } else {
-          if (!email.trim() || !password.trim()) {
-            setError('يرجى إدخال البريد الإلكتروني وكلمة المرور.');
-            setLoading(false);
-            return;
-          }
-          const demoUser = demoLogin(email, password);
-          if (demoUser) {
-            onLogin({
-              uid: demoUser.uid,
-              name: demoUser.name,
-              role: demoUser.role,
-              email: demoUser.email,
-            });
-            resetForm();
-            onClose();
-          } else {
-            setError('البريد أو كلمة المرور غير صحيحة. يمكنك استخدام أزرار الدخول السريع.');
-          }
-        }
-        setLoading(false);
-        return;
-      }
-
-      // ============ وضع Firebase الحقيقي ============
       if (isRegister) {
+        // --- 1. إنشاء حساب طالب جديد حقيقي عبر Firebase Auth ---
         if (!name.trim()) {
-          setError('يرجى إدخال الاسم الأكاديمي.');
+          setError('يرجى إدخال الاسم الأكاديمي الكامل.');
           setLoading(false);
           return;
         }
@@ -112,6 +51,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
         const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
         const uid = cred.user.uid;
 
+        // تسجيل وثيقة المستخدم كطالب وفق القواعد الأمنية
         await setDoc(doc(db, 'users', uid), {
           uid,
           email: email.trim(),
@@ -130,6 +70,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
         resetForm();
         onClose();
       } else {
+        // --- 2. تسجيل الدخول الحقيقي عبر Firebase Auth ---
         if (!email.trim() || !password.trim()) {
           setError('يرجى إدخال البريد الإلكتروني وكلمة المرور.');
           setLoading(false);
@@ -139,6 +80,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
         const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
         const uid = cred.user.uid;
 
+        // جلب الدور والاسم المعتمد من وثيقة المستخدم في Firestore
         let role: UserRole = 'student';
         let displayName = cred.user.displayName || email.trim();
 
@@ -150,7 +92,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
             displayName = data.displayName || displayName;
           }
         } catch {
-          console.info('[Auth] Could not fetch user document, defaulting to student role.');
+          console.info('[Auth] Could not fetch user profile from Firestore, using default student role.');
         }
 
         onLogin({
@@ -167,17 +109,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
       if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
         setError('البريد الإلكتروني أو كلمة المرور غير صحيحة.');
       } else if (code === 'auth/email-already-in-use') {
-        setError('هذا البريد الإلكتروني مسجل مسبقاً. جرب تسجيل الدخول.');
+        setError('هذا البريد الإلكتروني مسجل مسبقاً. يرجى تسجيل الدخول.');
       } else if (code === 'auth/weak-password') {
-        setError('كلمة المرور ضعيفة جداً. يرجى اختيار كلمة أقوى.');
+        setError('كلمة المرور ضعيفة جداً. يرجى اختيار كلمة سر أقوى.');
       } else if (code === 'auth/invalid-email') {
-        setError('صيغة البريد الإلكتروني غير صحيحة.');
+        setError('صيغة البريد الإلكتروني غير صالحة.');
       } else if (code === 'auth/too-many-requests') {
-        setError('تم تجاوز عدد المحاولات المسموح بها. حاول مرة أخرى لاحقاً.');
+        setError('تم تجاوز عدد المحاولات المسموح بها مؤقتاً. حاول مرة أخرى لاحقاً.');
       } else if (code.includes('network') || code.includes('unavailable')) {
-        setError('تعذر الاتصال بالخادم. تحقق من اتصال الإنترنت.');
+        setError('تعذر الاتصال بالخادم السحابي. يرجى التحقق من اتصال الإنترنت.');
       } else {
-        setError(err?.message || 'حدث خطأ غير متوقع. حاول مرة أخرى.');
+        setError(err?.message || 'حدث خطأ غير متوقع أثناء المصادقة. يرجى المحاولة ثانية.');
       }
     } finally {
       setLoading(false);
@@ -213,12 +155,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
       <div 
         className="card" 
         style={{ 
-          maxWidth: '440px', 
+          maxWidth: '430px', 
           width: '100%', 
           maxHeight: 'calc(100dvh - 1.5rem)',
           overflowY: 'auto',
           position: 'relative',
-          padding: '1.25rem 1.25rem 1rem',
+          padding: '1.5rem',
           margin: 'auto',
           boxSizing: 'border-box',
           borderRadius: 'var(--radius-lg)',
@@ -231,8 +173,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
           className="btn btn-ghost"
           style={{ 
             position: 'absolute', 
-            top: '10px', 
-            left: '10px', 
+            top: '12px', 
+            left: '12px', 
             width: '32px',
             height: '32px',
             padding: 0,
@@ -251,109 +193,50 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
         </button>
 
         {/* رأس النافذة */}
-        <div style={{ textAlign: 'center', marginBottom: '0.9rem', marginTop: '0.25rem' }}>
+        <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
           <div style={{ 
-            width: '40px', 
-            height: '40px', 
+            width: '44px', 
+            height: '44px', 
             borderRadius: 'var(--radius-md)', 
             background: 'var(--primary-100)', 
             color: 'var(--primary-700)', 
             display: 'inline-flex', 
             alignItems: 'center', 
             justifyContent: 'center', 
-            marginBottom: '0.4rem' 
+            marginBottom: '0.5rem' 
           }}>
-            <BookOpen size={20} />
+            <BookOpen size={22} />
           </div>
-          <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
-            {isRegister ? 'إنشاء حساب طالب جديد' : 'تسجيل الدخول إلى البوابة'}
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
+            {isRegister ? 'إنشاء حساب طالب جديد' : 'تسجيل الدخول إلى البوابة الأكاديمية'}
           </h2>
-          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem', margin: 0 }}>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem', margin: 0 }}>
             منتدى أسيرا لتعليم البحث العلمي (ASIRA LMS)
           </p>
         </div>
 
-        {/* أزرار الدخول السريع في وضع التجربة */}
-        {demoActive && !isRegister && (
-          <div style={{ 
-            marginBottom: '0.85rem', 
-            padding: '0.65rem 0.75rem', 
-            background: 'var(--bg-subtle)', 
-            borderRadius: 'var(--radius-md)',
-            border: '1px solid var(--border-color)',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.45rem' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                <Play size={13} color="var(--accent-gold-dark)" />
-                دخول تجريبي فوري بنقرة واحدة:
-              </span>
-              <span style={{ fontSize: '0.65rem', padding: '0.1rem 0.4rem', borderRadius: '4px', background: '#fef3c7', color: '#92400e', fontWeight: 700 }}>
-                Demo
-              </span>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.4rem' }}>
-              {DEMO_ACCOUNTS.map((account) => (
-                <button
-                  key={account.uid}
-                  type="button"
-                  onClick={() => handleDemoQuickLogin(account)}
-                  className="btn btn-outline"
-                  style={{
-                    padding: '0.4rem 0.2rem',
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '0.1rem',
-                    background: 'var(--bg-card)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: 'var(--radius-sm)',
-                    lineHeight: 1.2,
-                  }}
-                  title={account.email}
-                >
-                  <span>{account.role === 'student' ? '👨‍🎓 طالب' : account.role === 'instructor' ? '👨‍🏫 مدرس' : '🛡️ مدير'}</span>
-                  <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', fontWeight: 400 }}>
-                    {account.role === 'student' ? 'طالب أسيرا' : account.role === 'instructor' ? 'د. أحمد' : 'الإدارة'}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* تنبيه حماية الصلاحيات الصارم عند التسجيل الحقيقي */}
-        {isRegister && !demoActive && (
-          <div style={{ padding: '0.55rem 0.75rem', background: 'var(--primary-50)', borderRadius: 'var(--radius-md)', border: '1px solid var(--primary-100)', fontSize: '0.75rem', color: 'var(--primary-800)', marginBottom: '0.75rem', display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+        {/* تنبيه الأمان عند إنشاء حساب جديد */}
+        {isRegister && (
+          <div style={{ padding: '0.65rem 0.85rem', background: 'var(--primary-50)', borderRadius: 'var(--radius-md)', border: '1px solid var(--primary-100)', fontSize: '0.78rem', color: 'var(--primary-800)', marginBottom: '1rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <ShieldCheck size={16} color="var(--primary-600)" style={{ flexShrink: 0 }} />
-            <span>يُنشأ الحساب بصلاحية طالب افتراضياً وفق ضوابط الأمان.</span>
+            <span>يُنشأ أي حساب جديد بصلاحية طالب (Student) افتراضياً وفق ضوابط الأمان الأكاديمي.</span>
           </div>
         )}
 
         {/* رسالة الخطأ */}
         {error && (
-          <div style={{ padding: '0.55rem 0.75rem', background: '#fef2f2', borderRadius: 'var(--radius-md)', border: '1px solid #fecaca', fontSize: '0.75rem', color: '#991b1b', marginBottom: '0.75rem', display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+          <div style={{ padding: '0.65rem 0.85rem', background: '#fef2f2', borderRadius: 'var(--radius-md)', border: '1px solid #fecaca', fontSize: '0.78rem', color: '#991b1b', marginBottom: '1rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <AlertTriangle size={16} color="#dc2626" style={{ flexShrink: 0 }} />
             <span>{error}</span>
           </div>
         )}
 
-        {/* فاصل إذا كان وضع التجربة نشط */}
-        {demoActive && !isRegister && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-            <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }} />
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-subtle)' }}>أو بالبريد وكلمة المرور</span>
-            <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }} />
-          </div>
-        )}
-
         {/* نموذج الإدخال */}
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
           {isRegister && (
             <div>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, marginBottom: '0.2rem', color: 'var(--text-main)' }}>
-                الاسم الأكاديمي
+              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.25rem', color: 'var(--text-main)' }}>
+                الاسم الأكاديمي الكامل *
               </label>
               <input
                 type="text"
@@ -363,13 +246,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
                 required
                 style={{ 
                   width: '100%', 
-                  padding: '0.55rem 0.75rem', 
+                  padding: '0.6rem 0.8rem', 
                   borderRadius: 'var(--radius-md)', 
                   border: '1px solid var(--border-color)', 
                   background: 'var(--bg-main)', 
                   color: 'var(--text-main)', 
                   fontFamily: 'var(--font-arabic)',
-                  fontSize: '0.85rem',
+                  fontSize: '0.88rem',
                   boxSizing: 'border-box',
                 }}
               />
@@ -377,49 +260,49 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
           )}
 
           <div>
-            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, marginBottom: '0.2rem', color: 'var(--text-main)' }}>
-              البريد الإلكتروني
+            <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.25rem', color: 'var(--text-main)' }}>
+              البريد الإلكتروني *
             </label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder={demoActive ? 'student@demo.asira.com' : 'name@example.com'}
+              placeholder="name@example.com"
               required
               style={{ 
                 width: '100%', 
-                padding: '0.55rem 0.75rem', 
+                padding: '0.6rem 0.8rem', 
                 borderRadius: 'var(--radius-md)', 
                 border: '1px solid var(--border-color)', 
                 background: 'var(--bg-main)', 
                 color: 'var(--text-main)', 
                 fontFamily: 'var(--font-arabic)',
-                fontSize: '0.85rem',
+                fontSize: '0.88rem',
                 boxSizing: 'border-box',
               }}
             />
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, marginBottom: '0.2rem', color: 'var(--text-main)' }}>
-              كلمة المرور
+            <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.25rem', color: 'var(--text-main)' }}>
+              كلمة المرور *
             </label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder={demoActive ? 'demo123' : '••••••••'}
-              required={!demoActive || !isRegister}
-              minLength={demoActive ? undefined : 6}
+              placeholder="••••••••"
+              required
+              minLength={6}
               style={{ 
                 width: '100%', 
-                padding: '0.55rem 0.75rem', 
+                padding: '0.6rem 0.8rem', 
                 borderRadius: 'var(--radius-md)', 
                 border: '1px solid var(--border-color)', 
                 background: 'var(--bg-main)', 
                 color: 'var(--text-main)', 
                 fontFamily: 'var(--font-arabic)',
-                fontSize: '0.85rem',
+                fontSize: '0.88rem',
                 boxSizing: 'border-box',
               }}
             />
@@ -429,13 +312,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
             type="submit"
             className="btn btn-primary"
             style={{ 
-              padding: '0.65rem', 
-              marginTop: '0.35rem', 
+              padding: '0.75rem', 
+              marginTop: '0.4rem', 
               display: 'flex', 
               alignItems: 'center', 
               justifyContent: 'center', 
               gap: '0.5rem',
-              fontSize: '0.9rem',
+              fontSize: '0.92rem',
               fontWeight: 700,
               borderRadius: 'var(--radius-md)',
             }}
@@ -444,8 +327,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
           >
             {loading ? (
               <>
-                <Loader2 size={16} className="spin-animation" />
-                <span>جاري المعالجة...</span>
+                <Loader2 size={18} className="spin-animation" />
+                <span>جاري المصادقة السحابية...</span>
               </>
             ) : (
               <span>{isRegister ? 'إنشاء حساب طالب' : 'تسجيل الدخول'}</span>
@@ -454,11 +337,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
         </form>
 
         {/* التبديل بين الدخول والتسجيل */}
-        <div style={{ textAlign: 'center', marginTop: '0.85rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+        <div style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
           {isRegister ? (
-            <span>لديك حساب بالفعل؟ <button onClick={() => { setIsRegister(false); setError(null); }} style={{ background: 'none', border: 'none', color: 'var(--primary-600)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>سجل دخولك</button></span>
+            <span>لديك حساب بالفعل؟ <button onClick={() => { setIsRegister(false); setError(null); }} style={{ background: 'none', border: 'none', color: 'var(--primary-600)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>سجل دخولك هنا</button></span>
           ) : (
-            <span>طالب جديد؟ <button onClick={() => { setIsRegister(true); setError(null); }} style={{ background: 'none', border: 'none', color: 'var(--primary-600)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>أنشئ حسابك هنا</button></span>
+            <span>طالب جديد في المنصة؟ <button onClick={() => { setIsRegister(true); setError(null); }} style={{ background: 'none', border: 'none', color: 'var(--primary-600)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>أنشئ حسابك الأكاديمي</button></span>
           )}
         </div>
       </div>
