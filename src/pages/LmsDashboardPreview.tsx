@@ -276,11 +276,11 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '0.5rem', background: 'var(--bg-subtle)', padding: '0.35rem', borderRadius: 'var(--radius-md)' }}>
+            <div style={{ display: 'flex', gap: '0.4rem', background: 'var(--bg-subtle)', padding: '0.35rem', borderRadius: 'var(--radius-md)', flexWrap: 'wrap' }}>
               <button
                 onClick={() => setActiveRole('student')}
                 className={`btn ${activeRole === 'student' ? 'btn-primary' : 'btn-ghost'}`}
-                style={{ fontSize: '0.85rem', padding: '0.45rem 1rem' }}
+                style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem', flex: '1 1 auto' }}
               >
                 <GraduationCap size={15} />
                 <span>معاينة واجهة الطالب</span>
@@ -289,7 +289,7 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
               <button
                 onClick={() => setActiveRole('instructor')}
                 className={`btn ${activeRole === 'instructor' ? 'btn-primary' : 'btn-ghost'}`}
-                style={{ fontSize: '0.85rem', padding: '0.45rem 1rem' }}
+                style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem', flex: '1 1 auto' }}
               >
                 <Users size={15} />
                 <span>معاينة واجهة المدرس</span>
@@ -298,7 +298,7 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
               <button
                 onClick={() => setActiveRole('admin')}
                 className={`btn ${activeRole === 'admin' ? 'btn-primary' : 'btn-ghost'}`}
-                style={{ fontSize: '0.85rem', padding: '0.45rem 1rem' }}
+                style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem', flex: '1 1 auto' }}
               >
                 <ShieldCheck size={15} />
                 <span>لوحة تحكم المدير</span>

@@ -15,6 +15,23 @@
   --primary-100: #dbe6fe;
   --primary-50:  #eff4ff;
 
+  /* صناديق الحالات الملونة والتنبيهات (Contextual Alerts) */
+  --info-box-bg: rgba(37, 99, 235, 0.08);
+  --info-box-border: rgba(37, 99, 235, 0.25);
+  --info-box-text: #1e40af;
+
+  --success-box-bg: rgba(16, 185, 129, 0.08);
+  --success-box-border: rgba(16, 185, 129, 0.25);
+  --success-box-text: #065f46;
+
+  --danger-box-bg: rgba(239, 68, 68, 0.08);
+  --danger-box-border: rgba(239, 68, 68, 0.25);
+  --danger-box-text: #991b1b;
+
+  --warning-box-bg: rgba(245, 158, 11, 0.08);
+  --warning-box-border: rgba(245, 158, 11, 0.25);
+  --warning-box-text: #92400e;
+
   /* لمسات التميز والبحث العلمي (Emerald & Gold Accents) */
   --accent-emerald: #10b981;
   --accent-emerald-dark: #059669;
@@ -71,7 +88,30 @@
   --text-subtle: #64748b;
   --primary-50: rgba(37, 99, 235, 0.15);
   --primary-100: rgba(37, 99, 235, 0.25);
+  --primary-400: #93c5fd;
+  --primary-500: #60a5fa;
+  --primary-600: #3b82f6;
   --primary-700: #60a5fa;
+  --primary-800: #bfdbfe;
+  --primary-900: #dbeafe;
+  --primary-950: #eff6ff;
+
+  --info-box-bg: rgba(59, 130, 246, 0.16);
+  --info-box-border: rgba(96, 165, 250, 0.35);
+  --info-box-text: #bfdbfe;
+
+  --success-box-bg: rgba(16, 185, 129, 0.16);
+  --success-box-border: rgba(52, 211, 153, 0.35);
+  --success-box-text: #a7f3d0;
+
+  --danger-box-bg: rgba(239, 68, 68, 0.16);
+  --danger-box-border: rgba(248, 113, 113, 0.35);
+  --danger-box-text: #fecaca;
+
+  --warning-box-bg: rgba(245, 158, 11, 0.16);
+  --warning-box-border: rgba(251, 191, 36, 0.35);
+  --warning-box-text: #fde68a;
+
   --accent-emerald-light: rgba(16, 185, 129, 0.18);
   --accent-emerald-dark: #34d399;
   --accent-gold-light: rgba(245, 158, 11, 0.18);
@@ -209,6 +249,60 @@ body {
   background: var(--accent-gold-light);
   color: var(--accent-gold-dark);
   border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+/* صناديق التنبيهات والحالات التفاعلية */
+.alert-box {
+  padding: 0.85rem 1.15rem;
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+.alert-box-info {
+  background: var(--info-box-bg);
+  border: 1px solid var(--info-box-border);
+  color: var(--info-box-text);
+}
+.alert-box-success {
+  background: var(--success-box-bg);
+  border: 1px solid var(--success-box-border);
+  color: var(--success-box-text);
+}
+.alert-box-danger {
+  background: var(--danger-box-bg);
+  border: 1px solid var(--danger-box-border);
+  color: var(--danger-box-text);
+}
+.alert-box-warning {
+  background: var(--warning-box-bg);
+  border: 1px solid var(--warning-box-border);
+  color: var(--warning-box-text);
+}
+
+/* شريط تبويبات المنصة المتجاوب كلياً على كافة الشاشات */
+.lms-tabs-bar {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 2px solid var(--border-color);
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.5rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+.lms-tab-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: 0.88rem;
+  padding: 0.5rem 0.9rem;
+}
+
+/* حاوية الجداول المتجاوبة للأجهزة الذكية */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 1rem;
 }
 
 /* بطاقات المنصة (Cards) */

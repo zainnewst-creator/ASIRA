@@ -231,11 +231,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   return (
     <div>
       {/* شريط تبويبات الإدارة العليا */}
-      <div style={{ display: 'flex', gap: '0.6rem', borderBottom: '2px solid var(--border-color)', marginBottom: '2rem', paddingBottom: '0.5rem', overflowX: 'auto' }}>
+      <div className="lms-tabs-bar">
         <button
           onClick={() => setActiveTab('overview')}
-          className={`btn ${activeTab === 'overview' ? 'btn-primary' : 'btn-ghost'}`}
-          style={{ fontSize: '0.92rem' }}
+          className={`btn lms-tab-btn ${activeTab === 'overview' ? 'btn-primary' : 'btn-ghost'}`}
         >
           <Layers size={16} />
           <span>المؤشرات والجاهزية الصفرية</span>
@@ -243,8 +242,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
         <button
           onClick={() => setActiveTab('enrollments')}
-          className={`btn ${activeTab === 'enrollments' ? 'btn-primary' : 'btn-ghost'}`}
-          style={{ fontSize: '0.92rem' }}
+          className={`btn lms-tab-btn ${activeTab === 'enrollments' ? 'btn-primary' : 'btn-ghost'}`}
         >
           <Users size={16} />
           <span>طلبات الالتحاق بالكورسات ({pendingCount > 0 ? `${pendingCount} معلق` : 'الكل'})</span>
@@ -252,8 +250,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
         <button
           onClick={() => setActiveTab('users')}
-          className={`btn ${activeTab === 'users' ? 'btn-primary' : 'btn-ghost'}`}
-          style={{ fontSize: '0.92rem' }}
+          className={`btn lms-tab-btn ${activeTab === 'users' ? 'btn-primary' : 'btn-ghost'}`}
         >
           <ShieldAlert size={16} />
           <span>إدارة المستخدمين والصلاحيات ({usersList.length})</span>
@@ -261,8 +258,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
         <button
           onClick={() => setActiveTab('certificates')}
-          className={`btn ${activeTab === 'certificates' ? 'btn-primary' : 'btn-ghost'}`}
-          style={{ fontSize: '0.92rem' }}
+          className={`btn lms-tab-btn ${activeTab === 'certificates' ? 'btn-primary' : 'btn-ghost'}`}
         >
           <Award size={16} />
           <span>اعتماد وتوقيع الشهادات</span>
@@ -270,8 +266,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
         <button
           onClick={() => setActiveTab('audit_logs')}
-          className={`btn ${activeTab === 'audit_logs' ? 'btn-primary' : 'btn-ghost'}`}
-          style={{ fontSize: '0.92rem' }}
+          className={`btn lms-tab-btn ${activeTab === 'audit_logs' ? 'btn-primary' : 'btn-ghost'}`}
         >
           <FileCheck2 size={16} />
           <span>سجل التدقيق الأكاديمي ({auditLogs.length})</span>
@@ -279,8 +274,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
         <button
           onClick={() => setActiveTab('backup')}
-          className={`btn ${activeTab === 'backup' ? 'btn-primary' : 'btn-ghost'}`}
-          style={{ fontSize: '0.92rem' }}
+          className={`btn lms-tab-btn ${activeTab === 'backup' ? 'btn-primary' : 'btn-ghost'}`}
         >
           <Database size={16} />
           <span>النسخ الاحتياطي والترحيل</span>

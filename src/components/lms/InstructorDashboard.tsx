@@ -14,7 +14,9 @@ import {
   Award,
   Search,
   Trash2,
-  FolderPlus
+  FolderPlus,
+  Headphones,
+  Video
 } from 'lucide-react';
 import { 
   INITIAL_COURSES,
@@ -147,8 +149,10 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
 
   // نافذة إضافة درس
   const [isAddLessonModalOpen, setIsAddLessonModalOpen] = useState(false);
+  const [lessonMediaType, setLessonMediaType] = useState<'video' | 'audio'>('video');
   const [newLessonTitle, setNewLessonTitle] = useState('');
   const [newLessonYoutube, setNewLessonYoutube] = useState('');
+  const [newLessonAudio, setNewLessonAudio] = useState('');
   const [newLessonDrive, setNewLessonDrive] = useState('');
 
   // نافذة إضافة تكليف جديد
@@ -334,7 +338,10 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
     const newLesson: MockLessonItem = {
       id: `les-${Date.now()}`,
       title: newLessonTitle.trim(),
-      youtubeId: newLessonYoutube.trim() || 'dQw4w9WgXcQ',
+      mediaType: lessonMediaType,
+      youtubeId: lessonMediaType === 'video' ? (newLessonYoutube.trim() || 'dQw4w9WgXcQ') : undefined,
+      driveAudioUrl: lessonMediaType === 'audio' ? newLessonAudio.trim() : undefined,
+      audioUrl: lessonMediaType === 'audio' ? newLessonAudio.trim() : undefined,
       durationMinutes: 45,
       isMandatory: true,
       drivePdfUrl: newLessonDrive.trim() || 'https://drive.google.com',
@@ -370,8 +377,10 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
     }
 
     setIsAddLessonModalOpen(false);
+    setLessonMediaType('video');
     setNewLessonTitle('');
     setNewLessonYoutube('');
+    setNewLessonAudio('');
     setNewLessonDrive('');
   };
 
@@ -662,11 +671,10 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
       </div>
 
       {/* تبويبات المدرس الأكاديمية المبسطة */}
-      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '2px solid var(--border-color)', marginBottom: '1.75rem', paddingBottom: '0.5rem', overflowX: 'auto' }}>
+      <div className="lms-tabs-bar">
         <button
           onClick={() => setActiveTab('assignments')}
-          className={`btn ${activeTab === 'assignments' ? 'btn-primary' : 'btn-ghost'}`}
-          style={{ fontSize: '0.9rem' }}
+          className={`btn lms-tab-btn ${activeTab === 'assignments' ? 'btn-primary' : 'btn-ghost'}`}
         >
           <FileText size={16} />
           <span>تصحيح التكليفات ({submissions.length})</span>
@@ -674,8 +682,7 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
 
         <button
           onClick={() => setActiveTab('exams')}
-          className={`btn ${activeTab === 'exams' ? 'btn-primary' : 'btn-ghost'}`}
-          style={{ fontSize: '0.9rem' }}
+          className={`btn lms-tab-btn ${activeTab === 'exams' ? 'btn-primary' : 'btn-ghost'}`}
         >
           <CheckCircle2 size={16} />
           <span>مراجعة درجات الاختبارات ({examAttempts.length})</span>
@@ -683,8 +690,7 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
 
         <button
           onClick={() => setActiveTab('curriculum')}
-          className={`btn ${activeTab === 'curriculum' ? 'btn-primary' : 'btn-ghost'}`}
-          style={{ fontSize: '0.9rem' }}
+          className={`btn lms-tab-btn ${activeTab === 'curriculum' ? 'btn-primary' : 'btn-ghost'}`}
         >
           <Layers size={16} />
           <span>المنهج والوحدات الدراسية (Curriculum Builder)</span>
@@ -692,8 +698,7 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
 
         <button
           onClick={() => setActiveTab('practical')}
-          className={`btn ${activeTab === 'practical' ? 'btn-primary' : 'btn-ghost'}`}
-          style={{ fontSize: '0.9rem' }}
+          className={`btn lms-tab-btn ${activeTab === 'practical' ? 'btn-primary' : 'btn-ghost'}`}
         >
           <GraduationCap size={16} />
           <span>الامتحان العملي الحضوري</span>
@@ -2010,12 +2015,55 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>عنوان الدرس *</label>
                 <input type="text" required value={newLessonTitle} onChange={(e) => setNewLessonTitle(e.target.value)} placeholder="مثال: الدرس 4: صياغة استراتيجية MeSH" style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }} />
               </div>
+
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>معرف فيديو YouTube أو الرابط</label>
-                <input type="text" value={newLessonYoutube} onChange={(e) => setNewLessonYoutube(e.target.value)} placeholder="dQw4w9WgXcQ" style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }} />
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>نوع محتوى المحاضرة</label>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setLessonMediaType('video')}
+                    className={`btn ${lessonMediaType === 'video' ? 'btn-primary' : 'btn-outline'}`}
+                    style={{ flex: 1, padding: '0.45rem', fontSize: '0.82rem' }}
+                  >
+                    <Video size={14} />
+                    <span>فيديو YouTube</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLessonMediaType('audio')}
+                    className={`btn ${lessonMediaType === 'audio' ? 'btn-primary' : 'btn-outline'}`}
+                    style={{ flex: 1, padding: '0.45rem', fontSize: '0.82rem' }}
+                  >
+                    <Headphones size={14} />
+                    <span>تسجيل صوتي (Google Drive Audio)</span>
+                  </button>
+                </div>
               </div>
+
+              {lessonMediaType === 'video' ? (
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>معرف فيديو YouTube أو الرابط</label>
+                  <input type="text" value={newLessonYoutube} onChange={(e) => setNewLessonYoutube(e.target.value)} placeholder="مثال: dQw4w9WgXcQ" style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }} />
+                </div>
+              ) : (
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>رابط التسجيل الصوتي من Google Drive أو ملف صوتي *</label>
+                  <input 
+                    type="url" 
+                    required 
+                    value={newLessonAudio} 
+                    onChange={(e) => setNewLessonAudio(e.target.value)} 
+                    placeholder="https://drive.google.com/file/d/..." 
+                    style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }} 
+                  />
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.25rem' }}>
+                    💡 ارفع التسجيل الصوتي لـ Google Drive واضبط المشاركة على "أي شخص لديه الرابط (Viewer)".
+                  </span>
+                </div>
+              )}
+
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>رابط سلايدات Google Drive</label>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>رابط سلايدات وملاحظات Google Drive (PDF)</label>
                 <input type="url" value={newLessonDrive} onChange={(e) => setNewLessonDrive(e.target.value)} placeholder="https://drive.google.com/..." style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }} />
               </div>
               <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>

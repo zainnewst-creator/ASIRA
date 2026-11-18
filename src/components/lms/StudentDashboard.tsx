@@ -18,7 +18,8 @@ import {
   Download,
   PlayCircle,
   Edit3,
-  Lock
+  Lock,
+  Headphones
 } from 'lucide-react';
 import { 
   MockStudentSubmission, 
@@ -30,6 +31,7 @@ import {
 } from '../../data/mockData';
 import { Course } from '../../types';
 import { AcademicCertificateModal } from './AcademicCertificateModal';
+import { AudioLessonPlayer } from './AudioLessonPlayer';
 import { sanitizeUrl, sanitizeExamForStudent, isTrustedStorageUrl } from '../../utils/security';
 
 export interface StudentDashboardProps {
@@ -478,11 +480,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
       </div>
 
       {/* شريط تبويبات لوحة تحكم الطالب المحسنة */}
-      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '2px solid var(--border-color)', marginBottom: '1.75rem', paddingBottom: '0.5rem', overflowX: 'auto' }}>
+      <div className="lms-tabs-bar">
         <button
           onClick={() => setActiveTab('my_courses')}
-          className={`btn ${activeTab === 'my_courses' ? 'btn-primary' : 'btn-ghost'}`}
-          style={{ fontSize: '0.9rem' }}
+          className={`btn lms-tab-btn ${activeTab === 'my_courses' ? 'btn-primary' : 'btn-ghost'}`}
         >
           <BookOpen size={16} />
           <span>دوراتي المسجلة ({courses.length})</span>
@@ -490,8 +491,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
         <button
           onClick={() => setActiveTab('learn')}
-          className={`btn ${activeTab === 'learn' ? 'btn-primary' : 'btn-ghost'}`}
-          style={{ fontSize: '0.9rem' }}
+          className={`btn lms-tab-btn ${activeTab === 'learn' ? 'btn-primary' : 'btn-ghost'}`}
         >
           <PlayCircle size={16} />
           <span>المحاضرات ومشغل الدروس</span>
@@ -499,8 +499,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
         <button
           onClick={() => setActiveTab('assignments')}
-          className={`btn ${activeTab === 'assignments' ? 'btn-primary' : 'btn-ghost'}`}
-          style={{ fontSize: '0.9rem' }}
+          className={`btn lms-tab-btn ${activeTab === 'assignments' ? 'btn-primary' : 'btn-ghost'}`}
         >
           <FileText size={16} />
           <span>التكليفات وملاحظات المشرف</span>
@@ -508,8 +507,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
         <button
           onClick={() => setActiveTab('exam')}
-          className={`btn ${activeTab === 'exam' ? 'btn-primary' : 'btn-ghost'}`}
-          style={{ fontSize: '0.9rem' }}
+          className={`btn lms-tab-btn ${activeTab === 'exam' ? 'btn-primary' : 'btn-ghost'}`}
         >
           <CheckCircle2 size={16} />
           <span>الاختبارات الإلكترونية (MCQ)</span>
@@ -517,8 +515,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
         <button
           onClick={() => setActiveTab('transcript')}
-          className={`btn ${activeTab === 'transcript' ? 'btn-primary' : 'btn-ghost'}`}
-          style={{ fontSize: '0.9rem' }}
+          className={`btn lms-tab-btn ${activeTab === 'transcript' ? 'btn-primary' : 'btn-ghost'}`}
         >
           <GraduationCap size={16} />
           <span>السجل الأكاديمي والشهادة</span>
@@ -695,6 +692,15 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                   </button>
                 )}
               </div>
+            ) : currentLesson?.mediaType === 'audio' || (currentLesson?.audioUrl || currentLesson?.driveAudioUrl) ? (
+              <AudioLessonPlayer
+                title={currentLesson.title}
+                courseTitle={currentCourse?.title}
+                instructorName={currentCourse?.instructorNames?.[0]}
+                audioUrl={currentLesson.audioUrl}
+                driveAudioUrl={currentLesson.driveAudioUrl}
+                durationMinutes={currentLesson.durationMinutes}
+              />
             ) : (
               <div style={{ 
                 width: '100%', 
@@ -931,6 +937,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                                   <Lock size={14} color="#ef4444" />
                                 ) : isCompleted ? (
                                   <CheckCircle2 size={15} color="#10b981" />
+                                ) : (les.mediaType === 'audio' || les.audioUrl || les.driveAudioUrl) ? (
+                                  <Headphones size={15} color={isCurrent ? 'var(--primary-600)' : '#3b82f6'} />
                                 ) : (
                                   <PlayCircle size={15} color={isCurrent ? 'var(--primary-600)' : 'var(--text-subtle)'} />
                                 )}
@@ -1129,7 +1137,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                   <li>من خيار الوصول العام (General access)، غيّر الحالة إلى <strong>"أي شخص لديه الرابط" (Anyone with the link)</strong>، وتأكد من تعيين الدور إلى <strong>"مشاهد" (Viewer)</strong> حتى يتمكن المشرف من فتح الملف وتصحيحه.</li>
                   <li>انسخ الرابط الصحيح (Copy link) والصقه في الخانة أدناه.</li>
                 </ol>
-                <div style={{ padding: '0.65rem 0.85rem', background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: 'var(--radius-sm)', fontSize: '0.78rem', color: 'var(--primary-800)', lineHeight: '1.6' }}>
+                <div className="alert-box alert-box-info" style={{ padding: '0.65rem 0.85rem', fontSize: '0.78rem', lineHeight: '1.6' }}>
                   <strong>⚠️ تنبيه هام حول صلاحيات الوصول:</strong> فحص النظام الآلي يتأكد فقط من أن الرابط يتبع نطاق Google Drive أو Docs الآمن والمعتمد؛ <em>وهذا الفحص لا يضمن وجود الملف ولا يضمن إمكانية وصول المشرف إليه</em>. إذا كان الملف مقفلاً أو لا يملك المشرف إذن عرضه، فسيطلب منك المشرف إعادة التسليم وتعديل صلاحيات المشاركة.
                 </div>
               </div>
@@ -1185,19 +1193,17 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               )}
 
               {submitSuccessNotice && (
-                <div style={{
-                  marginTop: '0.85rem',
-                  padding: '0.85rem 1rem',
-                  background: 'rgba(16, 185, 129, 0.1)',
-                  border: '1px solid #10b981',
-                  color: '#047857',
-                  borderRadius: 'var(--radius-md)',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  gap: '0.6rem',
-                }}>
+                <div 
+                  className="alert-box alert-box-success"
+                  style={{
+                    marginTop: '0.85rem',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '0.6rem',
+                  }}
+                >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                     <CheckCircle2 size={18} color="#059669" />
                     <span style={{ fontSize: '0.88rem', fontWeight: 700 }}>
@@ -1270,7 +1276,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               <p style={{ fontSize: '0.95rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
                 الدرجة الرسمية المحسوبة: <strong style={{ color: 'var(--accent-emerald)', fontSize: '1.2rem' }}>{examCalculatedScore} / 30 درجة</strong>
               </p>
-              <div style={{ padding: '0.65rem 1rem', background: 'rgba(16, 185, 129, 0.1)', color: '#047857', borderRadius: 'var(--radius-md)', maxWidth: '420px', margin: '0 auto 1.25rem', fontSize: '0.85rem', fontWeight: 600 }}>
+              <div className="alert-box alert-box-success" style={{ maxWidth: '420px', margin: '0 auto 1.25rem', fontSize: '0.85rem', fontWeight: 600 }}>
                 🎉 تم فتح المحاضرة والدرس التالي لك في الكورس فوراً!
               </div>
               <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -1698,18 +1704,18 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
             // الحالة 4: تم رفض الطلب
             if (currentCertReq.status === 'rejected') {
               return (
-                <div style={{ padding: '1.25rem', background: '#fef2f2', border: '1px solid #f87171', borderRadius: 'var(--radius-md)' }}>
+                <div className="alert-box alert-box-danger" style={{ padding: '1.25rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
                     <div>
-                      <span className="badge" style={{ background: '#fee2e2', color: '#b91c1c', marginBottom: '0.35rem' }}>
+                      <span className="badge badge-primary" style={{ marginBottom: '0.35rem', borderColor: 'currentColor' }}>
                         تم رفض طلب الشهادة
                       </span>
-                      <h4 style={{ margin: '0.2rem 0', color: '#991b1b', fontSize: '1rem', fontWeight: 800 }}>ملاحظات الإدارة الأكاديمية:</h4>
-                      <p style={{ margin: 0, fontSize: '0.85rem', color: '#7f1d1d' }}>
+                      <h4 style={{ margin: '0.2rem 0', fontSize: '1rem', fontWeight: 800 }}>ملاحظات الإدارة الأكاديمية:</h4>
+                      <p style={{ margin: 0, fontSize: '0.85rem' }}>
                         {currentCertReq.adminNotes || 'لم يتم استيفاء المتطلبات المقررة في الحضور والتطبيقات العملية.'}
                       </p>
                     </div>
-                    <button onClick={handleRequestCert} className="btn btn-outline" style={{ borderColor: '#ef4444', color: '#b91c1c' }}>
+                    <button onClick={handleRequestCert} className="btn btn-outline" style={{ borderColor: 'currentColor', color: 'inherit' }}>
                       إعادة تقديم الطلب
                     </button>
                   </div>

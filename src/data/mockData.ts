@@ -464,7 +464,10 @@ export const INITIAL_EXAM_ATTEMPTS: MockExamAttemptForInstructor[] = [
 export interface MockLessonItem {
   id: string;
   title: string;
-  youtubeId: string;
+  mediaType?: 'video' | 'audio';
+  youtubeId?: string;
+  audioUrl?: string;
+  driveAudioUrl?: string;
   durationMinutes: number;
   isMandatory: boolean;
   drivePdfUrl?: string;

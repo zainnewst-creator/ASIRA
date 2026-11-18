@@ -58,7 +58,10 @@ export interface Lesson {
   courseId: string;
   title: string;
   description?: string;
+  mediaType?: 'video' | 'audio';
   youtubeVideoId?: string;
+  audioUrl?: string;
+  driveAudioUrl?: string;
   attachments?: { title: string; driveUrl: string; type: 'pdf' | 'doc' | 'link' }[];
   durationMinutes?: number;
   orderIndex: number;
