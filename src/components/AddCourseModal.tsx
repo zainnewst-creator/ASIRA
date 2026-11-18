@@ -17,7 +17,7 @@ export const AddCourseModal: React.FC<AddCourseModalProps> = ({
   const [code, setCode] = useState('RES-');
   const [summary, setSummary] = useState('');
   const [description, setDescription] = useState('');
-  const [instructorNames, setInstructorNames] = useState('د. إبراهيم يحيى, د. أحمد الصالح');
+  const [instructorNames, setInstructorNames] = useState('');
   const [coverUrl, setCoverUrl] = useState('https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=800&q=80');
   const [passingScore, setPassingScore] = useState(70);
   const [totalLessons, setTotalLessons] = useState(12);
@@ -154,7 +154,7 @@ export const AddCourseModal: React.FC<AddCourseModalProps> = ({
               required
               value={instructorNames}
               onChange={(e) => setInstructorNames(e.target.value)}
-              placeholder="مثال: د. إبراهيم يحيى, د. أحمد الصالح, د. سارة الكيلاني"
+              placeholder="مثال: د. محمد العبدالله, د. سارة الأحمد"
               style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.9rem' }}
             />
           </div>

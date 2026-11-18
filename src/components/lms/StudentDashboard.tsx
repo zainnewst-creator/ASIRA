@@ -109,10 +109,46 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   // محاولة اختبار الطالب الحالي
   const studentExamAttempt = examAttempts.find((a) => a.studentUid === studentUid) || examAttempts[0];
 
-  // حالة مشغل الدروس
+  // حالة مشغل الدروس ومتابعة المحاضرات المكتملة
   const [currentModuleIndex, setCurrentModuleIndex] = useState(0);
   const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
-  const [completedLessonIds, setCompletedLessonIds] = useState<string[]>([]);
+  const [completedLessonIds, setCompletedLessonIds] = useState<string[]>(() => {
+    try {
+      if (selectedCourseId && studentUid) {
+        const saved = localStorage.getItem(`asira_completed_lessons_${studentUid}_${selectedCourseId}`);
+        return saved ? JSON.parse(saved) : [];
+      }
+    } catch {
+      // ignore
+    }
+    return [];
+  });
+
+  // مزامنة الدروس المكتملة عند تبديل الكورس أو عند تحديد درس جديد كمكتمل
+  React.useEffect(() => {
+    if (selectedCourseId && studentUid) {
+      try {
+        const saved = localStorage.getItem(`asira_completed_lessons_${studentUid}_${selectedCourseId}`);
+        if (saved) {
+          setCompletedLessonIds(JSON.parse(saved));
+        } else {
+          setCompletedLessonIds([]);
+        }
+      } catch {
+        setCompletedLessonIds([]);
+      }
+    }
+  }, [selectedCourseId, studentUid]);
+
+  React.useEffect(() => {
+    if (selectedCourseId && studentUid) {
+      try {
+        localStorage.setItem(`asira_completed_lessons_${studentUid}_${selectedCourseId}`, JSON.stringify(completedLessonIds));
+      } catch {
+        // ignore
+      }
+    }
+  }, [completedLessonIds, selectedCourseId, studentUid]);
 
   // الأكورديون للوحدات الدراسية
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({
@@ -655,7 +691,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
         </div>
 
         <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-          المشرف الأكاديمي: <strong>{currentCourse.instructorNames?.join(', ') || 'د. إبراهيم يحيى'}</strong>
+          المشرف الأكاديمي: <strong>{currentCourse.instructorNames?.join(', ') || 'المشرف الأكاديمي'}</strong>
         </div>
       </div>
 
@@ -826,7 +862,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                 </h2>
                 <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'flex', gap: '1rem', marginTop: '0.25rem' }}>
                   <span>المدة: {currentLesson?.durationMinutes} دقيقة</span>
-                  <span>المحاضر: {currentCourse?.instructorNames?.[0] || 'د. إبراهيم يحيى'}</span>
+                  <span>المحاضر: {currentCourse?.instructorNames?.[0] || 'المشرف الأكاديمي'}</span>
                 </div>
               </div>
 

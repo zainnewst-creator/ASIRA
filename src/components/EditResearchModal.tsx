@@ -61,7 +61,7 @@ export const EditResearchModal: React.FC<EditResearchModalProps> = ({
     if (paper) {
       setTitle(paper.title || '');
       setAuthors(paper.authors ? paper.authors.join(', ') : '');
-      setSupervisorName(paper.supervisorName || 'د. إبراهيم يحيى');
+      setSupervisorName(paper.supervisorName || '');
       setField(paper.field || 'طب بشري وباطنة');
       setJournal(paper.journal || '');
       setPublicationYear(paper.publicationYear || 2026);
@@ -103,7 +103,7 @@ export const EditResearchModal: React.FC<EditResearchModalProps> = ({
       authors: authors.split(',').map((a) => a.trim()).filter(Boolean).length > 0
         ? authors.split(',').map((a) => a.trim()).filter(Boolean)
         : paper.authors,
-      supervisorName: supervisorName.trim() || 'د. إبراهيم يحيى',
+      supervisorName: supervisorName.trim() || 'المشرف الأكاديمي للبحث',
       field: field.trim(),
       journal: journal.trim(),
       publicationYear: Number(publicationYear) || 2026,

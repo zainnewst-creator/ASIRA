@@ -231,7 +231,7 @@ export const AcademicCertificateModal: React.FC<AcademicCertificateModalProps> =
             <div>
               <div style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: '0.35rem' }}>المشرف الأكاديمي ورئيس المبادرة:</div>
               <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', textDecoration: 'underline' }}>
-                د. إبراهيم يحيى
+                {course?.instructorNames?.[0] || 'عمادة منتدى أسيرا'}
               </div>
               <div style={{ fontSize: '0.75rem', color: '#64748b' }}>عميد منتدى أسيرا للبحث العلمي</div>
             </div>

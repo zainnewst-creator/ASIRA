@@ -16,7 +16,12 @@ import {
   Trash2,
   FolderPlus,
   Headphones,
-  Video
+  Video,
+  ArrowRight,
+  Users,
+  BarChart2,
+  Clock,
+  UserCheck
 } from 'lucide-react';
 import { 
   INITIAL_COURSES,
@@ -27,7 +32,8 @@ import {
   MockCurriculumModule,
   MockLessonItem,
   MockAssignmentItem,
-  MockExamItem
+  MockExamItem,
+  MockPendingEnrollment
 } from '../../data/mockData';
 import { Course, ResearchPaper } from '../../types';
 import { AddCourseModal } from '../AddCourseModal';
@@ -50,6 +56,7 @@ export interface InstructorDashboardProps {
   onUpdateCurriculum?: (updated: MockCourseCurriculum) => void;
   practicalGrades?: Record<string, { score: number; notes: string }>;
   onUpdatePracticalGrade?: (studentId: string, score: number, notes: string) => void;
+  enrollments?: MockPendingEnrollment[];
   onLogAudit?: (action: string, details: string) => void;
 }
 
@@ -68,13 +75,14 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
   onUpdateCurriculum,
   practicalGrades: propPracticalGrades,
   onUpdatePracticalGrade,
+  enrollments = [],
   onLogAudit,
 }) => {
-  const [activeTab, setActiveTab] = useState<'assignments' | 'exams' | 'curriculum' | 'practical'>('assignments');
-  const [selectedCourseId, setSelectedCourseId] = useState<string>(propActiveCourseId || courses[0]?.id || 'course-1');
+  const [activeTab, setActiveTab] = useState<'curriculum' | 'exams' | 'assignments' | 'practical' | 'progress'>('curriculum');
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(propActiveCourseId || null);
 
-  // الكورس النشط حالياً
-  const currentCourse = courses.find((c) => c.id === selectedCourseId) || courses[0];
+  // الكورس النشط حالياً عند الدخول لإدارته
+  const currentCourse = selectedCourseId ? (courses.find((c) => c.id === selectedCourseId) || courses[0]) : null;
 
   // بيانات التكليفات
   const [localSubmissions, setLocalSubmissions] = useState<MockStudentSubmission[]>(propSubmissions || []);
@@ -146,6 +154,10 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
   const [localPracticalGrades, setLocalPracticalGrades] = useState<Record<string, { score: number; notes: string }>>({});
   const practicalGrades = propPracticalGrades || localPracticalGrades;
   const [selectedPracticalStudent, setSelectedPracticalStudent] = useState<{ id: string; name: string; score: number; notes: string } | null>(null);
+  const [isAddPracticalModalOpen, setIsAddPracticalModalOpen] = useState(false);
+  const [newPracticalStudentUid, setNewPracticalStudentUid] = useState('');
+  const [newPracticalScore, setNewPracticalScore] = useState(40);
+  const [newPracticalNotes, setNewPracticalNotes] = useState('أداء متميز في الاختبار العملي الحضوري');
 
   // نافذة إضافة درس
   const [isAddLessonModalOpen, setIsAddLessonModalOpen] = useState(false);
@@ -598,112 +610,278 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
     }
   };
 
+  // الطلاب المعتمدون في الكورس المحدد
+  const courseApprovedStudents = (enrollments || []).filter(
+    (e) => e.courseId === currentCourse?.id && e.status === 'approved'
+  );
+
+  // تصفية التكليفات والاختبارات المرتبطة بالكورس أو طلابه
+  const courseSubmissions = submissions.filter((sub) => 
+    courseApprovedStudents.length === 0 || courseApprovedStudents.some(s => s.studentUid === sub.studentUid || s.studentName === sub.studentName)
+  );
+
+  const courseExamAttempts = examAttempts.filter((att) => 
+    courseApprovedStudents.length === 0 || courseApprovedStudents.some(s => s.studentUid === att.studentUid || s.studentName === att.studentName)
+  );
+
   return (
     <div>
-      {/* شريط اختيار الكورس المدار وأزرار الإنشاء السريعة */}
-      <div style={{
-        background: 'var(--bg-card)',
-        border: '1px solid var(--border-color)',
-        borderRadius: 'var(--radius-md)',
-        padding: '0.85rem 1.25rem',
-        marginBottom: '1.5rem',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '1rem',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-main)' }}>
-            الكورس المدار حالياً:
-          </span>
-          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-            {courses.map((course) => (
-              <button
-                key={course.id}
-                onClick={() => handleSelectCourse(course.id)}
-                className={`btn ${selectedCourseId === course.id ? 'btn-primary' : 'btn-outline'}`}
-                style={{ fontSize: '0.82rem', padding: '0.35rem 0.85rem', borderRadius: 'var(--radius-full)' }}
-              >
-                <span>{course.code}</span>
-              </button>
-            ))}
+      {/* المستوى الأول: قائمة الكورسات الحالية (عند عدم اختيار كورس محدد) */}
+      {!selectedCourseId && (
+        <div style={{ marginBottom: '2rem' }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '1rem',
+            marginBottom: '1.5rem',
+            background: 'var(--bg-card)',
+            padding: '1.25rem 1.5rem',
+            borderRadius: 'var(--radius-lg)',
+            border: '1px solid var(--border-color)',
+          }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.35rem' }}>
+                <span className="badge badge-emerald" style={{ fontSize: '0.82rem' }}>
+                  👨‍🏫 إدارة المقررات والتعليم الأكاديمي
+                </span>
+              </div>
+              <h1 style={{ fontSize: '1.45rem', fontWeight: 900, color: 'var(--text-main)', margin: 0 }}>
+                قائمة الكورسات الحالية
+              </h1>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '0.3rem 0 0' }}>
+                اختر الكورس الأكاديمي لإدارة منهجه ومحاضراته، متابعة تقدم الطلاب المسجلين فيه، ورصد وتصحيح التكليفات والاختبارات والامتحان العملي.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+              {onAddCourse && (
+                <button
+                  onClick={() => setIsAddCourseModalOpen(true)}
+                  className="btn btn-primary"
+                  style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+                >
+                  <Plus size={15} />
+                  <span>إضافة كورس جديد</span>
+                </button>
+              )}
+              {onAddResearch && (
+                <button
+                  onClick={() => setIsAddResearchModalOpen(true)}
+                  className="btn btn-outline"
+                  style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+                >
+                  <Plus size={15} />
+                  <span>إضافة بحث منشور</span>
+                </button>
+              )}
+            </div>
           </div>
-          <span className="badge badge-emerald" style={{ fontSize: '0.82rem' }}>
-            {currentCourse?.title}
-          </span>
-          <button
-            onClick={() => setIsEditCourseModalOpen(true)}
-            className="btn btn-outline"
-            style={{ fontSize: '0.82rem', padding: '0.35rem 0.85rem' }}
-            title="تعديل تفاصيل الكورس (الوصف، المشرفين، الغلاف، درجات النجاح)"
-            id="edit-course-details-top-btn"
-          >
-            <Edit3 size={14} />
-            <span>تعديل تفاصيل الكورس</span>
-          </button>
+
+          {/* شبكة بطاقات الكورسات */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+            gap: '1.25rem',
+          }}>
+            {courses.map((course) => {
+              const enrolledInCourse = (enrollments || []).filter((e) => e.courseId === course.id && e.status === 'approved');
+              const pendingInCourse = (enrollments || []).filter((e) => e.courseId === course.id && e.status === 'pending');
+              return (
+                <div
+                  key={course.id}
+                  className="card"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    transition: 'transform 0.2s, box-shadow 0.2s',
+                    cursor: 'pointer',
+                    border: '1px solid var(--border-color)',
+                    padding: '1.35rem',
+                  }}
+                  onClick={() => handleSelectCourse(course.id)}
+                >
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                      <span className="badge badge-emerald" style={{ fontWeight: 800 }}>
+                        {course.code}
+                      </span>
+                      <span className="badge badge-subtle" style={{ fontSize: '0.78rem' }}>
+                        درجة النجاح: {course.passingScore}%
+                      </span>
+                    </div>
+
+                    <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '0.5rem', lineHeight: 1.4 }}>
+                      {course.title}
+                    </h3>
+
+                    <p style={{
+                      fontSize: '0.84rem',
+                      color: 'var(--text-muted)',
+                      lineHeight: 1.5,
+                      marginBottom: '1rem',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden'
+                    }}>
+                      {course.summary || course.description}
+                    </p>
+
+                    <div style={{
+                      fontSize: '0.8rem',
+                      color: 'var(--text-muted)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      marginBottom: '0.85rem'
+                    }}>
+                      <Users size={14} />
+                      <span>المشرفون: <strong>{course.instructorNames?.join('، ') || 'المشرف الأكاديمي'}</strong></span>
+                    </div>
+                  </div>
+
+                  <div style={{
+                    paddingTop: '0.85rem',
+                    borderTop: '1px solid var(--border-color)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginTop: '0.5rem'
+                  }}>
+                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                      <span className="badge badge-primary" style={{ fontSize: '0.78rem' }}>
+                        👥 {enrolledInCourse.length} طلاب مسجلون
+                      </span>
+                      {pendingInCourse.length > 0 && (
+                        <span className="badge badge-gold" style={{ fontSize: '0.74rem' }}>
+                          ⏳ {pendingInCourse.length} بانتظار القبول
+                        </span>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectCourse(course.id);
+                      }}
+                      className="btn btn-outline"
+                      style={{ fontSize: '0.82rem', padding: '0.35rem 0.85rem' }}
+                    >
+                      <span>إدارة الكورس ←</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
+      )}
 
-        {/* أزرار إضافة كورس وبحث عامة */}
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          {onAddCourse && (
+      {/* المستوى الثاني: نافذة إدارة الكورس المختار */}
+      {selectedCourseId && currentCourse && (
+        <>
+          {/* شريط رأس الكورس والعودة لقائمة الكورسات */}
+          <div style={{
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-color)',
+            borderRadius: 'var(--radius-md)',
+            padding: '0.85rem 1.25rem',
+            marginBottom: '1.5rem',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '1rem',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setSelectedCourseId(null)}
+                className="btn btn-outline"
+                style={{ fontSize: '0.85rem', padding: '0.4rem 0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                title="العودة إلى قائمة الكورسات"
+              >
+                <ArrowRight size={15} />
+                <span>العودة إلى قائمة الكورسات</span>
+              </button>
+
+              <span className="badge badge-emerald" style={{ fontSize: '0.85rem', fontWeight: 800 }}>
+                {currentCourse.code}
+              </span>
+              <span style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                {currentCourse.title}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {onAddCourse && (
+                <button
+                  onClick={() => setIsAddCourseModalOpen(true)}
+                  className="btn btn-outline"
+                  style={{ fontSize: '0.82rem', padding: '0.4rem 0.85rem' }}
+                >
+                  <Plus size={14} />
+                  <span>إضافة كورس جديد</span>
+                </button>
+              )}
+
+              {onAddResearch && (
+                <button
+                  onClick={() => setIsAddResearchModalOpen(true)}
+                  className="btn btn-outline"
+                  style={{ fontSize: '0.82rem', padding: '0.4rem 0.85rem' }}
+                >
+                  <Plus size={14} />
+                  <span>إضافة بحث منشور</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* تبويبات المشرف الأكاديمية بالترتيب الجديد المطلوب */}
+          <div className="lms-tabs-bar">
             <button
-              onClick={() => setIsAddCourseModalOpen(true)}
-              className="btn btn-outline"
-              style={{ fontSize: '0.82rem', padding: '0.4rem 0.85rem' }}
+              onClick={() => setActiveTab('curriculum')}
+              className={`btn lms-tab-btn ${activeTab === 'curriculum' ? 'btn-primary' : 'btn-ghost'}`}
             >
-              <Plus size={14} />
-              <span>إضافة كورس جديد</span>
+              <Layers size={16} />
+              <span>المنهج والوحدات الدراسية (Curriculum Builder)</span>
             </button>
-          )}
 
-          {onAddResearch && (
             <button
-              onClick={() => setIsAddResearchModalOpen(true)}
-              className="btn btn-outline"
-              style={{ fontSize: '0.82rem', padding: '0.4rem 0.85rem' }}
+              onClick={() => setActiveTab('exams')}
+              className={`btn lms-tab-btn ${activeTab === 'exams' ? 'btn-primary' : 'btn-ghost'}`}
             >
-              <Plus size={14} />
-              <span>إضافة بحث منشور</span>
+              <CheckCircle2 size={16} />
+              <span>مراجعة درجات الاختبارات ({courseExamAttempts.length})</span>
             </button>
-          )}
-        </div>
-      </div>
 
-      {/* تبويبات المدرس الأكاديمية المبسطة */}
-      <div className="lms-tabs-bar">
-        <button
-          onClick={() => setActiveTab('assignments')}
-          className={`btn lms-tab-btn ${activeTab === 'assignments' ? 'btn-primary' : 'btn-ghost'}`}
-        >
-          <FileText size={16} />
-          <span>تصحيح التكليفات ({submissions.length})</span>
-        </button>
+            <button
+              onClick={() => setActiveTab('assignments')}
+              className={`btn lms-tab-btn ${activeTab === 'assignments' ? 'btn-primary' : 'btn-ghost'}`}
+            >
+              <FileText size={16} />
+              <span>تصحيح التكليفات ({courseSubmissions.length})</span>
+            </button>
 
-        <button
-          onClick={() => setActiveTab('exams')}
-          className={`btn lms-tab-btn ${activeTab === 'exams' ? 'btn-primary' : 'btn-ghost'}`}
-        >
-          <CheckCircle2 size={16} />
-          <span>مراجعة درجات الاختبارات ({examAttempts.length})</span>
-        </button>
+            <button
+              onClick={() => setActiveTab('practical')}
+              className={`btn lms-tab-btn ${activeTab === 'practical' ? 'btn-primary' : 'btn-ghost'}`}
+            >
+              <GraduationCap size={16} />
+              <span>الامتحان العملي الحضوري</span>
+            </button>
 
-        <button
-          onClick={() => setActiveTab('curriculum')}
-          className={`btn lms-tab-btn ${activeTab === 'curriculum' ? 'btn-primary' : 'btn-ghost'}`}
-        >
-          <Layers size={16} />
-          <span>المنهج والوحدات الدراسية (Curriculum Builder)</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('practical')}
-          className={`btn lms-tab-btn ${activeTab === 'practical' ? 'btn-primary' : 'btn-ghost'}`}
-        >
-          <GraduationCap size={16} />
-          <span>الامتحان العملي الحضوري</span>
-        </button>
-      </div>
+            <button
+              onClick={() => setActiveTab('progress')}
+              className={`btn lms-tab-btn ${activeTab === 'progress' ? 'btn-primary' : 'btn-ghost'}`}
+            >
+              <Award size={16} />
+              <span>متابعة تقدم الطلاب ({courseApprovedStudents.length})</span>
+            </button>
+          </div>
 
       {/* 1. تبويب تصحيح التكليفات (Assignments Hub) */}
       {activeTab === 'assignments' && (
@@ -1618,85 +1796,116 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
       {/* 4. تبويب الامتحان العملي الحضوري */}
       {activeTab === 'practical' && (
         <div className="card">
-          <div style={{ marginBottom: '1.25rem' }}>
-            <h2 style={{ fontSize: '1.3rem', fontWeight: 800, margin: 0 }}>
-              رصد وتعديل الامتحان العملي الحضوري بالجامعة
-            </h2>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-              رصد درجات الامتحان العملي الحضوري المنعقد في المعمل المركزي (من 50 درجة).
-            </p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <h2 style={{ fontSize: '1.3rem', fontWeight: 800, margin: 0 }}>
+                رصد وتعديل الامتحان العملي الحضوري بالجامعة
+              </h2>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                رصد درجات الامتحان العملي الحضوري المنعقد في المعمل المركزي (من 50 درجة).
+              </p>
+            </div>
+            {courseApprovedStudents.length > 0 && (
+              <button
+                onClick={() => {
+                  setNewPracticalStudentUid(courseApprovedStudents[0]?.studentUid || '');
+                  setNewPracticalScore(40);
+                  setNewPracticalNotes('أداء متميز في الاختبار العملي الحضوري');
+                  setIsAddPracticalModalOpen(true);
+                }}
+                className="btn btn-primary"
+                style={{ fontSize: '0.85rem', padding: '0.45rem 0.95rem' }}
+              >
+                <Plus size={15} />
+                <span>رصد درجة عملي لطالب جديد</span>
+              </button>
+            )}
           </div>
 
-          <div className="table-responsive">
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: '0.88rem' }}>
-              <thead>
-                <tr style={{ background: 'var(--bg-subtle)', borderBottom: '2px solid var(--border-color)' }}>
-                  <th style={{ padding: '0.85rem' }}>اسم الطالب</th>
-                  <th style={{ padding: '0.85rem' }}>الدرجة المرصودة (من 50)</th>
-                  <th style={{ padding: '0.85rem' }}>الملاحظات الأكاديمية</th>
-                  <th style={{ padding: '0.85rem' }}>الإجراء</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '0.85rem' }}>
-                    <strong>أحمد محمد الصالح</strong>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>جامعة الملك سعود</div>
-                  </td>
-                  <td style={{ padding: '0.85rem', fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary-700)' }}>
-                    {practicalGrades['student-1']?.score || 42} / 50
-                  </td>
-                  <td style={{ padding: '0.85rem', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                    {practicalGrades['student-1']?.notes || 'أداء ممتاز'}
-                  </td>
-                  <td style={{ padding: '0.85rem' }}>
-                    <button
-                      onClick={() => setSelectedPracticalStudent({
-                        id: 'student-1',
-                        name: 'أحمد محمد الصالح',
-                        score: practicalGrades['student-1']?.score || 42,
-                        notes: practicalGrades['student-1']?.notes || 'أداء ممتاز في اختبار تحليل البيانات الإحصائية الحضوري',
-                      })}
-                      className="btn btn-outline"
-                      style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
-                    >
-                      <Edit3 size={13} />
-                      <span>تعديل الدرجة</span>
-                    </button>
-                  </td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '0.85rem' }}>
-                    <strong>سارة خالد الكيلاني</strong>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>جامعة العلوم والتكنولوجيا - دكتور صيدلة</div>
-                  </td>
-                  <td style={{ padding: '0.85rem', fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary-700)' }}>
-                    {practicalGrades['student-2']?.score || 38} / 50
-                  </td>
-                  <td style={{ padding: '0.85rem', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                    {practicalGrades['student-2']?.notes || 'جيد جداً مع ملاحظة طفيفة في صياغة الفرضية'}
-                  </td>
-                  <td style={{ padding: '0.85rem' }}>
-                    <button
-                      onClick={() => setSelectedPracticalStudent({
-                        id: 'student-2',
-                        name: 'سارة خالد الكيلاني',
-                        score: practicalGrades['student-2']?.score || 38,
-                        notes: practicalGrades['student-2']?.notes || 'جيد جداً مع ملاحظة طفيفة في صياغة الفرضية',
-                      })}
-                      className="btn btn-outline"
-                      style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
-                    >
-                      <Edit3 size={13} />
-                      <span>تعديل الدرجة</span>
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          {courseApprovedStudents.length === 0 ? (
+            <div style={{
+              textAlign: 'center',
+              padding: '3rem 1.5rem',
+              background: 'var(--bg-main)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px dashed var(--border-color)',
+            }}>
+              <GraduationCap size={44} color="var(--primary-600)" style={{ margin: '0 auto 1rem', opacity: 0.8 }} />
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '0.5rem' }}>
+                لا يوجد طلاب مسجلون رسمياً في هذا المقرر بعد
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', maxWidth: '480px', margin: '0 auto', lineHeight: 1.6 }}>
+                بمجرد تقديم الطلاب لطلبات الالتحاق واعتمادها من قبل الإدارة الأكاديمية، سيظهرون تلقائياً هنا لرصد درجات الامتحان العملي وتثبيتها في سجلاتهم.
+              </p>
+            </div>
+          ) : (
+            <div className="table-responsive">
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: '0.88rem' }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg-subtle)', borderBottom: '2px solid var(--border-color)' }}>
+                    <th style={{ padding: '0.85rem' }}>اسم الطالب والبيانات الأكاديمية</th>
+                    <th style={{ padding: '0.85rem' }}>تاريخ القبول</th>
+                    <th style={{ padding: '0.85rem' }}>الدرجة المرصودة (من 50)</th>
+                    <th style={{ padding: '0.85rem' }}>الملاحظات الأكاديمية</th>
+                    <th style={{ padding: '0.85rem' }}>الإجراء</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {courseApprovedStudents.map((st) => {
+                    const gradeInfo = practicalGrades[st.studentUid] || practicalGrades[st.id];
+                    const isGraded = gradeInfo && gradeInfo.score !== undefined;
+                    return (
+                      <tr key={st.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                        <td style={{ padding: '0.85rem' }}>
+                          <strong style={{ display: 'block', color: 'var(--text-main)' }}>{st.studentName}</strong>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                            {st.university} {st.specialty ? `• ${st.specialty}` : ''}
+                          </div>
+                          <div style={{ fontSize: '0.74rem', color: 'var(--text-subtle)' }}>
+                            {st.studentEmail}
+                          </div>
+                        </td>
+                        <td style={{ padding: '0.85rem', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                          {st.requestedAt || '—'}
+                        </td>
+                        <td style={{ padding: '0.85rem' }}>
+                          {isGraded ? (
+                            <span style={{ fontSize: '1.15rem', fontWeight: 900, color: 'var(--primary-700)' }}>
+                              {gradeInfo.score} / 50
+                            </span>
+                          ) : (
+                            <span className="badge badge-subtle" style={{ fontSize: '0.78rem' }}>
+                              لم يُرصد بعد
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding: '0.85rem', fontSize: '0.84rem', color: 'var(--text-muted)' }}>
+                          {gradeInfo?.notes || '—'}
+                        </td>
+                        <td style={{ padding: '0.85rem' }}>
+                          <button
+                            onClick={() => setSelectedPracticalStudent({
+                              id: st.studentUid,
+                              name: st.studentName,
+                              score: gradeInfo?.score !== undefined ? gradeInfo.score : 40,
+                              notes: gradeInfo?.notes || 'أداء متميز في اختبار تحليل البيانات الإحصائية الحضوري',
+                            })}
+                            className="btn btn-outline"
+                            style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
+                          >
+                            <Edit3 size={13} />
+                            <span>{isGraded ? 'تعديل الدرجة' : 'رصد الدرجة'}</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-          {/* نافذة تعديل درجة الامتحان العملي الحضوري */}
+          {/* نافذة تعديل أو رصد درجة الطالب العملي المحدد */}
           {selectedPracticalStudent && (
             <div className="modal-overlay">
               <div className="modal-content" style={{ maxWidth: '520px', width: '100%', position: 'relative' }}>
@@ -1777,7 +1986,294 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
               </div>
             </div>
           )}
+
+          {/* نافذة رصد درجة عملي جديدة لطالب */}
+          {isAddPracticalModalOpen && (
+            <div className="modal-overlay">
+              <div className="modal-content" style={{ maxWidth: '520px', width: '100%', position: 'relative' }}>
+                <button
+                  onClick={() => setIsAddPracticalModalOpen(false)}
+                  className="btn btn-ghost"
+                  style={{ position: 'absolute', top: '12px', left: '12px' }}
+                >
+                  ✕
+                </button>
+
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '0.4rem' }}>
+                  رصد درجة امتحان عملي لطالب
+                </h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
+                  اختر طالباً من المسجلين في المقرر وأدخل درجته وملاحظاته.
+                </p>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                    اختر الطالب:
+                  </label>
+                  <select
+                    value={newPracticalStudentUid}
+                    onChange={(e) => setNewPracticalStudentUid(e.target.value)}
+                    style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }}
+                  >
+                    {courseApprovedStudents.map((st) => (
+                      <option key={st.studentUid} value={st.studentUid}>
+                        {st.studentName} ({st.university} - {st.studentEmail})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                    الدرجة المرصودة (من 50):
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={50}
+                    value={newPracticalScore}
+                    onChange={(e) => setNewPracticalScore(Number(e.target.value))}
+                    style={{ width: '130px', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '2px solid var(--primary-600)', fontSize: '1.2rem', fontWeight: 800, textAlign: 'center' }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                    الملاحظات الأكاديمية:
+                  </label>
+                  <input
+                    type="text"
+                    value={newPracticalNotes}
+                    onChange={(e) => setNewPracticalNotes(e.target.value)}
+                    placeholder="مثال: أداء ممتاز، دقة في تطبيق منهجية البحث"
+                    style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                  <button onClick={() => setIsAddPracticalModalOpen(false)} className="btn btn-outline">
+                    إلغاء
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (!newPracticalStudentUid) return;
+                      const selectedStudentObj = courseApprovedStudents.find(s => s.studentUid === newPracticalStudentUid);
+                      const sName = selectedStudentObj?.studentName || newPracticalStudentUid;
+
+                      if (onUpdatePracticalGrade) {
+                        onUpdatePracticalGrade(newPracticalStudentUid, newPracticalScore, newPracticalNotes);
+                      } else {
+                        setLocalPracticalGrades((prev) => ({
+                          ...prev,
+                          [newPracticalStudentUid]: {
+                            score: newPracticalScore,
+                            notes: newPracticalNotes,
+                          }
+                        }));
+                      }
+
+                      if (onLogAudit) {
+                        onLogAudit(
+                          'رصد درجة امتحان عملي حضوري',
+                          `رصد درجة الطالب (${sName}): ${newPracticalScore}/50`
+                        );
+                      }
+
+                      setIsAddPracticalModalOpen(false);
+                    }}
+                    className="btn btn-primary"
+                  >
+                    <Save size={15} />
+                    <span>تثبيت الدرجة</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
+      )}
+
+      {/* 5. تبويب متابعة تقدم الطلاب (Student Progress Tracker) */}
+      {activeTab === 'progress' && (
+        <div className="card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <h2 style={{ fontSize: '1.3rem', fontWeight: 800, margin: 0 }}>
+                لوحة متابعة التقدم الأكاديمي للطلاب (Student Progress Tracker)
+              </h2>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                متابعة دقيقة لنسبة مشاهدة المحاضرات، تسليمات التكليفات، درجات الاختبارات والامتحان العملي لكل طالب مسجل.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <span className="badge badge-primary">
+                👥 المسجلون: {courseApprovedStudents.length}
+              </span>
+              <span className="badge badge-emerald">
+                📚 المحاضرات: {curriculum.modules.reduce((acc, m) => acc + (m.lessons?.length || 0), 0) || currentCourse?.totalLessonsCount || 0}
+              </span>
+            </div>
+          </div>
+
+          {courseApprovedStudents.length === 0 ? (
+            <div style={{
+              textAlign: 'center',
+              padding: '3rem 1.5rem',
+              background: 'var(--bg-main)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px dashed var(--border-color)',
+            }}>
+              <Award size={44} color="var(--primary-600)" style={{ margin: '0 auto 1rem', opacity: 0.8 }} />
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '0.5rem' }}>
+                لا يوجد طلاب ملتحقون بهذا المقرر حالياً
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', maxWidth: '480px', margin: '0 auto', lineHeight: 1.6 }}>
+                عند قبول انضمام أي طالب للكورس، سيظهر تقدمه الأكاديمي هنا تلقائياً لتمكين المشرف من متابعة مساره لحظة بلحظة.
+              </p>
+            </div>
+          ) : (
+            <div className="table-responsive">
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: '0.88rem' }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg-subtle)', borderBottom: '2px solid var(--border-color)' }}>
+                    <th style={{ padding: '0.85rem' }}>الطالب والبيانات الجامعية</th>
+                    <th style={{ padding: '0.85rem' }}>مشاهدة الدروس والمحاضرات</th>
+                    <th style={{ padding: '0.85rem' }}>التكليفات الدراسية</th>
+                    <th style={{ padding: '0.85rem' }}>الاختبارات النظرية</th>
+                    <th style={{ padding: '0.85rem' }}>الامتحان العملي (50)</th>
+                    <th style={{ padding: '0.85rem' }}>الحالة الأكاديمية</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {courseApprovedStudents.map((st) => {
+                    // حساب المحاضرات المكتملة
+                    let completedLessonsCount = 0;
+                    try {
+                      const saved = localStorage.getItem(`asira_completed_lessons_${st.studentUid}_${currentCourse?.id}`);
+                      if (saved) {
+                        completedLessonsCount = JSON.parse(saved).length;
+                      }
+                    } catch {}
+                    const totalLessons = curriculum.modules.reduce((acc, m) => acc + (m.lessons?.length || 0), 0) || currentCourse?.totalLessonsCount || 1;
+                    const lessonsPercent = Math.min(100, Math.round((completedLessonsCount / totalLessons) * 100));
+                    const remainingLessons = Math.max(0, totalLessons - completedLessonsCount);
+
+                    // حساب التكليفات
+                    const stSubmissions = submissions.filter(s => s.studentUid === st.studentUid);
+                    const gradedSubmissions = stSubmissions.filter(s => s.status === 'graded');
+                    const totalAssigScore = gradedSubmissions.reduce((acc, s) => acc + (s.grade || 0), 0);
+                    const totalCurriculumAssignments = curriculum.modules.reduce((acc, m) => acc + (m.assignments?.length || 0), 0);
+
+                    // حساب الاختبارات
+                    const stExams = examAttempts.filter(a => a.studentUid === st.studentUid);
+                    const examScore = stExams[0]?.officialGrade ?? stExams[0]?.calculatedScore;
+                    const totalCurriculumExams = curriculum.modules.reduce((acc, m) => acc + (m.exams?.length || 0), 0);
+
+                    // الامتحان العملي
+                    const practicalEntry = practicalGrades[st.studentUid] || practicalGrades[st.id];
+                    const practicalScore = practicalEntry?.score;
+
+                    // مجموع الدرجات إن توفر
+                    const hasPractical = practicalScore !== undefined;
+                    const totalCumulative = (practicalScore || 0) + (examScore || 0) + totalAssigScore;
+                    const isPassing = totalCumulative >= (currentCourse?.passingScore || 70);
+
+                    return (
+                      <tr key={st.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                        <td style={{ padding: '0.85rem' }}>
+                          <strong style={{ display: 'block', color: 'var(--text-main)' }}>{st.studentName}</strong>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                            {st.university} {st.specialty ? `• ${st.specialty}` : ''}
+                          </div>
+                          <div style={{ fontSize: '0.74rem', color: 'var(--text-subtle)' }}>
+                            {st.studentEmail}
+                          </div>
+                        </td>
+
+                        {/* مشاهدة الدروس */}
+                        <td style={{ padding: '0.85rem', minWidth: '150px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.25rem' }}>
+                            <span>{completedLessonsCount} / {totalLessons} درس</span>
+                            <span>{lessonsPercent}%</span>
+                          </div>
+                          <div style={{ width: '100%', height: '6px', background: 'var(--bg-main)', borderRadius: '3px', overflow: 'hidden' }}>
+                            <div style={{ width: `${lessonsPercent}%`, height: '100%', background: 'var(--primary-600)', transition: 'width 0.3s' }} />
+                          </div>
+                          <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                            {remainingLessons === 0 ? '✓ أتم جميع المحاضرات' : `متبقي: ${remainingLessons} درس`}
+                          </div>
+                        </td>
+
+                        {/* التكليفات */}
+                        <td style={{ padding: '0.85rem', fontSize: '0.82rem' }}>
+                          <div>
+                            <strong>{stSubmissions.length}</strong> من أصل {totalCurriculumAssignments} تكليفات
+                          </div>
+                          <div style={{ color: 'var(--text-muted)', fontSize: '0.76rem', marginTop: '0.15rem' }}>
+                            المصححة: {gradedSubmissions.length} ({totalAssigScore} درجة)
+                          </div>
+                        </td>
+
+                        {/* الاختبارات */}
+                        <td style={{ padding: '0.85rem', fontSize: '0.82rem' }}>
+                          <div>
+                            <strong>{stExams.length}</strong> من أصل {totalCurriculumExams} اختبار
+                          </div>
+                          <div style={{ color: 'var(--text-muted)', fontSize: '0.76rem', marginTop: '0.15rem' }}>
+                            الدرجة: {examScore !== undefined ? `${examScore} / 30` : 'لم يُقدم بعد'}
+                          </div>
+                        </td>
+
+                        {/* الامتحان العملي */}
+                        <td style={{ padding: '0.85rem' }}>
+                          {hasPractical ? (
+                            <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--primary-700)' }}>
+                              {practicalScore} / 50
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setSelectedPracticalStudent({
+                                  id: st.studentUid,
+                                  name: st.studentName,
+                                  score: 40,
+                                  notes: 'أداء متميز في الاختبار العملي الحضوري',
+                                });
+                              }}
+                              className="btn btn-outline"
+                              style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}
+                            >
+                              رصد الآن
+                            </button>
+                          )}
+                        </td>
+
+                        {/* الحالة والشهادة */}
+                        <td style={{ padding: '0.85rem' }}>
+                          {hasPractical && isPassing ? (
+                            <span className="badge badge-emerald" style={{ fontSize: '0.78rem' }}>
+                              مؤهل للشهادة 🎓 ({totalCumulative}%)
+                            </span>
+                          ) : hasPractical ? (
+                            <span className="badge badge-gold" style={{ fontSize: '0.78rem' }}>
+                              قيد المتابعة ({totalCumulative}%)
+                            </span>
+                          ) : (
+                            <span className="badge badge-subtle" style={{ fontSize: '0.78rem' }}>
+                              قيد الدراسة ⏳
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+        </>
       )}
 
       {/* نافذة إضافة مديول / وحدة دراسية جديدة */}

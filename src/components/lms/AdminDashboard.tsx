@@ -206,7 +206,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         newStatus,
         req.verificationCode || `ASIRA-2026-${Math.floor(1000 + Math.random() * 9000)}`,
         req.signedPdfUrl,
-        'جاري إعداد وثيقة الشهادة وتوقيعها خارج المنصة من العميد د. إبراهيم يحيى'
+        'جاري إعداد وثيقة الشهادة وتوقيعها من الإدارة الأكاديمية والعمادة'
       );
     } else {
       setLocalCertRequests((prev) =>
@@ -216,7 +216,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 ...c,
                 status: newStatus,
                 verificationCode: c.verificationCode || `ASIRA-2026-${Math.floor(1000 + Math.random() * 9000)}`,
-                adminNotes: 'جاري إعداد وثيقة الشهادة وتوقيعها خارج المنصة من العميد د. إبراهيم يحيى',
+                adminNotes: 'جاري إعداد وثيقة الشهادة وتوقيعها من الإدارة الأكاديمية والعمادة',
               }
             : c
         )
@@ -951,7 +951,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       rows={2}
                       value={certNotesInput}
                       onChange={(e) => setCertNotesInput(e.target.value)}
-                      placeholder="مثال: تم تدقيق الدرجات التراكمية واعتماد الشهادة وتوقيعها من العميد د. إبراهيم يحيى."
+                      placeholder="مثال: تم تدقيق الدرجات التراكمية واعتماد الشهادة وتوقيعها من العمادة الأكاديمية."
                       style={{
                         width: '100%',
                         padding: '0.65rem',

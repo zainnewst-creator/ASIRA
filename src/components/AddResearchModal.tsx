@@ -43,7 +43,7 @@ export const AddResearchModal: React.FC<AddResearchModalProps> = ({
 }) => {
   const [title, setTitle] = useState('');
   const [authors, setAuthors] = useState('');
-  const [supervisorName, setSupervisorName] = useState('د. إبراهيم يحيى');
+  const [supervisorName, setSupervisorName] = useState('');
   const [field, setField] = useState('طب بشري وباطنة');
   const [journal, setJournal] = useState('');
   const [publicationYear, setPublicationYear] = useState(2026);
@@ -83,7 +83,7 @@ export const AddResearchModal: React.FC<AddResearchModalProps> = ({
       authors: authors.split(',').map((a) => a.trim()).filter(Boolean).length > 0
         ? authors.split(',').map((a) => a.trim()).filter(Boolean)
         : ['فريق باحثي منتدى أسيرا للبحث العلمي'],
-      supervisorName: supervisorName.trim() || 'د. إبراهيم يحيى',
+      supervisorName: supervisorName.trim() || 'المشرف الأكاديمي للبحث',
       field: field.trim(),
       journal: journal.trim(),
       publicationYear: Number(publicationYear) || 2026,
@@ -168,7 +168,7 @@ export const AddResearchModal: React.FC<AddResearchModalProps> = ({
                 type="text"
                 value={supervisorName}
                 onChange={(e) => setSupervisorName(e.target.value)}
-                placeholder="د. إبراهيم يحيى"
+                placeholder="اسم المشرف الأكاديمي للبحث"
                 style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.88rem' }}
               />
             </div>

@@ -244,7 +244,7 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
               <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>نظام أسيرا الأكاديمي (LMS Engine)</span>
             </div>
             <h1 style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-main)', margin: 0 }}>
-              {activeRole === 'admin' ? 'الإدارة الأكاديمية والعمليات' : activeRole === 'instructor' ? 'المشرف: د. إبراهيم يحيى' : `مرحباً بك، ${initialName}`}
+              {activeRole === 'admin' ? 'الإدارة الأكاديمية والعمليات' : activeRole === 'instructor' ? (initialName ? `المشرف: ${initialName}` : 'لوحة المشرف الأكاديمي') : `مرحباً بك، ${initialName}`}
             </h1>
           </div>
 
@@ -370,6 +370,7 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
             onUpdateCurriculum={handleUpdateCurriculum}
             practicalGrades={practicalGrades}
             onUpdatePracticalGrade={handleUpdatePracticalGrade}
+            enrollments={enrollments}
             onLogAudit={appendAuditLog}
           />
         )}

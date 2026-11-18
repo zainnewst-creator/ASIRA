@@ -150,7 +150,7 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({
                 required
                 value={instructorNames}
                 onChange={(e) => setInstructorNames(e.target.value)}
-                placeholder="مثال: د. إبراهيم يحيى, د. أحمد الصالح, د. سارة الكيلاني"
+                placeholder="مثال: د. محمد العبدالله, د. سارة الأحمد"
                 style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.9rem' }}
               />
             </div>
