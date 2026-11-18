@@ -26,6 +26,7 @@ import {
   MockExamAttemptForInstructor, 
   MockCourseCurriculum,
   MockCertificateRequest,
+  MockPendingEnrollment,
   INITIAL_CURRICULUM,
   INITIAL_COURSES
 } from '../../data/mockData';
@@ -36,6 +37,7 @@ import { sanitizeUrl, sanitizeExamForStudent, isTrustedStorageUrl } from '../../
 
 export interface StudentDashboardProps {
   courses?: Course[];
+  pendingEnrollments?: MockPendingEnrollment[];
   activeCourseId?: string;
   onSelectCourseId?: (courseId: string) => void;
   studentName?: string;
@@ -53,7 +55,8 @@ export interface StudentDashboardProps {
 }
 
 export const StudentDashboard: React.FC<StudentDashboardProps> = ({
-  courses = INITIAL_COURSES,
+  courses = [],
+  pendingEnrollments = [],
   activeCourseId: propActiveCourseId,
   onSelectCourseId,
   studentName = 'طالب أسيرا',
@@ -66,10 +69,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   practicalGrades: propPracticalGrades,
   certRequests: propCertRequests,
   onRequestCertificate,
+  onNavigateTab,
   onLogAudit,
 }) => {
-  const [activeTab, setActiveTab] = useState<'my_courses' | 'learn' | 'assignments' | 'exam' | 'transcript'>('my_courses');
-  const [selectedCourseId, setSelectedCourseId] = useState<string>(propActiveCourseId || courses[0]?.id || 'course-1');
+  const [activeTab, setActiveTab] = useState<'learn' | 'assignments' | 'exam' | 'transcript'>('learn');
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(propActiveCourseId || null);
 
   // طلبات الشهادات الأكاديمية
   const [localCertRequests, setLocalCertRequests] = useState<MockCertificateRequest[]>(propCertRequests || []);
@@ -77,7 +81,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   const [requestFeedback, setRequestFeedback] = useState<string | null>(null);
 
   // الكورس الحالي المختار
-  const currentCourse = courses.find((c) => c.id === selectedCourseId) || courses[0];
+  const currentCourse = selectedCourseId ? (courses.find((c) => c.id === selectedCourseId) || courses[0]) : null;
 
   // استخدام البيانات الممررة أو الافتراضية
   const [localSubmissions, setLocalSubmissions] = useState<MockStudentSubmission[]>(propSubmissions || []);
@@ -438,15 +442,195 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   const practicalScore = practicalGrades[studentUid]?.score || 0;
   const totalScore = assignmentScore + examScore + practicalScore;
 
+  // ========================================================
+  // 1. نافذة المقررات المسجلة (المربعات ونظرة عامة بدون أشرطة مشتتة)
+  // ========================================================
+  if (!selectedCourseId || !currentCourse) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        {/* الترويسة الأنيقة لشاشة دوراتي */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <h2 style={{ fontSize: '1.35rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>
+              دوراتي ومساراتي الأكاديمية المسجلة
+            </h2>
+            <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+              مرحباً بك، د. {studentName} — اختر الدورة لمتابعة المحاضرات، حل التكليفات، أو أداء الاختبارات.
+            </p>
+          </div>
+          {onNavigateTab && (
+            <button
+              onClick={() => onNavigateTab('courses')}
+              className="btn btn-outline"
+              style={{ fontSize: '0.85rem', borderRadius: 'var(--radius-full)' }}
+            >
+              <BookOpen size={15} />
+              <span>دليل جميع الكورسات المتاحة</span>
+            </button>
+          )}
+        </div>
+
+        {/* إشعار بطلبات الالتحاق قيد الانتظار إن وجدت */}
+        {pendingEnrollments && pendingEnrollments.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)', margin: 0 }}>
+              طلبات الالتحاق قيد المراجعة والاعتماد:
+            </h4>
+            {pendingEnrollments.map((pe) => (
+              <div
+                key={pe.id}
+                className="alert-box alert-box-warning"
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}
+              >
+                <div>
+                  <strong>{pe.courseTitle}</strong>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                    تم تقديم الطلب بتاريخ {pe.requestedAt || 'اليوم'} • الحالة: بانتظار اعتماد الإدارة لتفعيل الدروس
+                  </div>
+                </div>
+                <span className="badge badge-gold">⏳ قيد المراجعة</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* إذا لم يكن الطالب مسجلاً في أي كورس بعد */}
+        {courses.length === 0 ? (
+          <div className="card" style={{ textAlign: 'center', padding: '3.5rem 1.5rem', maxWidth: '620px', margin: '2rem auto' }}>
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              background: 'var(--primary-100)',
+              color: 'var(--primary-600)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: '1.25rem'
+            }}>
+              <GraduationCap size={34} />
+            </div>
+            <h3 style={{ fontSize: '1.35rem', fontWeight: 800, marginBottom: '0.75rem', color: 'var(--text-main)' }}>
+              أنت لست مسجلاً في أي كورس حالياً
+            </h3>
+            <p style={{ fontSize: '0.92rem', color: 'var(--text-muted)', lineHeight: '1.7', marginBottom: '2rem' }}>
+              تفضل بالاطلاع على دليل المسارات والكورسات الأكاديمية المتاحة في منتدى أسيرا، واختر الدورة المناسبة وقدم طلب التحاق ليتم تفعيله لك من قبل إدارة المنتدى.
+            </p>
+            {onNavigateTab && (
+              <button
+                onClick={() => onNavigateTab('courses')}
+                className="btn btn-primary"
+                style={{ padding: '0.85rem 2rem', fontSize: '1rem', borderRadius: 'var(--radius-full)', margin: '0 auto', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                <span>استكشاف الكورسات والتقديم على دورة</span>
+                <ChevronLeft size={18} />
+              </button>
+            )}
+          </div>
+        ) : (
+          /* شبكة المربعات (الكورسات المسجلة) */
+          <div className="grid-2">
+            {courses.map((course) => {
+              const isComingSoon = course.status === 'coming_soon';
+
+              return (
+                <div key={course.id} className="card" style={{ border: '1px solid var(--border-color)', position: 'relative' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
+                    <span className={`badge ${isComingSoon ? 'badge-gold' : 'badge-emerald'}`}>
+                      {isComingSoon ? '⏳ قريباً (قيد الإعداد)' : 'كورس مسجل ومعتمد'}
+                    </span>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontFamily: 'monospace', fontWeight: 700 }}>
+                      {course.code}
+                    </span>
+                  </div>
+
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '0.4rem', color: 'var(--text-main)' }}>
+                    {course.title}
+                  </h3>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem', lineHeight: '1.6' }}>
+                    {course.summary}
+                  </p>
+
+                  <div style={{ marginBottom: '1.25rem', padding: '0.75rem', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '0.35rem' }}>
+                      <span>نسبة الإنجاز في المساق:</span>
+                      <strong>{isComingSoon ? '0%' : '40%'}</strong>
+                    </div>
+                    <div style={{ height: '8px', background: 'var(--border-color)', borderRadius: 'var(--radius-full)', overflow: 'hidden' }}>
+                      <div style={{ width: isComingSoon ? '0%' : '40%', height: '100%', background: 'linear-gradient(90deg, #10b981, #2563eb)' }} />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {isComingSoon ? (
+                      <button
+                        disabled
+                        className="btn btn-outline"
+                        style={{ flex: 1, fontSize: '0.85rem', opacity: 0.65, cursor: 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+                      >
+                        <Lock size={14} />
+                        <span>قريباً (المحتوى قيد التجهيز)</span>
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => {
+                            setSelectedCourseId(course.id);
+                            setActiveTab('learn');
+                            if (onSelectCourseId) onSelectCourseId(course.id);
+                          }}
+                          className="btn btn-primary"
+                          style={{ flex: 1, fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+                        >
+                          <span>دخول الكورس ومتابعة التعلم</span>
+                          <ChevronLeft size={16} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedCourseId(course.id);
+                            setActiveTab('assignments');
+                            if (onSelectCourseId) onSelectCourseId(course.id);
+                          }}
+                          className="btn btn-outline"
+                          style={{ fontSize: '0.85rem' }}
+                        >
+                          <span>التكليفات</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedCourseId(course.id);
+                            setActiveTab('transcript');
+                            if (onSelectCourseId) onSelectCourseId(course.id);
+                          }}
+                          className="btn btn-outline"
+                          style={{ fontSize: '0.85rem' }}
+                        >
+                          <span>السجل</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ========================================================
+  // 2. نافذة الكورس المختار (داخل الكورس بنوافذ منسابة)
+  // ========================================================
   return (
     <div>
-      {/* شريط اختيار الكورس ومؤشر الكورس النشط */}
+      {/* شريط رأس الكورس مع زر العودة الأنيق */}
       <div style={{
         background: 'var(--bg-card)',
         border: '1px solid var(--border-color)',
         borderRadius: 'var(--radius-md)',
         padding: '0.85rem 1.25rem',
-        marginBottom: '1.5rem',
+        marginBottom: '1.25rem',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -454,41 +638,29 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
         gap: '0.75rem',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-main)' }}>
-            الكورس النشط:
+          <button
+            onClick={() => setSelectedCourseId(null)}
+            className="btn btn-outline"
+            style={{ fontSize: '0.82rem', padding: '0.4rem 0.9rem', borderRadius: 'var(--radius-full)', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+          >
+            <ChevronRight size={16} />
+            <span>← العودة إلى قائمة مقرراتي</span>
+          </button>
+          <span className="badge badge-primary" style={{ fontFamily: 'monospace' }}>
+            {currentCourse.code}
           </span>
-          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-            {courses.map((course) => (
-              <button
-                key={course.id}
-                onClick={() => handleSelectCourse(course.id)}
-                className={`btn ${selectedCourseId === course.id ? 'btn-primary' : 'btn-outline'}`}
-                style={{ fontSize: '0.82rem', padding: '0.35rem 0.85rem', borderRadius: 'var(--radius-full)' }}
-              >
-                <span>{course.code}</span>
-              </button>
-            ))}
-          </div>
-          <span className="badge badge-emerald" style={{ fontSize: '0.82rem' }}>
-            {currentCourse?.title}
+          <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)' }}>
+            {currentCourse.title}
           </span>
         </div>
 
         <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-          المشرف الأكاديمي: <strong>{currentCourse?.instructorNames?.join(', ') || 'د. إبراهيم يحيى'}</strong>
+          المشرف الأكاديمي: <strong>{currentCourse.instructorNames?.join(', ') || 'د. إبراهيم يحيى'}</strong>
         </div>
       </div>
 
-      {/* شريط تبويبات لوحة تحكم الطالب المحسنة */}
-      <div className="lms-tabs-bar">
-        <button
-          onClick={() => setActiveTab('my_courses')}
-          className={`btn lms-tab-btn ${activeTab === 'my_courses' ? 'btn-primary' : 'btn-ghost'}`}
-        >
-          <BookOpen size={16} />
-          <span>دوراتي المسجلة ({courses.length})</span>
-        </button>
-
+      {/* تبويبات خاصة بهذا الكورس فقط */}
+      <div className="lms-tabs-bar" style={{ marginBottom: '1.5rem' }}>
         <button
           onClick={() => setActiveTab('learn')}
           className={`btn lms-tab-btn ${activeTab === 'learn' ? 'btn-primary' : 'btn-ghost'}`}
@@ -541,96 +713,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
             <span style={{ fontWeight: 700 }}>{lockedNotice}</span>
           </div>
           <button onClick={() => setLockedNotice(null)} className="btn btn-ghost" style={{ padding: '0.2rem 0.5rem' }}>✕</button>
-        </div>
-      )}
-
-      {/* 1. تبويب: دوراتي المسجلة (Multi-Course Overview) */}
-      {activeTab === 'my_courses' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <div>
-              <h2 style={{ fontSize: '1.3rem', fontWeight: 800, margin: 0 }}>
-                مساراتك ودوراتك الأكاديمية المسجلة
-              </h2>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                تابع تقدمك الأكاديمي في كل كورس واطلع على المحاضرات والتقييمات المعتمدة.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid-2">
-            {courses.map((course) => {
-              const isCurrent = course.id === selectedCourseId;
-              const isComingSoon = course.status === 'coming_soon';
-
-              return (
-                <div key={course.id} className="card" style={{ border: isCurrent ? '2px solid var(--primary-600)' : '1px solid var(--border-color)', position: 'relative' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
-                    <span className={`badge ${isComingSoon ? 'badge-gold' : isCurrent ? 'badge-primary' : 'badge-emerald'}`}>
-                      {isComingSoon ? '⏳ قريباً (قيد الإعداد)' : isCurrent ? 'الكورس المفتوح حالياً' : 'كورس مسجل'}
-                    </span>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontFamily: 'monospace', fontWeight: 700 }}>
-                      {course.code}
-                    </span>
-                  </div>
-
-                  <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '0.4rem', color: 'var(--text-main)' }}>
-                    {course.title}
-                  </h3>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem', lineHeight: '1.6' }}>
-                    {course.summary}
-                  </p>
-
-                  <div style={{ marginBottom: '1.25rem', padding: '0.75rem', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '0.35rem' }}>
-                      <span>نسبة الإنجاز في المساق:</span>
-                      <strong>{isComingSoon ? '0% (قيد الإطلاق)' : isCurrent ? `${progressPercentage}%` : '40%'}</strong>
-                    </div>
-                    <div style={{ height: '8px', background: 'var(--border-color)', borderRadius: 'var(--radius-full)', overflow: 'hidden' }}>
-                      <div style={{ width: isComingSoon ? '0%' : isCurrent ? `${progressPercentage}%` : '40%', height: '100%', background: 'linear-gradient(90deg, #10b981, #2563eb)' }} />
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    {isComingSoon ? (
-                      <button
-                        disabled
-                        className="btn btn-outline"
-                        style={{ flex: 1, fontSize: '0.85rem', opacity: 0.65, cursor: 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
-                      >
-                        <Lock size={14} />
-                        <span>قريباً (المحتوى قيد التجهيز)</span>
-                      </button>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => {
-                            handleSelectCourse(course.id);
-                            setActiveTab('learn');
-                          }}
-                          className="btn btn-primary"
-                          style={{ flex: 1, fontSize: '0.85rem' }}
-                        >
-                          <span>{isCurrent ? 'متابعة الدروس الآن' : 'فتح محتوى هذا الكورس'}</span>
-                          <ChevronRight size={15} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            handleSelectCourse(course.id);
-                            setActiveTab('assignments');
-                          }}
-                          className="btn btn-outline"
-                          style={{ fontSize: '0.85rem' }}
-                        >
-                          <span>التكليفات</span>
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
         </div>
       )}
 

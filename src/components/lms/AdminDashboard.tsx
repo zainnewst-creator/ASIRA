@@ -12,16 +12,22 @@ import {
   Layers, 
   Search,
   ExternalLink,
-  Database
+  Database,
+  FileText,
+  Plus,
+  Edit,
+  Trash2
 } from 'lucide-react';
 import { 
   MockPendingEnrollment, 
   MockAuditLogItem, 
   MockCertificateRequest
 } from '../../data/mockData';
-import { UserRole } from '../../types';
+import { ResearchPaper, UserRole } from '../../types';
 import { sanitizeUrl } from '../../utils/security';
 import { exportPlatformData, validateRestorePackage } from '../../services/backupService';
+import { AddResearchModal } from '../AddResearchModal';
+import { EditResearchModal } from '../EditResearchModal';
 
 export interface AdminDashboardProps {
   enrollments?: MockPendingEnrollment[];
@@ -36,6 +42,10 @@ export interface AdminDashboardProps {
     notes?: string
   ) => void;
   onIssueCertificate?: (id: string, code: string, pdfUrl: string) => void;
+  researches?: ResearchPaper[];
+  onAddResearch?: (paper: ResearchPaper) => void;
+  onUpdateResearch?: (paper: ResearchPaper) => void;
+  onDeleteResearch?: (id: string) => void;
   auditLogs?: MockAuditLogItem[];
   onLogAudit?: (action: string, details: string) => void;
 }
@@ -47,10 +57,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   certRequests: propCertRequests,
   onUpdateCertificate,
   onIssueCertificate,
+  researches = [],
+  onAddResearch,
+  onUpdateResearch,
+  onDeleteResearch,
   auditLogs: propAuditLogs,
   onLogAudit,
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'enrollments' | 'users' | 'certificates' | 'audit_logs' | 'backup'>('enrollments');
+  const [activeTab, setActiveTab] = useState<'overview' | 'enrollments' | 'users' | 'certificates' | 'researches' | 'audit_logs' | 'backup'>('enrollments');
+
+  // إدارة الأبحاث المنشورة
+  const [isAddResearchOpen, setIsAddResearchOpen] = useState(false);
+  const [editingResearch, setEditingResearch] = useState<ResearchPaper | null>(null);
+  const [researchSearch, setResearchSearch] = useState('');
+  const [selectedResearchField, setSelectedResearchField] = useState('all');
+
+  const filteredResearches = researches.filter((paper) => {
+    const matchesField = selectedResearchField === 'all' || paper.field === selectedResearchField;
+    const matchesSearch =
+      paper.title.toLowerCase().includes(researchSearch.toLowerCase()) ||
+      paper.journal.toLowerCase().includes(researchSearch.toLowerCase()) ||
+      paper.authors.some((author) => author.toLowerCase().includes(researchSearch.toLowerCase()));
+    return matchesField && matchesSearch;
+  });
 
   // بيانات طلبات الالتحاق
   const [localEnrollments, setLocalEnrollments] = useState<MockPendingEnrollment[]>([]);
@@ -262,6 +291,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         >
           <Award size={16} />
           <span>اعتماد وتوقيع الشهادات</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('researches')}
+          className={`btn lms-tab-btn ${activeTab === 'researches' ? 'btn-primary' : 'btn-ghost'}`}
+        >
+          <FileText size={16} />
+          <span>الأبحاث المنشورة ({researches.length})</span>
         </button>
 
         <button
@@ -943,7 +980,204 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
-      {/* 5. تبويب: سجل التدقيق الأكاديمي غير القابل للتعديل (Audit Logs) */}
+      {/* 5. تبويب: إدارة الأبحاث المنشورة (Research Showcase Management) */}
+      {activeTab === 'researches' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+            <div>
+              <h2 style={{ fontSize: '1.3rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>
+                إدارة معرض الأبحاث المنشورة (Research Showcase)
+              </h2>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                إضافة، تعديل، وحذف الأوراق العلمية المنشورة لطلاب وباحثي منتدى أسيرا في المجلات المحكمة.
+              </p>
+            </div>
+
+            {onAddResearch && (
+              <button
+                onClick={() => setIsAddResearchOpen(true)}
+                className="btn btn-primary"
+                style={{ fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '0.4rem', borderRadius: 'var(--radius-full)' }}
+                id="admin-add-research-btn"
+              >
+                <Plus size={16} />
+                <span>إضافة بحث منشور جديد</span>
+              </button>
+            )}
+          </div>
+
+          {/* شريط البحث وتصفية التخصص */}
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: '240px' }}>
+              <input
+                type="text"
+                value={researchSearch}
+                onChange={(e) => setResearchSearch(e.target.value)}
+                placeholder="ابحث بالعنوان، اسم الباحث، أو المجلة العلمية..."
+                style={{
+                  width: '100%',
+                  padding: '0.65rem 2.5rem 0.65rem 1rem',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-color)',
+                  background: 'var(--bg-card)',
+                  color: 'var(--text-main)',
+                  fontSize: '0.9rem',
+                }}
+              />
+              <Search size={16} color="var(--text-subtle)" style={{ position: 'absolute', right: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
+            </div>
+
+            <select
+              value={selectedResearchField}
+              onChange={(e) => setSelectedResearchField(e.target.value)}
+              style={{
+                padding: '0.65rem 1rem',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border-color)',
+                background: 'var(--bg-card)',
+                color: 'var(--text-main)',
+                fontSize: '0.88rem',
+              }}
+            >
+              <option value="all">كافة التخصصات الطبية</option>
+              <option value="طب بشري وباطنة">طب بشري وباطنة</option>
+              <option value="طب الأطفال والصيدلة السريرية">طب الأطفال والصيدلة السريرية</option>
+              <option value="التعليم الطبي والمنهجية">التعليم الطبي والمنهجية</option>
+            </select>
+          </div>
+
+          {/* جدول الأبحاث */}
+          <div className="table-responsive">
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: '0.88rem' }}>
+              <thead>
+                <tr style={{ background: 'var(--bg-subtle)', borderBottom: '2px solid var(--border-color)' }}>
+                  <th style={{ padding: '0.75rem' }}>عنوان البحث المنشور</th>
+                  <th style={{ padding: '0.75rem' }}>المجلة والسنة</th>
+                  <th style={{ padding: '0.75rem' }}>الباحثون المشاركون</th>
+                  <th style={{ padding: '0.75rem' }}>التخصص</th>
+                  <th style={{ padding: '0.75rem' }}>الرابط العلمي</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'center' }}>الإجراءات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredResearches.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
+                      لا توجد أبحاث منشورة مطابقة لمعايير البحث حالياً
+                    </td>
+                  </tr>
+                ) : (
+                  filteredResearches.map((paper) => (
+                    <tr key={paper.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '0.75rem', fontWeight: 700, color: 'var(--text-main)', maxWidth: '280px' }}>
+                        {paper.title}
+                      </td>
+                      <td style={{ padding: '0.75rem' }}>
+                        <div>{paper.journal}</div>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>عام {paper.publicationYear}</span>
+                      </td>
+                      <td style={{ padding: '0.75rem', fontSize: '0.82rem', color: 'var(--text-muted)', maxWidth: '180px' }}>
+                        {paper.authors.join('، ')}
+                      </td>
+                      <td style={{ padding: '0.75rem' }}>
+                        <span className="badge badge-primary" style={{ fontSize: '0.75rem' }}>{paper.field}</span>
+                      </td>
+                      <td style={{ padding: '0.75rem' }}>
+                        {paper.doiLink ? (
+                          <a
+                            href={sanitizeUrl(paper.doiLink)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: '#60a5fa', fontSize: '0.82rem' }}
+                          >
+                            <ExternalLink size={13} />
+                            <span>رابط النشر</span>
+                          </a>
+                        ) : paper.pubmedLink ? (
+                          <a
+                            href={sanitizeUrl(paper.pubmedLink)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: '#34d399', fontSize: '0.82rem' }}
+                          >
+                            <ExternalLink size={13} />
+                            <span>PubMed</span>
+                          </a>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>-</span>
+                        )}
+                      </td>
+                      <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                        <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                          <button
+                            onClick={() => setEditingResearch(paper)}
+                            className="btn btn-ghost"
+                            style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }}
+                            title="تعديل تفاصيل البحث"
+                          >
+                            <Edit size={14} />
+                            <span>تعديل</span>
+                          </button>
+                          {onDeleteResearch && (
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`هل أنت متأكد من حذف البحث "${paper.title}" نهائياً من المنصة؟`)) {
+                                  onDeleteResearch(paper.id);
+                                  if (onLogAudit) {
+                                    onLogAudit('حذف بحث منشور', `قام الأدمن بحذف البحث المنشور: ${paper.title}`);
+                                  }
+                                }
+                              }}
+                              className="btn btn-ghost"
+                              style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', color: '#ef4444' }}
+                              title="حذف البحث"
+                            >
+                              <Trash2 size={14} />
+                              <span>حذف</span>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* نوافذ إضافة وتعديل الأبحاث */}
+          {isAddResearchOpen && onAddResearch && (
+            <AddResearchModal
+              isOpen={isAddResearchOpen}
+              onClose={() => setIsAddResearchOpen(false)}
+              onAddResearch={(newPaper) => {
+                onAddResearch(newPaper);
+                setIsAddResearchOpen(false);
+                if (onLogAudit) {
+                  onLogAudit('إضافة بحث منشور', `أضاف الأدمن بحثاً جديداً بعنوان: ${newPaper.title}`);
+                }
+              }}
+            />
+          )}
+
+          {editingResearch && onUpdateResearch && (
+            <EditResearchModal
+              isOpen={Boolean(editingResearch)}
+              onClose={() => setEditingResearch(null)}
+              paper={editingResearch}
+              onUpdateResearch={(updatedPaper) => {
+                onUpdateResearch(updatedPaper);
+                setEditingResearch(null);
+                if (onLogAudit) {
+                  onLogAudit('تعديل بحث منشور', `عدّل الأدمن تفاصيل البحث: ${updatedPaper.title}`);
+                }
+              }}
+            />
+          )}
+        </div>
+      )}
+
+      {/* 6. تبويب: سجل التدقيق الأكاديمي غير القابل للتعديل (Audit Logs) */}
       {activeTab === 'audit_logs' && (
         <div className="card">
           <div style={{ marginBottom: '1.25rem' }}>

@@ -33,11 +33,17 @@ interface LmsDashboardPreviewProps {
   onUpdateCourse?: (updatedCourse: Course) => void;
   researches?: ResearchPaper[];
   onAddResearch?: (newPaper: ResearchPaper) => void;
+  onUpdateResearch?: (updatedPaper: ResearchPaper) => void;
+  onDeleteResearch?: (id: string) => void;
   curricula?: Record<string, MockCourseCurriculum>;
   onUpdateCurriculum?: (curriculum: MockCourseCurriculum) => void;
   userRole: UserRole;
   userName: string;
   userUid?: string;
+  enrollments?: MockPendingEnrollment[];
+  onApproveEnrollment?: (id: string) => void;
+  onRejectEnrollment?: (id: string) => void;
+  onNavigateTab?: (tab: string) => void;
   onLogout: () => void;
   onBackToPortal: () => void;
 }
@@ -48,11 +54,17 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
   onUpdateCourse,
   researches: _researches = INITIAL_RESEARCHES,
   onAddResearch,
+  onUpdateResearch,
+  onDeleteResearch,
   curricula: propCurricula,
   onUpdateCurriculum: propOnUpdateCurriculum,
   userRole: initialRole,
   userName: initialName,
   userUid = '',
+  enrollments: propEnrollments,
+  onApproveEnrollment: propOnApproveEnrollment,
+  onRejectEnrollment: propOnRejectEnrollment,
+  onNavigateTab,
   onLogout,
   onBackToPortal,
 }) => {
@@ -70,7 +82,8 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
     modules: []
   };
 
-  const [enrollments, setEnrollments] = useState<MockPendingEnrollment[]>([]);
+  const [localEnrollments, setLocalEnrollments] = useState<MockPendingEnrollment[]>([]);
+  const enrollments = propEnrollments || localEnrollments;
   const [certRequests, setCertRequests] = useState<MockCertificateRequest[]>([]);
   const [auditLogs, setAuditLogs] = useState<MockAuditLogItem[]>([]);
   const [practicalGrades, setPracticalGrades] = useState<Record<string, { score: number; notes: string }>>({});
@@ -142,12 +155,20 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
 
   // 6. قبول طلب التحاق من قبل المدير
   const handleApproveEnrollment = (id: string) => {
-    setEnrollments((prev) => prev.map((e) => e.id === id ? { ...e, status: 'approved' } : e));
+    if (propOnApproveEnrollment) {
+      propOnApproveEnrollment(id);
+    } else {
+      setLocalEnrollments((prev) => prev.map((e) => e.id === id ? { ...e, status: 'approved' } : e));
+    }
   };
 
   // 7. رفض طلب التحاق من قبل المدير
   const handleRejectEnrollment = (id: string) => {
-    setEnrollments((prev) => prev.map((e) => e.id === id ? { ...e, status: 'rejected' } : e));
+    if (propOnRejectEnrollment) {
+      propOnRejectEnrollment(id);
+    } else {
+      setLocalEnrollments((prev) => prev.map((e) => e.id === id ? { ...e, status: 'rejected' } : e));
+    }
   };
 
   // 8. تقديم طلب شهادة أكاديمية من قبل الطالب
@@ -298,23 +319,40 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
         )}
 
         {/* عرض اللوحة المناسبة حسب الدور النشط */}
-        {activeRole === 'student' && (
-          <StudentDashboard
-            courses={courses}
-            activeCourseId={selectedCourseId}
-            onSelectCourseId={setSelectedCourseId}
-            studentName={initialName}
-            studentUid={userUid || 'student-current'}
-            submissions={submissions}
-            onSubmitAssignment={handleSubmitAssignment}
-            examAttempts={examAttempts}
-            curriculum={currentCurriculum}
-            practicalGrades={practicalGrades}
-            certRequests={certRequests}
-            onRequestCertificate={handleRequestCertificate}
-            onLogAudit={appendAuditLog}
-          />
-        )}
+        {activeRole === 'student' && (() => {
+          const currentStudentUid = userUid || 'student-current';
+          const studentApprovedEnrollments = (enrollments || []).filter(
+            (e) => e.studentUid === currentStudentUid && e.status === 'approved'
+          );
+          const studentPendingEnrollments = (enrollments || []).filter(
+            (e) => e.studentUid === currentStudentUid && e.status === 'pending'
+          );
+
+          // للطالب، يعرض فقط الكورسات المقبول فيها رسمياً
+          const studentEnrolledCourses = initialRole === 'student'
+            ? courses.filter((c) => studentApprovedEnrollments.some((e) => e.courseId === c.id))
+            : courses;
+
+          return (
+            <StudentDashboard
+              courses={studentEnrolledCourses}
+              pendingEnrollments={studentPendingEnrollments}
+              activeCourseId={selectedCourseId}
+              onSelectCourseId={setSelectedCourseId}
+              studentName={initialName}
+              studentUid={currentStudentUid}
+              submissions={submissions}
+              onSubmitAssignment={handleSubmitAssignment}
+              examAttempts={examAttempts}
+              curriculum={currentCurriculum}
+              practicalGrades={practicalGrades}
+              certRequests={certRequests}
+              onRequestCertificate={handleRequestCertificate}
+              onNavigateTab={onNavigateTab || onBackToPortal}
+              onLogAudit={appendAuditLog}
+            />
+          );
+        })()}
 
         {activeRole === 'instructor' && (
           <InstructorDashboard
@@ -344,6 +382,10 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
             certRequests={certRequests}
             onUpdateCertificate={handleUpdateCertificate}
             onIssueCertificate={handleIssueCertificate}
+            researches={_researches}
+            onAddResearch={onAddResearch}
+            onUpdateResearch={onUpdateResearch}
+            onDeleteResearch={onDeleteResearch}
             auditLogs={auditLogs}
             onLogAudit={appendAuditLog}
           />

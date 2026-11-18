@@ -11,7 +11,7 @@ import { PoliciesPage } from './pages/PoliciesPage';
 import { LmsDashboardPreview } from './pages/LmsDashboardPreview';
 import { AuthModal } from './components/AuthModal';
 import { Course, ResearchPaper, UserRole } from './types';
-import { INITIAL_COURSES, INITIAL_RESEARCHES, INITIAL_CURRICULA, MockCourseCurriculum } from './data/mockData';
+import { INITIAL_COURSES, INITIAL_RESEARCHES, INITIAL_CURRICULA, MockCourseCurriculum, MockPendingEnrollment } from './data/mockData';
 import { CheckCircle2, ShieldAlert } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -20,6 +20,32 @@ export const App: React.FC = () => {
   const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
   const [currentUser, setCurrentUser] = useState<{ uid?: string; name: string; role: UserRole; email: string } | null>(null);
   const [enrollSuccessCourse, setEnrollSuccessCourse] = useState<Course | null>(null);
+
+  // الحالة المركزية لطلبات الالتحاق (Enrollments)
+  const [enrollments, setEnrollments] = useState<MockPendingEnrollment[]>(() => {
+    try {
+      const saved = localStorage.getItem('asira_enrollments');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const handleApproveEnrollment = (id: string) => {
+    setEnrollments((prev) => {
+      const updated = prev.map((e) => e.id === id ? { ...e, status: 'approved' as const } : e);
+      localStorage.setItem('asira_enrollments', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const handleRejectEnrollment = (id: string) => {
+    setEnrollments((prev) => {
+      const updated = prev.map((e) => e.id === id ? { ...e, status: 'rejected' as const } : e);
+      localStorage.setItem('asira_enrollments', JSON.stringify(updated));
+      return updated;
+    });
+  };
 
   // الحالة المركزية للكورسات والأبحاث والمناهج (Central Dynamic State)
   const [courses, setCourses] = useState<Course[]>(INITIAL_COURSES);
@@ -96,6 +122,27 @@ export const App: React.FC = () => {
     if (!currentUser) {
       setIsAuthOpen(true);
     } else {
+      const existing = enrollments.find(e => e.studentUid === currentUser.uid && e.courseId === course.id);
+      if (!existing) {
+        const newEnrollment: MockPendingEnrollment = {
+          id: `enr-${Date.now()}`,
+          studentUid: currentUser.uid || `student-${Date.now()}`,
+          studentName: currentUser.name || 'طالب أسيرا',
+          studentEmail: currentUser.email || '',
+          university: 'باحث أكاديمي',
+          specialty: 'علوم طبية وبحثية',
+          academicLevel: 'طالب / خريج',
+          courseId: course.id,
+          courseTitle: course.title,
+          requestedAt: new Date().toISOString().split('T')[0],
+          status: 'pending',
+        };
+        setEnrollments(prev => {
+          const updated = [newEnrollment, ...prev];
+          localStorage.setItem('asira_enrollments', JSON.stringify(updated));
+          return updated;
+        });
+      }
       setEnrollSuccessCourse(course);
     }
   };
@@ -169,11 +216,17 @@ export const App: React.FC = () => {
             onUpdateCourse={handleUpdateCourse}
             researches={researches}
             onAddResearch={handleAddResearch}
+            onUpdateResearch={handleUpdateResearch}
+            onDeleteResearch={handleDeleteResearch}
             curricula={curricula}
             onUpdateCurriculum={handleUpdateCurriculum}
             userRole={currentUser?.role || 'student'}
             userName={currentUser?.name || 'طالب أسيرا'}
             userUid={currentUser?.uid || ''}
+            enrollments={enrollments}
+            onApproveEnrollment={handleApproveEnrollment}
+            onRejectEnrollment={handleRejectEnrollment}
+            onNavigateTab={(tab) => setCurrentTab(tab)}
             onLogout={() => {
               setCurrentUser(null);
               setCurrentTab('home');
