@@ -74,7 +74,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             <h4 style={{ color: '#f8fafc', fontSize: '1.1rem', fontWeight: 700, marginBottom: '1.25rem' }}>
               مسارات البحث والتدريب
             </h4>
-            <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.92rem' }}>
+            <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.92rem', color: '#cbd5e1' }}>
               <li>المراجعات المنهجية (Systematic Reviews)</li>
               <li>التحليل الإحصائي التلوي (Meta-Analysis)</li>
               <li>تصميم الدراسات الإكلينيكية (Clinical Trials)</li>
@@ -88,7 +88,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             <h4 style={{ color: '#f8fafc', fontSize: '1.1rem', fontWeight: 700, marginBottom: '1.25rem' }}>
               مجتمعات أسيرا والسياسات
             </h4>
-            <p style={{ fontSize: '0.9rem', color: '#94a3b8', marginBottom: '1rem' }}>
+            <p style={{ fontSize: '0.9rem', color: '#cbd5e1', marginBottom: '1rem' }}>
               انضم لمجتمعاتنا التفاعلية لمتابعة الأوركيد والمشاريع البحثية الجديدة:
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1.5rem' }}>
@@ -107,16 +107,16 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                 <Mail size={15} /> البريد: contact@asira-research.org
               </a>
             </div>
-            <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '1rem', display: 'flex', gap: '1rem', fontSize: '0.85rem' }}>
-              <a href="#policies" onClick={(e) => { e.preventDefault(); onNavigate('policies'); }}>
+            <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.15)', paddingTop: '1rem', display: 'flex', gap: '1rem', fontSize: '0.85rem', color: '#94a3b8' }}>
+              <a href="#policies" onClick={(e) => { e.preventDefault(); onNavigate('policies'); }} style={{ color: '#93c5fd' }}>
                 سياسة الخصوصية
               </a>
-              <span>•</span>
-              <a href="#policies" onClick={(e) => { e.preventDefault(); onNavigate('policies'); }}>
+              <span style={{ color: '#64748b' }}>•</span>
+              <a href="#policies" onClick={(e) => { e.preventDefault(); onNavigate('policies'); }} style={{ color: '#93c5fd' }}>
                 شروط الاستخدام
               </a>
-              <span>•</span>
-              <a href="#policies" onClick={(e) => { e.preventDefault(); onNavigate('policies'); }}>
+              <span style={{ color: '#64748b' }}>•</span>
+              <a href="#policies" onClick={(e) => { e.preventDefault(); onNavigate('policies'); }} style={{ color: '#93c5fd' }}>
                 النزاهة الأكاديمية
               </a>
             </div>
@@ -124,11 +124,11 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
         </div>
 
         {/* شريط الحقوق السفلي */}
-        <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '2rem', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', fontSize: '0.85rem', color: '#64748b' }}>
+        <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '2rem', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', fontSize: '0.85rem', color: '#94a3b8' }}>
           <div>
             جميع الحقوق محفوظة © {new Date().getFullYear()} منتدى أسيرا لتعليم البحث العلمي (ASIRA Research Initiative).
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#cbd5e1' }}>
             <ShieldCheck size={16} color="#10b981" />
             <span>نظام أكاديمي آمن ومحمي بمعايير الصلاحيات الصارمة والتكلفة الصفرية</span>
           </div>

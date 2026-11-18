@@ -92,9 +92,9 @@
   --primary-500: #60a5fa;
   --primary-600: #3b82f6;
   --primary-700: #60a5fa;
-  --primary-800: #bfdbfe;
-  --primary-900: #dbeafe;
-  --primary-950: #eff6ff;
+  --primary-800: #0f1b40;
+  --primary-900: #0a132c;
+  --primary-950: #050a18;
 
   --info-box-bg: rgba(59, 130, 246, 0.16);
   --info-box-border: rgba(96, 165, 250, 0.35);
@@ -140,20 +140,20 @@ body {
   transition: background-color var(--transition-normal), color var(--transition-normal);
 }
 
-/* شريط التمرير المخصص */
+/* شريط التمرير المخصص الأنيق والناعم */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--bg-subtle);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--primary-700);
+  background: rgba(148, 163, 184, 0.35);
   border-radius: var(--radius-full);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--primary-600);
+  background: rgba(148, 163, 184, 0.65);
 }
 
 /* الحاوية العامة */
@@ -514,29 +514,53 @@ body {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(7, 13, 30, 0.8);
+  background: rgba(7, 13, 30, 0.82);
   backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 1000;
   padding: 1rem;
+  overflow: hidden; /* يمنع ظهور أي سحاب خارجي على الشاشة بجانب النافذة */
 }
 
-.modal-content {
+.modal-content,
+.modal-card {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   padding: 1.75rem;
   width: 100%;
   max-width: 640px;
-  max-height: 90vh;
+  max-height: calc(100dvh - 2rem);
   overflow-y: auto;
-  box-shadow: var(--shadow-xl);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.45);
   position: relative;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
 }
 
-/* التذييل (Footer) */
+.modal-content::-webkit-scrollbar,
+.modal-card::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.modal-content::-webkit-scrollbar-track,
+.modal-card::-webkit-scrollbar-track {
+  background: transparent;
+}
+.modal-content::-webkit-scrollbar-thumb,
+.modal-card::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 9999px;
+}
+.modal-content::-webkit-scrollbar-thumb:hover,
+.modal-card::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.65);
+}
+
+/* التذييل (Footer) - تباين عالي ومقروء بالكامل في الوضعين الفاتح والداكن */
 .footer {
   background: var(--primary-950);
   color: #94a3b8;
@@ -544,13 +568,23 @@ body {
   margin-top: 6rem;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
+[data-theme='dark'] .footer {
+  background: #050a18;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
 .footer a {
   color: #cbd5e1;
   text-decoration: none;
   transition: color var(--transition-fast);
 }
 .footer a:hover {
-  color: var(--accent-emerald);
+  color: #60a5fa;
+}
+.footer h4 {
+  color: #f8fafc;
+}
+.footer ul li {
+  color: #cbd5e1;
 }
 
 /* التجاوب مع أجهزة التابليت والجوال (Tablet & Mobile Responsiveness) */

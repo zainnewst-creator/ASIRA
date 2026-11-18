@@ -122,18 +122,8 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({
         const dynamicModules = activeCurriculum?.modules || [];
 
         return (
-          <div style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(7, 13, 30, 0.75)',
-            backdropFilter: 'blur(6px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 100,
-            padding: '1.5rem',
-          }}>
-            <div className="card" style={{ maxWidth: '680px', width: '100%', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
+          <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setSelectedCourseModal(null); }}>
+            <div className="modal-content" style={{ maxWidth: '680px' }}>
               <button
                 onClick={() => setSelectedCourseModal(null)}
                 className="btn btn-ghost"

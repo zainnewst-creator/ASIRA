@@ -187,36 +187,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
 
   return (
     <div 
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(7, 13, 30, 0.78)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-        padding: '0.75rem',
-        overflowY: 'auto',
-      }}
+      className="modal-overlay"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div 
-        className="card" 
+        className="modal-card" 
         style={{ 
           maxWidth: '430px', 
           width: '100%', 
-          maxHeight: 'calc(100dvh - 1.5rem)',
-          overflowY: 'auto',
-          position: 'relative',
           padding: '1.5rem',
           margin: 'auto',
           boxSizing: 'border-box',
-          borderRadius: 'var(--radius-lg)',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
         }}
       >
         {/* زر الإغلاق */}
@@ -269,16 +252,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
 
         {/* تنبيه الأمان عند إنشاء حساب جديد */}
         {isRegister && (
-          <div style={{ padding: '0.65rem 0.85rem', background: 'var(--primary-50)', borderRadius: 'var(--radius-md)', border: '1px solid var(--primary-100)', fontSize: '0.78rem', color: 'var(--primary-800)', marginBottom: '1rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <ShieldCheck size={16} color="var(--primary-600)" style={{ flexShrink: 0 }} />
+          <div className="alert-box alert-box-info" style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem', alignItems: 'center', fontSize: '0.8rem' }}>
+            <ShieldCheck size={16} style={{ flexShrink: 0 }} />
             <span>يُنشأ أي حساب جديد بصلاحية طالب (Student) افتراضياً وفق ضوابط الأمان الأكاديمي.</span>
           </div>
         )}
 
         {/* رسالة الخطأ */}
         {error && (
-          <div style={{ padding: '0.65rem 0.85rem', background: '#fef2f2', borderRadius: 'var(--radius-md)', border: '1px solid #fecaca', fontSize: '0.78rem', color: '#991b1b', marginBottom: '1rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <AlertTriangle size={16} color="#dc2626" style={{ flexShrink: 0 }} />
+          <div className="alert-box alert-box-danger" style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem', alignItems: 'center', fontSize: '0.82rem' }}>
+            <AlertTriangle size={16} style={{ flexShrink: 0 }} />
             <span>{error}</span>
           </div>
         )}

@@ -198,17 +198,8 @@ export const App: React.FC = () => {
 
       {/* نافذة تأكيد طلب الالتحاق */}
       {enrollSuccessCourse && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0, 0, 0, 0.7)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 110,
-          padding: '1.5rem',
-        }}>
-          <div className="card" style={{ maxWidth: '480px', width: '100%', textAlign: 'center' }}>
+        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setEnrollSuccessCourse(null); }}>
+          <div className="modal-content" style={{ maxWidth: '480px', textAlign: 'center' }}>
             <CheckCircle2 size={54} color="#10b981" style={{ margin: '0 auto 1rem' }} />
             <h3 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '0.5rem', color: 'var(--text-main)' }}>
               تم استلام طلب الالتحاق بنجاح!

@@ -778,18 +778,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           {/* نافذة إدارة وتغيير حالة الشهادة ورفع الملف المعتمد (Admin Management Modal) */}
           {selectedCertForManage && (
-            <div style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(7, 13, 30, 0.75)',
-              backdropFilter: 'blur(6px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 100,
-              padding: '1.5rem',
-            }}>
-              <div className="card" style={{ maxWidth: '620px', width: '100%', position: 'relative', maxHeight: '92vh', overflowY: 'auto' }}>
+            <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setSelectedCertForManage(null); }}>
+              <div className="modal-content" style={{ maxWidth: '620px' }}>
                 <button
                   onClick={() => setSelectedCertForManage(null)}
                   className="btn btn-ghost"
