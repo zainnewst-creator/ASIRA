@@ -358,11 +358,6 @@ export const App: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      {/* شريط الإشعار الإداري السريع لاختبار المنصة */}
-      <div style={{ background: 'var(--primary-900)', color: '#cbd5e1', fontSize: '0.8rem', padding: '0.4rem 1rem', textAlign: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-        <span>مرحباً بك في منصة <strong>منتدى أسيرا لتعليم البحث العلمي (ASIRA)</strong> — واجهة رسمية وبوابة أكاديمية LMS متكاملة بتكلفة صفرية.</span>
-      </div>
-
       {/* الهيدر العلوي */}
       <Navbar
         currentTab={currentTab}
