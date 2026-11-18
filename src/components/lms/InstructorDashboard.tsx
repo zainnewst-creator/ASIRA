@@ -47,6 +47,7 @@ export interface InstructorDashboardProps {
   onSelectCourseId?: (courseId: string) => void;
   onAddCourse?: (newCourse: Course) => void;
   onUpdateCourse?: (updatedCourse: Course) => void;
+  onDeleteCourse?: (courseId: string) => void;
   onAddResearch?: (newPaper: ResearchPaper) => void;
   submissions?: MockStudentSubmission[];
   onUpdateSubmission?: (updated: MockStudentSubmission) => void;
@@ -66,6 +67,7 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
   onSelectCourseId,
   onAddCourse,
   onUpdateCourse,
+  onDeleteCourse,
   onAddResearch,
   submissions: propSubmissions,
   onUpdateSubmission,
@@ -457,25 +459,6 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
     if (onUpdateCurriculum) onUpdateCurriculum(updatedCurriculum);
     else setLocalCurriculum(updatedCurriculum);
 
-    // إضافة تكليف جديد لقائمة تسليمات الطلاب
-    const newSubmissionEntry: MockStudentSubmission = {
-      id: `sub-new-${Date.now()}`,
-      studentUid: 'student-1',
-      studentName: 'أحمد محمد الصالح',
-      university: 'جامعة الملك سعود - كلية الطب',
-      assignmentTitle: assignmentTitle.trim(),
-      version: 1,
-      driveFileUrl: assignmentDriveTemplate || 'https://drive.google.com/file/d/SampleTemplate/view',
-      submittedAt: 'تم الإنشاء حديثاً',
-      status: 'submitted',
-      grade: undefined,
-      maxScore: Number(assignmentMaxScore) || 20,
-      instructorFeedback: undefined,
-    };
-
-    if (onUpdateSubmission) onUpdateSubmission(newSubmissionEntry);
-    else setLocalSubmissions((prev) => [newSubmissionEntry, ...prev]);
-
     if (onLogAudit) {
       onLogAudit('إضافة تكليف أكاديمي جديد', `تم إنشاء ونشر تكليف: "${assignmentTitle}" بدرجة ${assignmentMaxScore}`);
     }
@@ -762,16 +745,36 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                       )}
                     </div>
 
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleSelectCourse(course.id);
-                      }}
-                      className="btn btn-outline"
-                      style={{ fontSize: '0.82rem', padding: '0.35rem 0.85rem' }}
-                    >
-                      <span>إدارة الكورس ←</span>
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectCourse(course.id);
+                        }}
+                        className="btn btn-primary"
+                        style={{ fontSize: '0.82rem', padding: '0.35rem 0.85rem' }}
+                      >
+                        <span>إدارة الكورس ←</span>
+                      </button>
+                      {onDeleteCourse && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm(`هل أنت متأكد من حذف المقرر (${course.code}: ${course.title}) نهائياً من المنصة؟`)) {
+                              onDeleteCourse(course.id);
+                              if (onLogAudit) {
+                                onLogAudit('حذف كورس', `تم حذف الكورس ${course.code} من قائمة الكورسات`);
+                              }
+                            }
+                          }}
+                          className="btn btn-ghost"
+                          style={{ padding: '0.35rem 0.6rem', color: '#ef4444' }}
+                          title="حذف هذا المقرر نهائياً"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -816,6 +819,16 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
             </div>
 
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setIsEditCourseModalOpen(true)}
+                className="btn btn-outline"
+                style={{ fontSize: '0.82rem', padding: '0.4rem 0.85rem' }}
+                title="تعديل تفاصيل الكورس أو حذفه نهائياً"
+              >
+                <Edit3 size={14} />
+                <span>إعدادات وحذف الكورس</span>
+              </button>
+
               {onAddCourse && (
                 <button
                   onClick={() => setIsAddCourseModalOpen(true)}
@@ -2728,7 +2741,7 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
         />
       )}
 
-      {/* نافذة تعديل تفاصيل الكورس والغلاف والمشرفين */}
+      {/* نافذة تعديل تفاصيل الكورس والغلاف والمشرفين وحذف الكورس */}
       {isEditCourseModalOpen && currentCourse && (
         <EditCourseModal
           isOpen={isEditCourseModalOpen}
@@ -2742,6 +2755,16 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
               onLogAudit('تعديل كورس', `تم تحديث تفاصيل الكورس ${updated.code} - ${updated.title} بنجاح`);
             }
             setIsEditCourseModalOpen(false);
+          }}
+          onDeleteCourse={(courseId) => {
+            if (onDeleteCourse) {
+              onDeleteCourse(courseId);
+            }
+            if (onLogAudit) {
+              onLogAudit('حذف كورس', `تم حذف الكورس ${currentCourse.code} نهائياً`);
+            }
+            setIsEditCourseModalOpen(false);
+            setSelectedCourseId(null);
           }}
         />
       )}

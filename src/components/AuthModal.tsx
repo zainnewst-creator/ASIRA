@@ -23,8 +23,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // استرجاع البريد المحفوظ تلقائياً عند فتح النافذة
+  React.useEffect(() => {
+    try {
+      const savedEmail = localStorage.getItem('asira_remember_email');
+      if (savedEmail) {
+        setEmail(savedEmail);
+        setRememberMe(true);
+      }
+    } catch {
+      // ignore
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -99,6 +113,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
           createdAt: new Date().toISOString(),
         });
 
+        if (rememberMe) {
+          try {
+            localStorage.setItem('asira_remember_email', email.trim());
+          } catch {}
+        }
+
         onLogin({
           uid,
           name: name.trim(),
@@ -117,6 +137,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
 
         const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
         const uid = cred.user.uid;
+
+        if (rememberMe) {
+          try {
+            localStorage.setItem('asira_remember_email', email.trim());
+          } catch {}
+        } else {
+          try {
+            localStorage.removeItem('asira_remember_email');
+          } catch {}
+        }
 
         // جلب الدور والاسم المعتمد من وثيقة المستخدم في Firestore
         let role: UserRole = 'student';
@@ -205,8 +235,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
       resetForm();
       onClose();
     } catch (err: any) {
-      if (err?.code === 'auth/popup-closed-by-user' || err?.code === 'auth/cancelled-popup-request') {
+      const code = err?.code || '';
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
         // ألغى المستخدم النافذة المنبثقة
+      } else if (code === 'auth/unauthorized-domain') {
+        setError('النطاق الحالي غير مصرح به في Firebase. يرجى إضافة رابط الموقع في Firebase Console -> Authentication -> Settings -> Authorized domains.');
+      } else if (code === 'auth/popup-blocked') {
+        setError('تم حجب النافذة المنبثقة بواسطة المتصفح. يرجى السماح بالنوافذ المنبثقة (Popups) وإعادة المحاولة.');
+      } else if (code === 'auth/operation-not-allowed') {
+        setError('موفر تسجيل الدخول عبر Google غير مفعّل في Firebase Authentication Console.');
       } else {
         setError(err?.message || 'تعذر تسجيل الدخول عبر Google. حاول مرة أخرى.');
       }
@@ -503,6 +540,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
                   }}
                 />
               </div>
+
+              {!isRegister && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.2rem' }}>
+                  <input
+                    type="checkbox"
+                    id="auth-remember-me"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--primary-600)' }}
+                  />
+                  <label
+                    htmlFor="auth-remember-me"
+                    style={{ fontSize: '0.82rem', color: 'var(--text-muted)', cursor: 'pointer', userSelect: 'none' }}
+                  >
+                    تذكر بيانات تسجيلي على هذا الجهاز
+                  </label>
+                </div>
+              )}
 
               <button
                 type="submit"

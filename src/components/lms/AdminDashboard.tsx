@@ -473,8 +473,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               <span>رفض</span>
                             </button>
                           </div>
+                        ) : enr.status === 'rejected' ? (
+                          <button
+                            onClick={() => handleApprove(enr.id)}
+                            className="btn btn-outline"
+                            style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', color: 'var(--accent-emerald)', borderColor: 'var(--accent-emerald)' }}
+                            title="التراجع عن الرفض وقبول الطالب في المقرر"
+                          >
+                            <Check size={14} />
+                            <span>إعادة قبول واعتماد</span>
+                          </button>
                         ) : (
-                          <span style={{ fontSize: '0.82rem', color: 'var(--text-subtle)' }}>تم اتخاذ القرار</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <span style={{ fontSize: '0.82rem', color: 'var(--accent-emerald)', fontWeight: 700 }}>معتمد ✓</span>
+                            <button
+                              onClick={() => handleReject(enr.id)}
+                              className="btn btn-ghost"
+                              style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', color: '#ef4444' }}
+                              title="إلغاء الاعتماد وتحويله لمرفوض"
+                            >
+                              إلغاء القبول
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>

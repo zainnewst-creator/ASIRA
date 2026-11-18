@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Course, CourseStatus } from '../types';
-import { Edit3, X, Upload, Image, Save, CheckCircle } from 'lucide-react';
+import { Edit3, X, Upload, Image, Save, CheckCircle, Trash2 } from 'lucide-react';
 
 interface EditCourseModalProps {
   isOpen: boolean;
   onClose: () => void;
   course: Course;
   onUpdateCourse: (updated: Course) => void;
+  onDeleteCourse?: (courseId: string) => void;
 }
 
 export const EditCourseModal: React.FC<EditCourseModalProps> = ({
@@ -14,6 +15,7 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({
   onClose,
   course,
   onUpdateCourse,
+  onDeleteCourse,
 }) => {
   const [title, setTitle] = useState(course.title);
   const [code, setCode] = useState(course.code);
@@ -312,14 +314,34 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({
           </div>
 
           {/* أزرار الإجراء */}
-          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-            <button type="button" onClick={onClose} className="btn btn-outline">
-              إلغاء
-            </button>
-            <button type="submit" className="btn btn-primary" style={{ padding: '0.65rem 1.75rem' }} id="save-course-changes-btn">
-              <Save size={16} />
-              <span>حفظ وتحديث بيانات الكورس</span>
-            </button>
+          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+            {onDeleteCourse ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm(`هل أنت متأكد تماماً من حذف هذا المقرر (${course.code}: ${course.title}) نهائياً؟\nسيتم حذف المقرر وكافة بياناته من المنصة.`)) {
+                    onDeleteCourse(course.id);
+                    onClose();
+                  }
+                }}
+                className="btn btn-outline"
+                style={{ color: '#ef4444', borderColor: '#ef4444', fontSize: '0.85rem' }}
+                id="delete-course-btn"
+              >
+                <Trash2 size={15} />
+                <span>حذف هذا الكورس نهائياً</span>
+              </button>
+            ) : <div />}
+
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button type="button" onClick={onClose} className="btn btn-outline">
+                إلغاء
+              </button>
+              <button type="submit" className="btn btn-primary" style={{ padding: '0.65rem 1.75rem' }} id="save-course-changes-btn">
+                <Save size={16} />
+                <span>حفظ وتحديث بيانات الكورس</span>
+              </button>
+            </div>
           </div>
         </form>
       </div>

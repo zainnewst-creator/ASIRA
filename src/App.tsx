@@ -13,13 +13,66 @@ import { AuthModal } from './components/AuthModal';
 import { Course, ResearchPaper, UserRole } from './types';
 import { INITIAL_COURSES, INITIAL_RESEARCHES, INITIAL_CURRICULA, MockCourseCurriculum, MockPendingEnrollment } from './data/mockData';
 import { CheckCircle2, ShieldAlert } from 'lucide-react';
+import { auth, db } from './services/firebaseConfig';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<string>('home');
   const [isDark, setIsDark] = useState<boolean>(false);
   const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
-  const [currentUser, setCurrentUser] = useState<{ uid?: string; name: string; role: UserRole; email: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ uid?: string; name: string; role: UserRole; email: string } | null>(() => {
+    try {
+      const saved = localStorage.getItem('asira_current_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [enrollSuccessCourse, setEnrollSuccessCourse] = useState<Course | null>(null);
+
+  // حفظ واسترجاع جلسة المستخدم في المتصفح تلقائياً
+  useEffect(() => {
+    if (currentUser) {
+      try {
+        localStorage.setItem('asira_current_user', JSON.stringify(currentUser));
+      } catch {}
+    } else {
+      try {
+        localStorage.removeItem('asira_current_user');
+      } catch {}
+    }
+  }, [currentUser]);
+
+  // الاستماع المستمر لحالة مصادقة Firebase واستعادة الجلسة عند تحديث الصفحة (F5)
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        let role: UserRole = 'student';
+        let displayName = firebaseUser.displayName || firebaseUser.email || 'طالب أسيرا';
+        try {
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          if (userDoc.exists()) {
+            const data = userDoc.data();
+            role = (data.role as UserRole) || 'student';
+            displayName = data.displayName || displayName;
+          }
+        } catch {
+          // fallback
+        }
+        setCurrentUser((prev) => {
+          if (prev && prev.uid === firebaseUser.uid && prev.role === role) return prev;
+          return {
+            uid: firebaseUser.uid,
+            name: displayName,
+            role,
+            email: firebaseUser.email || '',
+          };
+        });
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   // الحالة المركزية لطلبات الالتحاق (Enrollments)
   const [enrollments, setEnrollments] = useState<MockPendingEnrollment[]>(() => {
@@ -47,13 +100,94 @@ export const App: React.FC = () => {
     });
   };
 
-  // الحالة المركزية للكورسات والأبحاث والمناهج (Central Dynamic State)
-  const [courses, setCourses] = useState<Course[]>(INITIAL_COURSES);
-  const [researches, setResearches] = useState<ResearchPaper[]>(INITIAL_RESEARCHES);
-  const [curricula, setCurricula] = useState<Record<string, MockCourseCurriculum>>(INITIAL_CURRICULA);
+  // تنظيف البيانات الوهمية القديمة من المتصفح عند أول زيارة بعد التحديث
+  useEffect(() => {
+    try {
+      const savedCourses = localStorage.getItem('asira_courses');
+      if (savedCourses) {
+        const parsed = JSON.parse(savedCourses);
+        const mockIds = ['course-1', 'course-2', 'course-3', 'course-4'];
+        const hasMock = parsed.some((c: { id: string }) => mockIds.includes(c.id));
+        if (hasMock) {
+          const cleaned = parsed.filter((c: { id: string }) => !mockIds.includes(c.id));
+          localStorage.setItem('asira_courses', JSON.stringify(cleaned));
+        }
+      }
+      const savedResearches = localStorage.getItem('asira_researches');
+      if (savedResearches) {
+        const parsed = JSON.parse(savedResearches);
+        const mockResIds = ['res-1', 'res-2', 'res-3'];
+        const hasMock = parsed.some((r: { id: string }) => mockResIds.includes(r.id));
+        if (hasMock) {
+          const cleaned = parsed.filter((r: { id: string }) => !mockResIds.includes(r.id));
+          localStorage.setItem('asira_researches', JSON.stringify(cleaned));
+        }
+      }
+      // تنظيف المناهج الوهمية
+      const savedCurricula = localStorage.getItem('asira_curricula');
+      if (savedCurricula) {
+        const parsed = JSON.parse(savedCurricula);
+        const mockCurrIds = ['course-1', 'course-2', 'course-3', 'course-4'];
+        let changed = false;
+        for (const id of mockCurrIds) {
+          if (parsed[id]) { delete parsed[id]; changed = true; }
+        }
+        if (changed) localStorage.setItem('asira_curricula', JSON.stringify(parsed));
+      }
+    } catch {}
+  }, []);
+
+  // الحالة المركزية للكورسات والأبحاث والمناهج (مع الحفظ في المتصفح)
+  const [courses, setCourses] = useState<Course[]>(() => {
+    try {
+      const saved = localStorage.getItem('asira_courses');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // استبعاد الكورسات الوهمية
+        const mockIds = ['course-1', 'course-2', 'course-3', 'course-4'];
+        return parsed.filter((c: { id: string }) => !mockIds.includes(c.id));
+      }
+      return INITIAL_COURSES;
+    } catch {
+      return INITIAL_COURSES;
+    }
+  });
+  const [researches, setResearches] = useState<ResearchPaper[]>(() => {
+    try {
+      const saved = localStorage.getItem('asira_researches');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const mockResIds = ['res-1', 'res-2', 'res-3'];
+        return parsed.filter((r: { id: string }) => !mockResIds.includes(r.id));
+      }
+      return INITIAL_RESEARCHES;
+    } catch {
+      return INITIAL_RESEARCHES;
+    }
+  });
+  const [curricula, setCurricula] = useState<Record<string, MockCourseCurriculum>>(() => {
+    try {
+      const saved = localStorage.getItem('asira_curricula');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const mockCurrIds = ['course-1', 'course-2', 'course-3', 'course-4'];
+        for (const id of mockCurrIds) delete parsed[id];
+        return parsed;
+      }
+      return INITIAL_CURRICULA;
+    } catch {
+      return INITIAL_CURRICULA;
+    }
+  });
 
   const handleAddCourse = (newCourse: Course) => {
-    setCourses((prev) => [newCourse, ...prev]);
+    setCourses((prev) => {
+      const updated = [newCourse, ...prev];
+      try {
+        localStorage.setItem('asira_courses', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
     // إنشاء منهج مستقل معزول للكورس الجديد دون توريث محتوى وهمي
     setCurricula((prev) => ({
       ...prev,
@@ -75,26 +209,78 @@ export const App: React.FC = () => {
   };
 
   const handleUpdateCourse = (updatedCourse: Course) => {
-    setCourses((prev) => prev.map((c) => c.id === updatedCourse.id ? updatedCourse : c));
+    setCourses((prev) => {
+      const updated = prev.map((c) => c.id === updatedCourse.id ? updatedCourse : c);
+      try {
+        localStorage.setItem('asira_courses', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  };
+
+  const handleDeleteCourse = (courseId: string) => {
+    setCourses((prev) => {
+      const updated = prev.filter((c) => c.id !== courseId);
+      try {
+        localStorage.setItem('asira_courses', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    setEnrollments((prev) => {
+      const updated = prev.filter((e) => e.courseId !== courseId);
+      try {
+        localStorage.setItem('asira_enrollments', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    setCurricula((prev) => {
+      const copy = { ...prev };
+      delete copy[courseId];
+      return copy;
+    });
   };
 
   const handleUpdateCurriculum = (updated: MockCourseCurriculum) => {
-    setCurricula((prev) => ({
-      ...prev,
-      [updated.courseId]: updated,
-    }));
+    setCurricula((prev) => {
+      const next = {
+        ...prev,
+        [updated.courseId]: updated,
+      };
+      try {
+        localStorage.setItem('asira_curricula', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
   };
 
   const handleAddResearch = (newPaper: ResearchPaper) => {
-    setResearches((prev) => [newPaper, ...prev]);
+    setResearches((prev) => {
+      const next = [newPaper, ...prev];
+      try {
+        localStorage.setItem('asira_researches', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
   };
 
   const handleUpdateResearch = (updatedPaper: ResearchPaper) => {
-    setResearches((prev) => prev.map((p) => p.id === updatedPaper.id ? updatedPaper : p));
+    setResearches((prev) => {
+      const next = prev.map((p) => (p.id === updatedPaper.id ? updatedPaper : p));
+      try {
+        localStorage.setItem('asira_researches', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
   };
 
   const handleDeleteResearch = (id: string) => {
-    setResearches((prev) => prev.filter((p) => p.id !== id));
+    setResearches((prev) => {
+      const next = prev.filter((p) => p.id !== id);
+      try {
+        localStorage.setItem('asira_researches', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
   };
 
   // إدارة الوضع الليلي
@@ -122,8 +308,27 @@ export const App: React.FC = () => {
     if (!currentUser) {
       setIsAuthOpen(true);
     } else {
-      const existing = enrollments.find(e => e.studentUid === currentUser.uid && e.courseId === course.id);
-      if (!existing) {
+      const existingIndex = enrollments.findIndex(e => e.studentUid === currentUser.uid && e.courseId === course.id);
+      if (existingIndex >= 0) {
+        const existing = enrollments[existingIndex];
+        if (existing.status === 'rejected' || existing.status === 'pending') {
+          // إعادة تفعيل الطلب وتحديث حالته إلى pending بتاريخ اليوم ليظهر فوراً للإدارة
+          const updated = [...enrollments];
+          updated[existingIndex] = {
+            ...existing,
+            studentName: currentUser.name || existing.studentName,
+            studentEmail: currentUser.email || existing.studentEmail,
+            status: 'pending',
+            requestedAt: new Date().toISOString().split('T')[0],
+          };
+          setEnrollments(updated);
+          localStorage.setItem('asira_enrollments', JSON.stringify(updated));
+          setEnrollSuccessCourse(course);
+        } else if (existing.status === 'approved') {
+          alert('أنت مسجل بالفعل في هذا المقرر الدراسي وبإمكانك الوصول إليه مباشرة من لوحة التعلم.');
+          setCurrentTab('lms_dashboard');
+        }
+      } else {
         const newEnrollment: MockPendingEnrollment = {
           id: `enr-${Date.now()}`,
           studentUid: currentUser.uid || `student-${Date.now()}`,
@@ -142,8 +347,8 @@ export const App: React.FC = () => {
           localStorage.setItem('asira_enrollments', JSON.stringify(updated));
           return updated;
         });
+        setEnrollSuccessCourse(course);
       }
-      setEnrollSuccessCourse(course);
     }
   };
 
@@ -214,6 +419,7 @@ export const App: React.FC = () => {
             courses={courses}
             onAddCourse={handleAddCourse}
             onUpdateCourse={handleUpdateCourse}
+            onDeleteCourse={handleDeleteCourse}
             researches={researches}
             onAddResearch={handleAddResearch}
             onUpdateResearch={handleUpdateResearch}
@@ -227,8 +433,14 @@ export const App: React.FC = () => {
             onApproveEnrollment={handleApproveEnrollment}
             onRejectEnrollment={handleRejectEnrollment}
             onNavigateTab={(tab) => setCurrentTab(tab)}
-            onLogout={() => {
+            onLogout={async () => {
+              try {
+                await signOut(auth);
+              } catch {}
               setCurrentUser(null);
+              try {
+                localStorage.removeItem('asira_current_user');
+              } catch {}
               setCurrentTab('home');
             }}
             onBackToPortal={() => setCurrentTab('home')}

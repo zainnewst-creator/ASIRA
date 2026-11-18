@@ -31,6 +31,7 @@ interface LmsDashboardPreviewProps {
   courses?: Course[];
   onAddCourse?: (newCourse: Course) => void;
   onUpdateCourse?: (updatedCourse: Course) => void;
+  onDeleteCourse?: (courseId: string) => void;
   researches?: ResearchPaper[];
   onAddResearch?: (newPaper: ResearchPaper) => void;
   onUpdateResearch?: (updatedPaper: ResearchPaper) => void;
@@ -52,6 +53,7 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
   courses = INITIAL_COURSES,
   onAddCourse,
   onUpdateCourse,
+  onDeleteCourse,
   researches: _researches = INITIAL_RESEARCHES,
   onAddResearch,
   onUpdateResearch,
@@ -361,6 +363,7 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
             onSelectCourseId={setSelectedCourseId}
             onAddCourse={onAddCourse}
             onUpdateCourse={onUpdateCourse}
+            onDeleteCourse={onDeleteCourse}
             onAddResearch={onAddResearch}
             submissions={submissions}
             onUpdateSubmission={handleUpdateSubmission}

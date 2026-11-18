@@ -104,10 +104,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   const [completedExamIds, setCompletedExamIds] = useState<string[]>([]);
 
   // تكليف الطالب الحالي
-  const studentSubmission = submissions.find((s) => s.studentUid === studentUid) || submissions[0];
+  const studentSubmission = submissions.find((s) => s.studentUid === studentUid);
 
   // محاولة اختبار الطالب الحالي
-  const studentExamAttempt = examAttempts.find((a) => a.studentUid === studentUid) || examAttempts[0];
+  const studentExamAttempt = examAttempts.find((a) => a.studentUid === studentUid);
 
   // حالة مشغل الدروس ومتابعة المحاضرات المكتملة
   const [currentModuleIndex, setCurrentModuleIndex] = useState(0);
@@ -193,15 +193,33 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   // إشعار قفل المتطلبات الأكاديمية
   const [lockedNotice, setLockedNotice] = useState<string | null>(null);
 
-  // حالة الاختبار التفاعلي والأسئلة الثلاثة
-  const [examSubmitted, setExamSubmitted] = useState(studentExamAttempt?.status === 'approved');
-  const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({
-    q1: 'A',
-    q2: 'A',
-    q3: 'A',
-  });
-  const [examTimer, setExamTimer] = useState<number>(1455); // ~24 minutes
-  const [examCalculatedScore, setExamCalculatedScore] = useState<number>(studentExamAttempt?.calculatedScore || 28);
+  // حالة الاختبار التفاعلي والأسئلة (تبدأ نظيفة تماماً لكل طالب ومقرر)
+  const [examSubmitted, setExamSubmitted] = useState<boolean>(Boolean(studentExamAttempt));
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
+  const [examTimer, setExamTimer] = useState<number>(30 * 60); // 30 دقيقة كاملة ونظيفة
+  const [examCalculatedScore, setExamCalculatedScore] = useState<number>(studentExamAttempt?.calculatedScore || 0);
+
+  // إعادة ضبط حالة الاختبار والتكليف بدقة عند تبديل الطالب أو المقرر
+  useEffect(() => {
+    if (studentExamAttempt) {
+      setExamSubmitted(true);
+      setExamCalculatedScore(studentExamAttempt.officialGrade ?? studentExamAttempt.calculatedScore ?? 0);
+    } else {
+      setExamSubmitted(false);
+      setExamCalculatedScore(0);
+      setSelectedAnswers({});
+      setExamTimer(30 * 60);
+    }
+  }, [studentExamAttempt, selectedCourseId, studentUid]);
+
+  useEffect(() => {
+    if (studentSubmission?.driveFileUrl) {
+      setAssignmentInputLink(studentSubmission.driveFileUrl);
+    } else {
+      setAssignmentInputLink('');
+      setStudentNotesInput('');
+    }
+  }, [studentSubmission, selectedCourseId, studentUid]);
 
   // تسليم الاختبار التفاعلي - يفتح الدرس الجديد فوراً
   const handleExamSubmit = () => {
@@ -308,6 +326,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
       const isCompleted =
         submittedAssignmentIds.includes(asg.id) ||
         submissions.some((s) => {
+          if (s.studentUid !== studentUid) return false;
           const titleMatch =
             s.assignmentTitle === asg.title ||
             s.assignmentTitle.includes(asg.title) ||
@@ -339,6 +358,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
         completedExamIds.includes(ex.id) ||
         examSubmitted ||
         examAttempts.some((a) => {
+          if (a.studentUid !== studentUid) return false;
           const titleMatch =
             a.examTitle === ex.title ||
             a.examTitle.includes(ex.title) ||
@@ -452,6 +472,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
       driveFileUrl: assignmentInputLink.trim(),
       submittedAt: formattedDate,
       status: 'submitted',
+      maxScore: studentSubmission?.maxScore || firstAsg?.maxScore || 20,
       grade: undefined,
       instructorFeedback: undefined,
       revisionNotes: studentNotesInput ? `ملاحظة الطالب: ${studentNotesInput}` : undefined,
