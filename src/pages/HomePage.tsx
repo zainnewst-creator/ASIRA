@@ -29,6 +29,10 @@ export const HomePage: React.FC<HomePageProps> = ({
   onEnroll, 
   onSelectCourse 
 }) => {
+  const publishedPapersCount = researches.length > 0 ? researches.length : INITIAL_STATS.publishedPapers;
+  const activeCoursesCount = courses.length > 0 ? courses.length : 3;
+  const totalEnrolled = courses.reduce((sum, c) => sum + (c.enrolledCount || 0), 0);
+  const studentsCount = totalEnrolled > 0 ? totalEnrolled : INITIAL_STATS.studentsTrained;
   return (
     <div>
       {/* 1. قسم البطل (Hero Section) */}
@@ -77,16 +81,16 @@ export const HomePage: React.FC<HomePageProps> = ({
           {/* شريط الإحصائيات الحية لأثر منتدى أسيرا */}
           <div className="stats-grid">
             <div className="stat-box">
-              <div className="stat-number">{INITIAL_STATS.publishedPapers}+</div>
+              <div className="stat-number">{publishedPapersCount}+</div>
               <div className="stat-label">بحثاً منشوراً في مجلات عالمية</div>
             </div>
             <div className="stat-box">
-              <div className="stat-number">{INITIAL_STATS.studentsTrained}+</div>
+              <div className="stat-number">{studentsCount}+</div>
               <div className="stat-label">باحثاً وطالباً تم تدريبهم</div>
             </div>
             <div className="stat-box">
-              <div className="stat-number">{INITIAL_STATS.activeMentors}+</div>
-              <div className="stat-label">مشرفاً وأكاديمياً متخصصاً</div>
+              <div className="stat-number">{activeCoursesCount}</div>
+              <div className="stat-label">برامج ومسارات تدريبية معتمدة</div>
             </div>
             <div className="stat-box">
               <div className="stat-number">{INITIAL_STATS.hoursOfTraining}+</div>
