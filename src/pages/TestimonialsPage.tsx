@@ -33,12 +33,30 @@ export const TestimonialsPage: React.FC = () => {
             </p>
 
             <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-              {item.avatarUrl && (
+              {item.avatarUrl ? (
                 <img
                   src={item.avatarUrl}
                   alt={item.studentName}
                   style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }}
                 />
+              ) : (
+                <div
+                  style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, var(--primary-600), var(--primary-900, #172554))',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 800,
+                    fontSize: '0.95rem',
+                    flexShrink: 0,
+                  }}
+                >
+                  {item.studentName.replace(/^[طصد]\.\s*/, '').slice(0, 2)}
+                </div>
               )}
               <div>
                 <h4 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>

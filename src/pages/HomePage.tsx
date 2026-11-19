@@ -253,12 +253,30 @@ export const HomePage: React.FC<HomePageProps> = ({
                   "{item.quote}"
                 </p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
-                  {item.avatarUrl && (
+                  {item.avatarUrl ? (
                     <img 
                       src={item.avatarUrl} 
                       alt={item.studentName}
                       style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover' }}
                     />
+                  ) : (
+                    <div
+                      style={{
+                        width: '42px',
+                        height: '42px',
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, var(--primary-600), var(--primary-850, #1e3a8a))',
+                        color: '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 800,
+                        fontSize: '0.88rem',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {item.studentName.replace(/^[طصد]\.\s*/, '').slice(0, 2)}
+                    </div>
                   )}
                   <div>
                     <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>

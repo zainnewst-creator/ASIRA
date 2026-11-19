@@ -3011,8 +3011,10 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
             <h3 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '1rem' }}>إضافة درس ومحاضرة إلى الكورس</h3>
             <form onSubmit={handleAddLesson} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>الوحدة الدراسية (المديول) المستهدف *</label>
+                <label htmlFor="lesson-target-module" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>الوحدة الدراسية (المديول) المستهدف *</label>
                 <select
+                  id="lesson-target-module"
+                  name="lessonTargetModule"
                   value={targetModuleId || curriculum.modules?.[0]?.id || ''}
                   onChange={(e) => setTargetModuleId(e.target.value)}
                   style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
@@ -3023,8 +3025,17 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                 </select>
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>عنوان الدرس *</label>
-                <input type="text" required value={newLessonTitle} onChange={(e) => setNewLessonTitle(e.target.value)} placeholder="مثال: الدرس 4: صياغة استراتيجية MeSH" style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }} />
+                <label htmlFor="new-lesson-title" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>عنوان الدرس *</label>
+                <input
+                  id="new-lesson-title"
+                  name="newLessonTitle"
+                  type="text"
+                  required
+                  value={newLessonTitle}
+                  onChange={(e) => setNewLessonTitle(e.target.value)}
+                  placeholder="مثال: الدرس 4: صياغة استراتيجية MeSH"
+                  style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
+                />
               </div>
 
               <div>
@@ -3053,19 +3064,29 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
 
               {lessonMediaType === 'video' ? (
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>معرف فيديو YouTube أو الرابط</label>
-                  <input type="text" value={newLessonYoutube} onChange={(e) => setNewLessonYoutube(e.target.value)} placeholder="مثال: dQw4w9WgXcQ" style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }} />
+                  <label htmlFor="new-lesson-youtube" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>معرف فيديو YouTube أو الرابط</label>
+                  <input
+                    id="new-lesson-youtube"
+                    name="newLessonYoutube"
+                    type="text"
+                    value={newLessonYoutube}
+                    onChange={(e) => setNewLessonYoutube(e.target.value)}
+                    placeholder="مثال: dQw4w9WgXcQ أو رابط يوتيوب كامل"
+                    style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
+                  />
                 </div>
               ) : (
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>رابط التسجيل الصوتي من Google Drive أو ملف صوتي *</label>
+                  <label htmlFor="new-lesson-audio" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>رابط التسجيل الصوتي من Google Drive أو ملف صوتي *</label>
                   <input 
+                    id="new-lesson-audio"
+                    name="newLessonAudio"
                     type="url" 
                     required 
                     value={newLessonAudio} 
                     onChange={(e) => setNewLessonAudio(e.target.value)} 
                     placeholder="https://drive.google.com/file/d/..." 
-                    style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }} 
+                    style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }} 
                   />
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.25rem' }}>
                     💡 ارفع التسجيل الصوتي لـ Google Drive واضبط المشاركة على "أي شخص لديه الرابط (Viewer)".
@@ -3074,8 +3095,16 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
               )}
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>رابط سلايدات وملاحظات Google Drive (PDF)</label>
-                <input type="url" value={newLessonDrive} onChange={(e) => setNewLessonDrive(e.target.value)} placeholder="https://drive.google.com/..." style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }} />
+                <label htmlFor="new-lesson-drive" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>رابط سلايدات وملاحظات Google Drive (PDF)</label>
+                <input
+                  id="new-lesson-drive"
+                  name="newLessonDrive"
+                  type="url"
+                  value={newLessonDrive}
+                  onChange={(e) => setNewLessonDrive(e.target.value)}
+                  placeholder="https://drive.google.com/..."
+                  style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
+                />
               </div>
               <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
                 <button type="button" onClick={() => setIsAddLessonModalOpen(false)} className="btn btn-outline">إلغاء</button>
@@ -3094,8 +3123,10 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
             <h3 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '1rem' }}>إضافة تكليف جديد للكورس</h3>
             <form onSubmit={handleAddAssignment} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>الوحدة الدراسية (المديول) المستهدف *</label>
+                <label htmlFor="assignment-target-module" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>الوحدة الدراسية (المديول) المستهدف *</label>
                 <select
+                  id="assignment-target-module"
+                  name="assignmentTargetModule"
                   value={targetModuleId || curriculum.modules?.[0]?.id || ''}
                   onChange={(e) => setTargetModuleId(e.target.value)}
                   style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
@@ -3106,26 +3137,67 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                 </select>
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>عنوان التكليف الأكاديمي *</label>
-                <input type="text" required value={assignmentTitle} onChange={(e) => setAssignmentTitle(e.target.value)} placeholder="مثال: التكليف 3: تحليل البيانات واستخلاص النتائج" style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }} />
+                <label htmlFor="assignment-title" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>عنوان التكليف الأكاديمي *</label>
+                <input
+                  id="assignment-title"
+                  name="assignmentTitle"
+                  type="text"
+                  required
+                  value={assignmentTitle}
+                  onChange={(e) => setAssignmentTitle(e.target.value)}
+                  placeholder="مثال: التكليف 3: تحليل البيانات واستخلاص النتائج"
+                  style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
+                />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>تعليمات وإرشادات الحل</label>
-                <textarea rows={2} value={assignmentInstructions} onChange={(e) => setAssignmentInstructions(e.target.value)} placeholder="تعليمات ومعايير التقييم..." style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', fontFamily: 'var(--font-arabic)' }} />
+                <label htmlFor="assignment-instructions" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>تعليمات وإرشادات الحل</label>
+                <textarea
+                  id="assignment-instructions"
+                  name="assignmentInstructions"
+                  rows={2}
+                  value={assignmentInstructions}
+                  onChange={(e) => setAssignmentInstructions(e.target.value)}
+                  placeholder="تعليمات ومعايير التقييم..."
+                  style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)', fontFamily: 'var(--font-arabic)' }}
+                />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>الدرجة القصوى</label>
-                  <input type="number" min={5} max={100} value={assignmentMaxScore} onChange={(e) => setAssignmentMaxScore(Number(e.target.value))} style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', fontWeight: 700 }} />
+                  <label htmlFor="assignment-max-score" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>الدرجة القصوى</label>
+                  <input
+                    id="assignment-max-score"
+                    name="assignmentMaxScore"
+                    type="number"
+                    min={5}
+                    max={100}
+                    value={assignmentMaxScore}
+                    onChange={(e) => setAssignmentMaxScore(Number(e.target.value))}
+                    style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)', fontWeight: 700 }}
+                  />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>الموعد النهائي</label>
-                  <input type="date" value={assignmentDeadline} onChange={(e) => setAssignmentDeadline(e.target.value)} style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }} />
+                  <label htmlFor="assignment-deadline" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>الموعد النهائي</label>
+                  <input
+                    id="assignment-deadline"
+                    name="assignmentDeadline"
+                    type="date"
+                    value={assignmentDeadline}
+                    onChange={(e) => setAssignmentDeadline(e.target.value)}
+                    style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
+                  />
                 </div>
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>رابط نموذج التكليف (Google Drive Template)</label>
-                <input type="url" value={assignmentDriveTemplate} onChange={(e) => setAssignmentDriveTemplate(e.target.value)} placeholder="https://drive.google.com/..." style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }} />
+                <label htmlFor="assignment-drive-template" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>رابط نموذج التكليف (Google Drive Template)</label>
+                <input
+                  id="assignment-drive-template"
+                  name="assignmentDriveTemplate"
+                  type="url"
+                  value={assignmentDriveTemplate}
+                  onChange={(e) => setAssignmentDriveTemplate(e.target.value)}
+                  placeholder="https://drive.google.com/..."
+                  style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
+                />
               </div>
               <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
                 <button type="button" onClick={() => setIsAddAssignmentModalOpen(false)} className="btn btn-outline">إلغاء</button>
@@ -3149,8 +3221,10 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
             <form onSubmit={handleSaveExam} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>الوحدة الدراسية (المديول) المستهدف *</label>
+                  <label htmlFor="exam-target-module" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>الوحدة الدراسية (المديول) المستهدف *</label>
                   <select
+                    id="exam-target-module"
+                    name="examTargetModule"
                     value={targetModuleId || curriculum.modules?.[0]?.id || ''}
                     onChange={(e) => setTargetModuleId(e.target.value)}
                     style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
@@ -3161,8 +3235,14 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>نوع الاختبار *</label>
-                  <select value={examType} onChange={(e) => setExamType(e.target.value as any)} style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }}>
+                  <label htmlFor="exam-type" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>نوع الاختبار *</label>
+                  <select
+                    id="exam-type"
+                    name="examType"
+                    value={examType}
+                    onChange={(e) => setExamType(e.target.value as any)}
+                    style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
+                  >
                     <option value="theory">اختبار منتصف المسار النظري (Mid-term MCQ)</option>
                     <option value="final">اختبار نهائي شامل (Final Exam)</option>
                     <option value="quiz">كويز سريع أسبوعي (Quiz)</option>
@@ -3172,18 +3252,45 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>عنوان الاختبار *</label>
-                <input type="text" required value={examTitle} onChange={(e) => setExamTitle(e.target.value)} placeholder="مثال: كويز الوحدة الثانية" style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }} />
+                <label htmlFor="exam-title" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>عنوان الاختبار *</label>
+                <input
+                  id="exam-title"
+                  name="examTitle"
+                  type="text"
+                  required
+                  value={examTitle}
+                  onChange={(e) => setExamTitle(e.target.value)}
+                  placeholder="مثال: كويز الوحدة الثانية"
+                  style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
+                />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>المدة بالدقائق</label>
-                  <input type="number" min={5} max={180} value={examDuration} onChange={(e) => setExamDuration(Number(e.target.value))} style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', fontWeight: 700 }} />
+                  <label htmlFor="exam-duration" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>المدة بالدقائق</label>
+                  <input
+                    id="exam-duration"
+                    name="examDuration"
+                    type="number"
+                    min={5}
+                    max={180}
+                    value={examDuration}
+                    onChange={(e) => setExamDuration(Number(e.target.value))}
+                    style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)', fontWeight: 700 }}
+                  />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>الدرجة الكلية</label>
-                  <input type="number" min={5} max={100} value={examMaxScore} onChange={(e) => setExamMaxScore(Number(e.target.value))} style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', fontWeight: 700 }} />
+                  <label htmlFor="exam-max-score" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.25rem' }}>الدرجة الكلية</label>
+                  <input
+                    id="exam-max-score"
+                    name="examMaxScore"
+                    type="number"
+                    min={5}
+                    max={100}
+                    value={examMaxScore}
+                    onChange={(e) => setExamMaxScore(Number(e.target.value))}
+                    style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)', fontWeight: 700 }}
+                  />
                 </div>
               </div>
 
@@ -3192,17 +3299,63 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                 <strong style={{ fontSize: '0.88rem', display: 'block', marginBottom: '0.5rem' }}>
                   إضافة سؤال جديد للاختبار ({examQuestions.length} أسئلة مضافة حالياً):
                 </strong>
-                <input type="text" value={newQText} onChange={(e) => setNewQText(e.target.value)} placeholder="نص السؤال..." style={{ width: '100%', padding: '0.55rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'var(--bg-card)', marginBottom: '0.5rem', fontSize: '0.85rem' }} />
+                <input
+                  id="new-question-text"
+                  name="newQuestionText"
+                  type="text"
+                  value={newQText}
+                  onChange={(e) => setNewQText(e.target.value)}
+                  placeholder="نص السؤال..."
+                  style={{ width: '100%', padding: '0.55rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-main)', marginBottom: '0.5rem', fontSize: '0.85rem' }}
+                />
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                  <input type="text" value={newOptA} onChange={(e) => setNewOptA(e.target.value)} placeholder="الخيار A" style={{ padding: '0.45rem', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--border-color)' }} />
-                  <input type="text" value={newOptB} onChange={(e) => setNewOptB(e.target.value)} placeholder="الخيار B" style={{ padding: '0.45rem', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--border-color)' }} />
-                  <input type="text" value={newOptC} onChange={(e) => setNewOptC(e.target.value)} placeholder="الخيار C" style={{ padding: '0.45rem', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--border-color)' }} />
-                  <input type="text" value={newOptD} onChange={(e) => setNewOptD(e.target.value)} placeholder="الخيار D" style={{ padding: '0.45rem', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--border-color)' }} />
+                  <input
+                    id="new-opt-a"
+                    name="newOptA"
+                    type="text"
+                    value={newOptA}
+                    onChange={(e) => setNewOptA(e.target.value)}
+                    placeholder="الخيار A"
+                    style={{ padding: '0.45rem', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-main)' }}
+                  />
+                  <input
+                    id="new-opt-b"
+                    name="newOptB"
+                    type="text"
+                    value={newOptB}
+                    onChange={(e) => setNewOptB(e.target.value)}
+                    placeholder="الخيار B"
+                    style={{ padding: '0.45rem', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-main)' }}
+                  />
+                  <input
+                    id="new-opt-c"
+                    name="newOptC"
+                    type="text"
+                    value={newOptC}
+                    onChange={(e) => setNewOptC(e.target.value)}
+                    placeholder="الخيار C"
+                    style={{ padding: '0.45rem', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-main)' }}
+                  />
+                  <input
+                    id="new-opt-d"
+                    name="newOptD"
+                    type="text"
+                    value={newOptD}
+                    onChange={(e) => setNewOptD(e.target.value)}
+                    placeholder="الخيار D"
+                    style={{ padding: '0.45rem', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-main)' }}
+                  />
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem' }}>
-                    <span>الخيار الصحيح:</span>
-                    <select value={newCorrectOpt} onChange={(e) => setNewCorrectOpt(e.target.value)} style={{ padding: '0.3rem', borderRadius: '4px' }}>
+                    <label htmlFor="new-correct-opt">الخيار الصحيح:</label>
+                    <select
+                      id="new-correct-opt"
+                      name="newCorrectOpt"
+                      value={newCorrectOpt}
+                      onChange={(e) => setNewCorrectOpt(e.target.value)}
+                      style={{ padding: '0.3rem', borderRadius: '4px', background: 'var(--bg-card)', color: 'var(--text-main)', border: '1px solid var(--border-color)' }}
+                    >
                       <option value="A">A</option>
                       <option value="B">B</option>
                       <option value="C">C</option>
