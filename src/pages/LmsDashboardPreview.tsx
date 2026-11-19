@@ -1,29 +1,36 @@
-import React, { useState } from 'react';
-import { 
+import React, { useState, useEffect } from 'react';
+import {
   Course,
   ResearchPaper,
-  UserRole 
+  UserRole
 } from '../types';
-import { 
-  INITIAL_COURSES, 
-  INITIAL_RESEARCHES, 
-  MockStudentSubmission, 
-  MockExamAttemptForInstructor, 
-  MockCourseCurriculum, 
-  MockPendingEnrollment, 
-  MockCertificateRequest, 
-  MockAuditLogItem, 
+import {
+  INITIAL_COURSES,
+  INITIAL_RESEARCHES,
+  MockStudentSubmission,
+  MockExamAttemptForInstructor,
+  MockCourseCurriculum,
+  MockPendingEnrollment,
+  MockCertificateRequest,
+  MockAuditLogItem,
   INITIAL_CURRICULA
 } from '../data/mockData';
 import { StudentDashboard } from '../components/lms/StudentDashboard';
 import { InstructorDashboard } from '../components/lms/InstructorDashboard';
 import { AdminDashboard } from '../components/lms/AdminDashboard';
-import { 
-  GraduationCap, 
-  Users, 
-  ShieldCheck, 
-  ArrowRight, 
-  LogOut, 
+import {
+  loadAllStudentDataForCourse,
+  saveSubmission as fbSaveSubmission,
+  saveExamAttempt as fbSaveExamAttempt,
+  savePracticalGrade as fbSavePracticalGrade,
+  loadPracticalGrades as fbLoadPracticalGrades,
+} from '../services/studentDataService';
+import {
+  GraduationCap,
+  Users,
+  ShieldCheck,
+  ArrowRight,
+  LogOut,
   Sparkles
 } from 'lucide-react';
 
@@ -125,13 +132,116 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
   const [auditLogs, setAuditLogs] = useState<MockAuditLogItem[]>([]);
   const [practicalGrades, setPracticalGrades] = useState<Record<string, { score: number; notes: string }>>({});
 
+  // تحميل بيانات الطلاب من Firebase عند تبديل الكورس النشط
+  useEffect(() => {
+    if (!activeCourseId) return;
+
+    // تحميل بيانات التكليفات والاختبارات والدرجات العملية لجميع الطلاب
+    loadAllStudentDataForCourse(activeCourseId).then((data) => {
+      // دمج التسليمات من Firebase مع الحالة الحالية
+      if (data.submissions && Object.keys(data.submissions).length > 0) {
+        const fbSubmissions: MockStudentSubmission[] = [];
+        Object.entries(data.submissions).forEach(([uid, subs]) => {
+          subs.forEach((sub) => {
+            fbSubmissions.push({
+              id: sub.assignmentId || `sub-fb-${Date.now()}-${Math.random()}`,
+              studentUid: uid,
+              studentName: uid,
+              university: 'باحث أكاديمي',
+              assignmentTitle: sub.assignmentTitle,
+              version: sub.version,
+              driveFileUrl: sub.driveFileUrl,
+              submittedAt: sub.submittedAt,
+              status: sub.status as 'submitted' | 'graded' | 'revision_required',
+              grade: sub.grade ?? undefined,
+              maxScore: sub.maxScore,
+              instructorFeedback: sub.instructorFeedback || undefined,
+              revisionNotes: sub.revisionNotes || undefined,
+            });
+          });
+        });
+        if (fbSubmissions.length > 0) {
+          setSubmissions((prev) => {
+            const merged = [...prev];
+            fbSubmissions.forEach((fb) => {
+              const existsIdx = merged.findIndex((s) =>
+                s.studentUid === fb.studentUid && s.assignmentTitle === fb.assignmentTitle
+              );
+              if (existsIdx >= 0) {
+                merged[existsIdx] = { ...merged[existsIdx], ...fb, id: merged[existsIdx].id };
+              } else {
+                merged.push(fb);
+              }
+            });
+            return merged;
+          });
+        }
+      }
+
+      // دمج محاولات الاختبار من Firebase
+      if (data.examAttempts && Object.keys(data.examAttempts).length > 0) {
+        const fbAttempts: MockExamAttemptForInstructor[] = [];
+        Object.entries(data.examAttempts).forEach(([uid, attempts]) => {
+          attempts.forEach((att) => {
+            fbAttempts.push({
+              id: `exam-att-${uid}-${att.examId}`,
+              studentUid: uid,
+              studentName: uid,
+              university: 'باحث أكاديمي',
+              examTitle: att.examId,
+              calculatedScore: att.calculatedScore,
+              maxScore: 30,
+              status: 'pending_review',
+              submittedAt: att.submittedAt,
+              studentAnswers: Object.entries(att.selectedAnswers || {}).map(([qId, ans]) => ({
+                qId,
+                questionText: `سؤال ${qId}`,
+                studentAnswer: ans,
+                correctAnswer: '',
+                points: 0,
+                maxPoints: 10,
+                isCorrect: true,
+              })),
+            });
+          });
+        });
+        if (fbAttempts.length > 0) {
+          setExamAttempts((prev) => {
+            const merged = [...prev];
+            fbAttempts.forEach((fb) => {
+              const existsIdx = merged.findIndex((a) => a.studentUid === fb.studentUid && a.examTitle === fb.examTitle);
+              if (existsIdx >= 0) {
+                merged[existsIdx] = { ...merged[existsIdx], calculatedScore: fb.calculatedScore, submittedAt: fb.submittedAt };
+              } else {
+                merged.push(fb);
+              }
+            });
+            return merged;
+          });
+        }
+      }
+
+      // دمج الدرجات العملية من Firebase
+      if (data.practicalGrades && Object.keys(data.practicalGrades).length > 0) {
+        setPracticalGrades((prev) => ({ ...prev, ...data.practicalGrades }));
+      }
+    }).catch(() => { });
+
+    // تحميل الدرجات العملية بشكل منفصل (أسرع)
+    fbLoadPracticalGrades(activeCourseId).then((grades) => {
+      if (Object.keys(grades).length > 0) {
+        setPracticalGrades((prev) => ({ ...prev, ...grades }));
+      }
+    }).catch(() => { });
+  }, [activeCourseId]);
+
   // إضافة عملية إلى سجل التدقيق غير القابل للتعديل
   const appendAuditLog = (action: string, details: string) => {
-    const actorName = activeRole === 'admin' 
-      ? 'مدير المنصة العام (Admin)' 
-      : activeRole === 'instructor' 
-      ? (initialName || 'المدرس الأكاديمي') 
-      : (initialName || 'طالب أسيرا');
+    const actorName = activeRole === 'admin'
+      ? 'مدير المنصة العام (Admin)'
+      : activeRole === 'instructor'
+        ? (initialName || 'المدرس الأكاديمي')
+        : (initialName || 'طالب أسيرا');
     const actorRole = activeRole === 'admin' ? 'مدير المنصة' : activeRole === 'instructor' ? 'مدرس مسند' : 'طالب';
 
     const now = new Date();
@@ -152,6 +262,21 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
   // 1. تحديث تكليف من قبل المدرس
   const handleUpdateSubmission = (updated: MockStudentSubmission) => {
     setSubmissions((prev) => prev.map((s) => s.id === updated.id ? updated : s));
+    // حفظ التحديث في Firebase
+    if (updated.studentUid && activeCourseId) {
+      fbSaveSubmission(updated.studentUid, activeCourseId, {
+        assignmentId: updated.id,
+        assignmentTitle: updated.assignmentTitle,
+        driveFileUrl: updated.driveFileUrl,
+        status: updated.status,
+        grade: updated.grade ?? null,
+        maxScore: updated.maxScore,
+        instructorFeedback: updated.instructorFeedback || '',
+        version: updated.version,
+        submittedAt: updated.submittedAt,
+        revisionNotes: updated.revisionNotes || '',
+      }).catch(() => { });
+    }
   };
 
   // 2. تسليم تكليف جديد من قبل الطالب
@@ -163,11 +288,37 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
       }
       return [newSub, ...prev];
     });
+    // حفظ التسليم في Firebase
+    if (newSub.studentUid && activeCourseId) {
+      const firstAsg = currentCurriculum.modules?.flatMap((m) => m.assignments || [])[0];
+      fbSaveSubmission(newSub.studentUid, activeCourseId, {
+        assignmentId: firstAsg?.id || newSub.id,
+        assignmentTitle: newSub.assignmentTitle,
+        driveFileUrl: newSub.driveFileUrl,
+        status: newSub.status,
+        grade: newSub.grade ?? null,
+        maxScore: newSub.maxScore,
+        instructorFeedback: newSub.instructorFeedback || '',
+        version: newSub.version,
+        submittedAt: newSub.submittedAt,
+        revisionNotes: newSub.revisionNotes || '',
+      }).catch(() => { });
+    }
   };
 
   // 3. اعتماد / تعديل درجة اختبار من قبل المدرس
   const handleUpdateExamAttempt = (updated: MockExamAttemptForInstructor) => {
     setExamAttempts((prev) => prev.map((a) => a.id === updated.id ? updated : a));
+    // حفظ تحديث درجة الاختبار في Firebase
+    if (updated.studentUid && activeCourseId) {
+      fbSaveExamAttempt(updated.studentUid, activeCourseId, {
+        examId: updated.examTitle || updated.id,
+        selectedAnswers: {},
+        calculatedScore: updated.officialGrade ?? updated.calculatedScore ?? 0,
+        examSubmitted: true,
+        submittedAt: updated.submittedAt || new Date().toISOString(),
+      }).catch(() => { });
+    }
   };
 
   // 4. تعديل المنهج والدروس لكل كورس على حدة
@@ -188,6 +339,10 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
       ...prev,
       [studentId]: { score, notes }
     }));
+    // حفظ الدرجة العملية في Firebase
+    if (activeCourseId) {
+      fbSavePracticalGrade(studentId, activeCourseId, score, notes, initialName || 'المدرس الأكاديمي').catch(() => { });
+    }
   };
 
   // 6. قبول طلب التحاق من قبل المدير أو المشرف
@@ -275,7 +430,7 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
       const next = [newReq, ...prev];
       try {
         localStorage.setItem('asira_cert_requests', JSON.stringify(next));
-      } catch {}
+      } catch { }
       return next;
     });
     appendAuditLog(
@@ -299,18 +454,18 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
       const next = prev.map((c) =>
         c.id === id
           ? {
-              ...c,
-              status,
-              verificationCode: code !== undefined ? code : c.verificationCode,
-              signedPdfUrl: pdfUrl !== undefined ? pdfUrl : c.signedPdfUrl,
-              adminNotes: notes !== undefined ? notes : c.adminNotes,
-              issuedAt: status === 'issued' ? new Date().toISOString().split('T')[0] : c.issuedAt,
-            }
+            ...c,
+            status,
+            verificationCode: code !== undefined ? code : c.verificationCode,
+            signedPdfUrl: pdfUrl !== undefined ? pdfUrl : c.signedPdfUrl,
+            adminNotes: notes !== undefined ? notes : c.adminNotes,
+            issuedAt: status === 'issued' ? new Date().toISOString().split('T')[0] : c.issuedAt,
+          }
           : c
       );
       try {
         localStorage.setItem('asira_cert_requests', JSON.stringify(next));
-      } catch {}
+      } catch { }
       return next;
     });
   };
@@ -326,7 +481,7 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
   return (
     <div style={{ minHeight: '88vh', background: 'var(--bg-main)', padding: '2rem 0 4rem' }}>
       <div className="container">
-        
+
         {/* شريط رأس لوحة التحكم الأكاديمية */}
         <div className="card" style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', borderTop: '4px solid var(--primary-600)' }}>
           <div>

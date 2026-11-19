@@ -15,7 +15,7 @@ import { INITIAL_COURSES, INITIAL_RESEARCHES, INITIAL_CURRICULA, MockCourseCurri
 import { CheckCircle2, ShieldAlert } from 'lucide-react';
 import { auth, db } from './services/firebaseConfig';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc, collection, getDocs, updateDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, updateDoc, setDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<string>('home');
@@ -257,6 +257,9 @@ export const App: React.FC = () => {
       try {
         localStorage.setItem('asira_cert_requests', JSON.stringify(next));
       } catch {}
+      try {
+        setDoc(doc(db, 'certRequests', newReq.id), newReq, { merge: true });
+      } catch {}
       return next;
     });
   };
@@ -284,6 +287,15 @@ export const App: React.FC = () => {
       try {
         localStorage.setItem('asira_cert_requests', JSON.stringify(next));
       } catch {}
+      try {
+        setDoc(doc(db, 'certRequests', id), {
+          status,
+          ...(code !== undefined ? { verificationCode: code } : {}),
+          ...(pdfUrl !== undefined ? { signedPdfUrl: pdfUrl } : {}),
+          ...(notes !== undefined ? { adminNotes: notes } : {}),
+          ...(status === 'issued' ? { issuedAt: new Date().toISOString().split('T')[0] } : {})
+        }, { merge: true });
+      } catch {}
       return next;
     });
   };
@@ -305,47 +317,74 @@ export const App: React.FC = () => {
   const handleApproveEnrollment = (id: string) => {
     setEnrollments((prev) => {
       const updated = prev.map((e) => (e.id === id ? { ...e, status: 'approved' as const } : e));
-      localStorage.setItem('asira_enrollments', JSON.stringify(updated));
+      try {
+        localStorage.setItem('asira_enrollments', JSON.stringify(updated));
+      } catch {}
       return updated;
     });
+    try {
+      updateDoc(doc(db, 'enrollments', id), { status: 'approved' });
+    } catch {}
   };
 
   const handleRejectEnrollment = (id: string) => {
     setEnrollments((prev) => {
       const updated = prev.map((e) => (e.id === id ? { ...e, status: 'rejected' as const } : e));
-      localStorage.setItem('asira_enrollments', JSON.stringify(updated));
+      try {
+        localStorage.setItem('asira_enrollments', JSON.stringify(updated));
+      } catch {}
       return updated;
     });
+    try {
+      updateDoc(doc(db, 'enrollments', id), { status: 'rejected' });
+    } catch {}
   };
 
   const handleArchiveEnrollment = (id: string) => {
+    const now = new Date().toISOString();
     setEnrollments((prev) => {
       const updated = prev.map((e) =>
-        e.id === id ? { ...e, status: 'archived' as const, archivedAt: new Date().toISOString() } : e
+        e.id === id ? { ...e, status: 'archived' as const, archivedAt: now } : e
       );
-      localStorage.setItem('asira_enrollments', JSON.stringify(updated));
+      try {
+        localStorage.setItem('asira_enrollments', JSON.stringify(updated));
+      } catch {}
       return updated;
     });
+    try {
+      updateDoc(doc(db, 'enrollments', id), { status: 'archived', archivedAt: now });
+    } catch {}
   };
 
   const handleDeleteEnrollment = (id: string) => {
     setEnrollments((prev) => {
       const updated = prev.filter((e) => e.id !== id);
-      localStorage.setItem('asira_enrollments', JSON.stringify(updated));
+      try {
+        localStorage.setItem('asira_enrollments', JSON.stringify(updated));
+      } catch {}
       return updated;
     });
+    try {
+      deleteDoc(doc(db, 'enrollments', id));
+    } catch {}
   };
 
   const handleArchiveAllProcessed = (courseId?: string) => {
+    const now = new Date().toISOString();
     setEnrollments((prev) => {
       const updated = prev.map((e) => {
         if (courseId && e.courseId !== courseId) return e;
         if (e.status === 'approved' || e.status === 'rejected') {
-          return { ...e, status: 'archived' as const, archivedAt: new Date().toISOString() };
+          try {
+            updateDoc(doc(db, 'enrollments', e.id), { status: 'archived', archivedAt: now });
+          } catch {}
+          return { ...e, status: 'archived' as const, archivedAt: now };
         }
         return e;
       });
-      localStorage.setItem('asira_enrollments', JSON.stringify(updated));
+      try {
+        localStorage.setItem('asira_enrollments', JSON.stringify(updated));
+      } catch {}
       return updated;
     });
   };
@@ -430,6 +469,77 @@ export const App: React.FC = () => {
     }
   });
 
+  // مزامنة الكورسات والمناهج وطلبات الالتحاق والشهادات مع Firestore عند بدء التشغيل
+  useEffect(() => {
+    // 1. تحميل الكورسات من Firestore
+    getDocs(collection(db, 'courses')).then((snap) => {
+      if (!snap.empty) {
+        const fbCourses = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Course));
+        setCourses((prev) => {
+          const map = new Map<string, Course>();
+          prev.forEach((c) => map.set(c.id, c));
+          fbCourses.forEach((c) => map.set(c.id, { ...map.get(c.id), ...c }));
+          const merged = Array.from(map.values());
+          try {
+            localStorage.setItem('asira_courses', JSON.stringify(merged));
+          } catch {}
+          return merged;
+        });
+      }
+    }).catch(() => {});
+
+    // 2. تحميل المناهج من Firestore
+    getDocs(collection(db, 'curricula')).then((snap) => {
+      if (!snap.empty) {
+        const fbCurricula: Record<string, MockCourseCurriculum> = {};
+        snap.docs.forEach((d) => {
+          fbCurricula[d.id] = d.data() as MockCourseCurriculum;
+        });
+        setCurricula((prev) => {
+          const merged = { ...prev, ...fbCurricula };
+          try {
+            localStorage.setItem('asira_curricula', JSON.stringify(merged));
+          } catch {}
+          return merged;
+        });
+      }
+    }).catch(() => {});
+
+    // 3. تحميل طلبات الالتحاق من Firestore
+    getDocs(collection(db, 'enrollments')).then((snap) => {
+      if (!snap.empty) {
+        const fbEnrollments = snap.docs.map((d) => ({ id: d.id, ...d.data() } as MockPendingEnrollment));
+        setEnrollments((prev) => {
+          const map = new Map<string, MockPendingEnrollment>();
+          prev.forEach((e) => map.set(e.id, e));
+          fbEnrollments.forEach((e) => map.set(e.id, { ...map.get(e.id), ...e }));
+          const merged = Array.from(map.values());
+          try {
+            localStorage.setItem('asira_enrollments', JSON.stringify(merged));
+          } catch {}
+          return merged;
+        });
+      }
+    }).catch(() => {});
+
+    // 4. تحميل طلبات الشهادات من Firestore
+    getDocs(collection(db, 'certRequests')).then((snap) => {
+      if (!snap.empty) {
+        const fbCerts = snap.docs.map((d) => ({ id: d.id, ...d.data() } as MockCertificateRequest));
+        setCertRequests((prev) => {
+          const map = new Map<string, MockCertificateRequest>();
+          prev.forEach((c) => map.set(c.id, c));
+          fbCerts.forEach((c) => map.set(c.id, { ...map.get(c.id), ...c }));
+          const merged = Array.from(map.values());
+          try {
+            localStorage.setItem('asira_cert_requests', JSON.stringify(merged));
+          } catch {}
+          return merged;
+        });
+      }
+    }).catch(() => {});
+  }, []);
+
   const handleAddCourse = (newCourse: Course) => {
     setCourses((prev) => {
       const updated = [newCourse, ...prev];
@@ -438,24 +548,36 @@ export const App: React.FC = () => {
       } catch {}
       return updated;
     });
+    try {
+      setDoc(doc(db, 'courses', newCourse.id), newCourse);
+    } catch {}
+
+    const newCurriculum: MockCourseCurriculum = {
+      courseId: newCourse.id,
+      modules: [
+        {
+          id: `mod-${newCourse.id}-1`,
+          title: 'الوحدة الأولى: مدخل ومقدمة عامة في المسار',
+          description: 'الوحدة التأسيسية الأولى للمقرر.',
+          status: newCourse.status === 'coming_soon' ? 'coming_soon' : 'published',
+          lessons: [],
+          assignments: [],
+          exams: []
+        }
+      ]
+    };
+
     // إنشاء منهج مستقل معزول للكورس الجديد دون توريث محتوى وهمي
-    setCurricula((prev) => ({
-      ...prev,
-      [newCourse.id]: {
-        courseId: newCourse.id,
-        modules: [
-          {
-            id: `mod-${newCourse.id}-1`,
-            title: 'الوحدة الأولى: مدخل ومقدمة عامة في المسار',
-            description: 'الوحدة التأسيسية الأولى للمقرر.',
-            status: newCourse.status === 'coming_soon' ? 'coming_soon' : 'published',
-            lessons: [],
-            assignments: [],
-            exams: []
-          }
-        ]
-      }
-    }));
+    setCurricula((prev) => {
+      const next = { ...prev, [newCourse.id]: newCurriculum };
+      try {
+        localStorage.setItem('asira_curricula', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+    try {
+      setDoc(doc(db, 'curricula', newCourse.id), newCurriculum);
+    } catch {}
   };
 
   const handleUpdateCourse = (updatedCourse: Course) => {
@@ -466,6 +588,9 @@ export const App: React.FC = () => {
       } catch {}
       return updated;
     });
+    try {
+      setDoc(doc(db, 'courses', updatedCourse.id), updatedCourse, { merge: true });
+    } catch {}
   };
 
   const handleDeleteCourse = (courseId: string) => {
@@ -486,8 +611,15 @@ export const App: React.FC = () => {
     setCurricula((prev) => {
       const copy = { ...prev };
       delete copy[courseId];
+      try {
+        localStorage.setItem('asira_curricula', JSON.stringify(copy));
+      } catch {}
       return copy;
     });
+    try {
+      deleteDoc(doc(db, 'courses', courseId));
+      deleteDoc(doc(db, 'curricula', courseId));
+    } catch {}
   };
 
   const handleUpdateCurriculum = (updated: MockCourseCurriculum) => {
@@ -501,6 +633,9 @@ export const App: React.FC = () => {
       } catch {}
       return next;
     });
+    try {
+      setDoc(doc(db, 'curricula', updated.courseId), updated);
+    } catch {}
   };
 
   const handleAddResearch = (newPaper: ResearchPaper) => {
@@ -564,15 +699,21 @@ export const App: React.FC = () => {
         if (existing.status === 'rejected' || existing.status === 'pending') {
           // إعادة تفعيل الطلب وتحديث حالته إلى pending بتاريخ اليوم ليظهر فوراً للإدارة
           const updated = [...enrollments];
-          updated[existingIndex] = {
+          const updatedEnrollment: MockPendingEnrollment = {
             ...existing,
             studentName: currentUser.name || existing.studentName,
             studentEmail: currentUser.email || existing.studentEmail,
             status: 'pending',
             requestedAt: new Date().toISOString().split('T')[0],
           };
+          updated[existingIndex] = updatedEnrollment;
           setEnrollments(updated);
-          localStorage.setItem('asira_enrollments', JSON.stringify(updated));
+          try {
+            localStorage.setItem('asira_enrollments', JSON.stringify(updated));
+          } catch {}
+          try {
+            setDoc(doc(db, 'enrollments', existing.id), updatedEnrollment, { merge: true });
+          } catch {}
           setEnrollSuccessCourse(course);
         } else if (existing.status === 'approved') {
           alert('أنت مسجل بالفعل في هذا المقرر الدراسي وبإمكانك الوصول إليه مباشرة من لوحة التعلم.');
@@ -594,9 +735,14 @@ export const App: React.FC = () => {
         };
         setEnrollments(prev => {
           const updated = [newEnrollment, ...prev];
-          localStorage.setItem('asira_enrollments', JSON.stringify(updated));
+          try {
+            localStorage.setItem('asira_enrollments', JSON.stringify(updated));
+          } catch {}
           return updated;
         });
+        try {
+          setDoc(doc(db, 'enrollments', newEnrollment.id), newEnrollment);
+        } catch {}
         setEnrollSuccessCourse(course);
       }
     }

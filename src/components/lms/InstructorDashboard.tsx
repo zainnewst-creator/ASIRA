@@ -43,6 +43,13 @@ import { AddCourseModal } from '../AddCourseModal';
 import { AddResearchModal } from '../AddResearchModal';
 import { EditCourseModal } from '../EditCourseModal';
 import { sanitizeUrl } from '../../utils/security';
+import {
+  loadAllStudentDataForCourse,
+  saveSubmission as fbSaveSubmission,
+  saveExamAttempt as fbSaveExamAttempt,
+  savePracticalGrade as fbSavePracticalGrade,
+  loadPracticalGrades as fbLoadPracticalGrades,
+} from '../../services/studentDataService';
 
 export interface InstructorDashboardProps {
   courses?: Course[];
@@ -218,6 +225,95 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
   const [newPracticalScore, setNewPracticalScore] = useState(40);
   const [newPracticalNotes, setNewPracticalNotes] = useState('أداء متميز في الاختبار العملي الحضوري');
 
+  // تحميل بيانات الطلاب من Firebase عند اختيار كورس
+  useEffect(() => {
+    if (!currentCourse?.id) return;
+    const courseId = currentCourse.id;
+
+    // تحميل كل بيانات الطلاب
+    loadAllStudentDataForCourse(courseId).then((data) => {
+      // دمج التسليمات
+      if (data.submissions && Object.keys(data.submissions).length > 0) {
+        const fbSubs: MockStudentSubmission[] = [];
+        Object.entries(data.submissions).forEach(([uid, subs]) => {
+          subs.forEach((sub) => {
+            fbSubs.push({
+              id: sub.assignmentId || `sub-fb-${uid}`,
+              studentUid: uid,
+              studentName: uid,
+              university: 'باحث أكاديمي',
+              assignmentTitle: sub.assignmentTitle,
+              version: sub.version,
+              driveFileUrl: sub.driveFileUrl,
+              submittedAt: sub.submittedAt,
+              status: sub.status as 'submitted' | 'graded' | 'revision_required',
+              grade: sub.grade ?? undefined,
+              maxScore: sub.maxScore,
+              instructorFeedback: sub.instructorFeedback || undefined,
+              revisionNotes: sub.revisionNotes || undefined,
+            });
+          });
+        });
+        if (fbSubs.length > 0) {
+          setLocalSubmissions((prev) => {
+            const merged = [...prev];
+            fbSubs.forEach((fb) => {
+              if (!merged.some((s) => s.studentUid === fb.studentUid && s.assignmentTitle === fb.assignmentTitle)) {
+                merged.push(fb);
+              }
+            });
+            return merged;
+          });
+        }
+      }
+
+      // دمج محاولات الاختبار
+      if (data.examAttempts && Object.keys(data.examAttempts).length > 0) {
+        const fbAtts: MockExamAttemptForInstructor[] = [];
+        Object.entries(data.examAttempts).forEach(([uid, attempts]) => {
+          attempts.forEach((att) => {
+            fbAtts.push({
+              id: `exam-att-${uid}-${att.examId}`,
+              studentUid: uid,
+              studentName: uid,
+              university: 'باحث أكاديمي',
+              examTitle: att.examId,
+              calculatedScore: att.calculatedScore,
+              maxScore: 30,
+              status: 'pending_review',
+              submittedAt: att.submittedAt,
+              studentAnswers: Object.entries(att.selectedAnswers || {}).map(([qId, ans]) => ({
+                qId,
+                questionText: `سؤال ${qId}`,
+                studentAnswer: ans,
+                correctAnswer: '',
+                points: 0,
+                maxPoints: 10,
+                isCorrect: true,
+              })),
+            });
+          });
+        });
+        if (fbAtts.length > 0) {
+          setLocalExamAttempts((prev) => {
+            const merged = [...prev];
+            fbAtts.forEach((fb) => {
+              if (!merged.some((a) => a.studentUid === fb.studentUid && a.examTitle === fb.examTitle)) {
+                merged.push(fb);
+              }
+            });
+            return merged;
+          });
+        }
+      }
+
+      // دمج الدرجات العملية
+      if (data.practicalGrades && Object.keys(data.practicalGrades).length > 0) {
+        setLocalPracticalGrades((prev) => ({ ...prev, ...data.practicalGrades }));
+      }
+    }).catch(() => {});
+  }, [currentCourse?.id]);
+
   // نافذة إضافة درس
   const [isAddLessonModalOpen, setIsAddLessonModalOpen] = useState(false);
   const [lessonMediaType, setLessonMediaType] = useState<'video' | 'audio'>('video');
@@ -289,6 +385,22 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
       setLocalSubmissions((prev) => prev.map((sub) => sub.id === updatedSub.id ? updatedSub : sub));
     }
 
+    // حفظ تحديث التكليف في Firebase
+    if (updatedSub.studentUid && currentCourse?.id) {
+      fbSaveSubmission(updatedSub.studentUid, currentCourse.id, {
+        assignmentId: updatedSub.id,
+        assignmentTitle: updatedSub.assignmentTitle,
+        driveFileUrl: updatedSub.driveFileUrl,
+        status: updatedSub.status,
+        grade: updatedSub.grade ?? null,
+        maxScore: updatedSub.maxScore,
+        instructorFeedback: updatedSub.instructorFeedback || '',
+        version: updatedSub.version,
+        submittedAt: updatedSub.submittedAt,
+        revisionNotes: updatedSub.revisionNotes || '',
+      }).catch(() => {});
+    }
+
     if (onLogAudit) {
       const details = requestRevisionToggle 
         ? `طلب إعادة تسليم وتعديل من الطالب (${selectedSubmission.studentName}): ${revisionNotesInput}`
@@ -314,6 +426,17 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
       onUpdateExamAttempt(updatedAtt);
     } else {
       setLocalExamAttempts((prev) => prev.map((att) => att.id === updatedAtt.id ? updatedAtt : att));
+    }
+
+    // حفظ تحديث درجة الاختبار في Firebase
+    if (updatedAtt.studentUid && currentCourse?.id) {
+      fbSaveExamAttempt(updatedAtt.studentUid, currentCourse.id, {
+        examId: updatedAtt.examTitle || updatedAtt.id,
+        selectedAnswers: {},
+        calculatedScore: updatedAtt.officialGrade ?? updatedAtt.calculatedScore ?? 0,
+        examSubmitted: true,
+        submittedAt: updatedAtt.submittedAt || new Date().toISOString(),
+      }).catch(() => {});
     }
 
     if (onLogAudit) {
@@ -2065,6 +2188,10 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                           }
                         }));
                       }
+                      // حفظ الدرجة العملية في Firebase
+                      if (currentCourse?.id) {
+                        fbSavePracticalGrade(selectedPracticalStudent.id, currentCourse.id, selectedPracticalStudent.score, selectedPracticalStudent.notes, 'المدرس الأكاديمي').catch(() => {});
+                      }
 
                       if (onLogAudit) {
                         onLogAudit(
@@ -2168,6 +2295,10 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                             notes: newPracticalNotes,
                           }
                         }));
+                      }
+                      // حفظ الدرجة العملية في Firebase
+                      if (currentCourse?.id) {
+                        fbSavePracticalGrade(newPracticalStudentUid, currentCourse.id, newPracticalScore, newPracticalNotes, 'المدرس الأكاديمي').catch(() => {});
                       }
 
                       if (onLogAudit) {

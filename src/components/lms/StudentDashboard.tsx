@@ -34,6 +34,15 @@ import { Course } from '../../types';
 import { AcademicCertificateModal } from './AcademicCertificateModal';
 import { AudioLessonPlayer } from './AudioLessonPlayer';
 import { sanitizeUrl, sanitizeExamForStudent, isTrustedStorageUrl } from '../../utils/security';
+import {
+  saveExamAttempt,
+  loadExamAttempts,
+  saveCompletedLessons,
+  loadCompletedLessons,
+  saveSubmission,
+  loadSubmissions,
+  ExamAttemptData,
+} from '../../services/studentDataService';
 
 export interface StudentDashboardProps {
   courses?: Course[];
@@ -198,6 +207,67 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
   const [examTimer, setExamTimer] = useState<number>(30 * 60); // 30 دقيقة كاملة ونظيفة
   const [examCalculatedScore, setExamCalculatedScore] = useState<number>(studentExamAttempt?.calculatedScore || 0);
+  const [examMaxScoreVal, setExamMaxScoreVal] = useState<number>(30);
+  // تتبع ما إذا تم تحميل بيانات الاختبار من Firebase
+  const [examDataLoaded, setExamDataLoaded] = useState<boolean>(false);
+
+  // تحميل بيانات الاختبار المحفوظة من Firebase/localStorage عند الدخول
+  useEffect(() => {
+    if (!studentUid || !selectedCourseId) return;
+    setExamDataLoaded(false);
+    loadExamAttempts(studentUid, selectedCourseId).then((attempts) => {
+      if (attempts.length > 0) {
+        const latest = attempts[attempts.length - 1];
+        if (latest.examSubmitted) {
+          setExamSubmitted(true);
+          setExamCalculatedScore(latest.calculatedScore);
+          setSelectedAnswers(latest.selectedAnswers || {});
+          // إضافة الاختبار لقائمة المكتملة لفتح الدروس التالية
+          if (latest.examId) {
+            setCompletedExamIds((prev) => Array.from(new Set([...prev, latest.examId])));
+          }
+        }
+      }
+      setExamDataLoaded(true);
+    }).catch(() => setExamDataLoaded(true));
+  }, [studentUid, selectedCourseId]);
+
+  // تحميل الدروس المكتملة من Firebase عند الدخول أو تبديل الكورس
+  useEffect(() => {
+    if (!studentUid || !selectedCourseId) return;
+    loadCompletedLessons(studentUid, selectedCourseId).then((lessons) => {
+      if (lessons.length > 0) {
+        setCompletedLessonIds(lessons);
+      }
+    }).catch(() => {});
+  }, [studentUid, selectedCourseId]);
+
+  // تحميل التسليمات المحفوظة من Firebase عند الدخول
+  useEffect(() => {
+    if (!studentUid || !selectedCourseId) return;
+    loadSubmissions(studentUid, selectedCourseId).then((subs) => {
+      if (subs.length > 0 && onSubmitAssignment) {
+        subs.forEach((sub) => {
+          const mockSub: MockStudentSubmission = {
+            id: sub.assignmentId || `sub-${Date.now()}`,
+            studentUid: sub.studentUid,
+            studentName: studentName,
+            university: 'باحث أكاديمي',
+            assignmentTitle: sub.assignmentTitle,
+            version: sub.version,
+            driveFileUrl: sub.driveFileUrl,
+            submittedAt: sub.submittedAt,
+            status: sub.status as 'submitted' | 'graded' | 'revision_required',
+            grade: sub.grade ?? undefined,
+            maxScore: sub.maxScore,
+            instructorFeedback: sub.instructorFeedback || undefined,
+            revisionNotes: sub.revisionNotes || undefined,
+          };
+          onSubmitAssignment(mockSub);
+        });
+      }
+    }).catch(() => {});
+  }, [studentUid, selectedCourseId]);
 
   // إعادة ضبط حالة الاختبار والتكليف بدقة عند تبديل الطالب أو المقرر
   useEffect(() => {
@@ -221,44 +291,91 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
     }
   }, [studentSubmission, selectedCourseId, studentUid]);
 
+  // استخراج أسئلة الاختبار ديناميكياً من المنهج
+  const allExams = curriculum.modules.flatMap((m) => m.exams || []);
+  const currentExam = allExams[0];
+  const examQuestions = currentExam?.questions || [];
+  const dynamicMaxScore = examQuestions.reduce((sum, q) => sum + q.points, 0) || 30;
+
   // تسليم الاختبار التفاعلي - يفتح الدرس الجديد فوراً
   const handleExamSubmit = () => {
     let score = 0;
-    if (selectedAnswers.q1 === 'A') score += 10;
-    if (selectedAnswers.q2 === 'A') score += 10;
-    if (selectedAnswers.q3 === 'A') score += 10;
+    if (examQuestions.length > 0) {
+      examQuestions.forEach((q) => {
+        if (selectedAnswers[q.id] === String(q.correctIndex)) {
+          score += q.points;
+        }
+      });
+    } else {
+      // Fallback للأسئلة القديمة الثابتة
+      if (selectedAnswers.q1 === 'A') score += 10;
+      if (selectedAnswers.q2 === 'A') score += 10;
+      if (selectedAnswers.q3 === 'A') score += 10;
+    }
 
-    const firstExam = curriculum.modules.flatMap((m) => m.exams || [])[0];
+    const firstExam = currentExam || curriculum.modules.flatMap((m) => m.exams || [])[0];
     if (firstExam?.id) {
       setCompletedExamIds((prev) => Array.from(new Set([...prev, firstExam.id])));
     }
 
     setExamCalculatedScore(score);
+    setExamMaxScoreVal(dynamicMaxScore);
     setExamSubmitted(true);
 
+    // حفظ في Firebase
+    if (studentUid && selectedCourseId) {
+      saveExamAttempt(studentUid, selectedCourseId, {
+        examId: firstExam?.id || 'exam-1',
+        selectedAnswers,
+        calculatedScore: score,
+        examSubmitted: true,
+        submittedAt: new Date().toISOString(),
+      }).catch(() => {});
+    }
+
     if (onLogAudit) {
-      onLogAudit('تسليم اختبار نظري', `قام الطالب (${studentName}) بتسليم محاولة اختبار وحصل مبدئياً على ${score}/30 وتم فتح الدرس التالي فوراً`);
+      onLogAudit('تسليم اختبار نظري', `قام الطالب (${studentName}) بتسليم محاولة اختبار وحصل مبدئياً على ${score}/${dynamicMaxScore} وتم فتح الدرس التالي فوراً`);
     }
   };
 
   // تسليم تلقائي عند نفاد الوقت المحدد للاختبار - يفتح الدرس الجديد فوراً
   const handleAutoSubmitOnTimeOut = () => {
     let score = 0;
-    if (selectedAnswers.q1 === 'A') score += 10;
-    if (selectedAnswers.q2 === 'A') score += 10;
-    if (selectedAnswers.q3 === 'A') score += 10;
+    if (examQuestions.length > 0) {
+      examQuestions.forEach((q) => {
+        if (selectedAnswers[q.id] === String(q.correctIndex)) {
+          score += q.points;
+        }
+      });
+    } else {
+      if (selectedAnswers.q1 === 'A') score += 10;
+      if (selectedAnswers.q2 === 'A') score += 10;
+      if (selectedAnswers.q3 === 'A') score += 10;
+    }
 
-    const firstExam = curriculum.modules.flatMap((m) => m.exams || [])[0];
+    const firstExam = currentExam || curriculum.modules.flatMap((m) => m.exams || [])[0];
     if (firstExam?.id) {
       setCompletedExamIds((prev) => Array.from(new Set([...prev, firstExam.id])));
     }
 
     setExamCalculatedScore(score);
+    setExamMaxScoreVal(dynamicMaxScore);
     setExamSubmitted(true);
     alert('⏱️ انتهى وقت الاختبار المحدد تماماً! تم تسليم إجاباتك تلقائياً للحفاظ على نتيجتك وتم فتح المحاضرة التالية لك.');
 
+    // حفظ في Firebase
+    if (studentUid && selectedCourseId) {
+      saveExamAttempt(studentUid, selectedCourseId, {
+        examId: firstExam?.id || 'exam-1',
+        selectedAnswers,
+        calculatedScore: score,
+        examSubmitted: true,
+        submittedAt: new Date().toISOString(),
+      }).catch(() => {});
+    }
+
     if (onLogAudit) {
-      onLogAudit('تسليم اختبار تلقائي لانتهاء الوقت', `تم تسليم اختبار الطالب (${studentName}) تلقائياً وحصل على ${score}/30`);
+      onLogAudit('تسليم اختبار تلقائي لانتهاء الوقت', `تم تسليم اختبار الطالب (${studentName}) تلقائياً وحصل على ${score}/${dynamicMaxScore}`);
     }
   };
 
@@ -431,13 +548,20 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
   // تبديل إكمال الدرس
   const toggleLessonCompletion = (lessonId: string) => {
+    let updatedLessons: string[];
     if (completedLessonIds.includes(lessonId)) {
-      setCompletedLessonIds((prev) => prev.filter((id) => id !== lessonId));
+      updatedLessons = completedLessonIds.filter((id) => id !== lessonId);
+      setCompletedLessonIds(updatedLessons);
     } else {
-      setCompletedLessonIds((prev) => [...prev, lessonId]);
+      updatedLessons = [...completedLessonIds, lessonId];
+      setCompletedLessonIds(updatedLessons);
       if (onLogAudit) {
         onLogAudit('إكمال درس تعليمي', `أكمل الطالب (${studentName}) الدرس: ${currentLesson?.title}`);
       }
+    }
+    // حفظ في Firebase + localStorage
+    if (studentUid && selectedCourseId) {
+      saveCompletedLessons(studentUid, selectedCourseId, updatedLessons).catch(() => {});
     }
   };
 
@@ -483,6 +607,22 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
     if (onSubmitAssignment) {
       onSubmitAssignment(updatedSub);
+    }
+
+    // حفظ التسليم في Firebase
+    if (studentUid && selectedCourseId) {
+      saveSubmission(studentUid, selectedCourseId, {
+        assignmentId: targetId,
+        assignmentTitle: targetTitle,
+        driveFileUrl: assignmentInputLink.trim(),
+        status: 'submitted',
+        grade: null,
+        maxScore: updatedSub.maxScore,
+        instructorFeedback: '',
+        version: nextVersion,
+        submittedAt: updatedSub.submittedAt,
+        revisionNotes: studentNotesInput || '',
+      }).catch(() => {});
     }
 
     if (onLogAudit) {
@@ -611,10 +751,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                   <div style={{ marginBottom: '1.25rem', padding: '0.75rem', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '0.35rem' }}>
                       <span>نسبة الإنجاز في المساق:</span>
-                      <strong>{isComingSoon ? '0%' : '40%'}</strong>
+                      <strong>{isComingSoon ? '0%' : `${progressPercentage}%`}</strong>
                     </div>
                     <div style={{ height: '8px', background: 'var(--border-color)', borderRadius: 'var(--radius-full)', overflow: 'hidden' }}>
-                      <div style={{ width: isComingSoon ? '0%' : '40%', height: '100%', background: 'linear-gradient(90deg, #10b981, #2563eb)' }} />
+                      <div style={{ width: isComingSoon ? '0%' : `${progressPercentage}%`, height: '100%', background: 'linear-gradient(90deg, #10b981, #2563eb)' }} />
                     </div>
                   </div>
 
@@ -907,8 +1047,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                 <span>ملفات وسلايدات المحاضرة (Google Drive):</span>
               </h4>
               <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
+                {currentLesson?.drivePdfUrl && currentLesson.drivePdfUrl !== 'https://drive.google.com' ? (
                 <a
-                  href={sanitizeUrl(currentLesson?.drivePdfUrl || 'https://drive.google.com')}
+                  href={sanitizeUrl(currentLesson.drivePdfUrl)}
                   target="_blank"
                   rel="noreferrer"
                   className="btn btn-outline"
@@ -917,6 +1058,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                   <FileText size={14} />
                   <span>سلايدات المحاضرة وملاحظات الشرح (PDF)</span>
                 </a>
+                ) : (
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem', padding: '0.4rem 0' }}>
+                  📄 لم يتم رفع ملف سلايدات لهذا الدرس بعد من قِبل المشرف الأكاديمي.
+                </span>
+                )}
               </div>
             </div>
 
@@ -1211,7 +1357,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               <div>
                 <span className="badge badge-primary">كورس: {currentCourse?.title}</span>
                 <h2 style={{ fontSize: '1.35rem', fontWeight: 800, marginTop: '0.35rem' }}>
-                  {studentSubmission?.assignmentTitle || 'صياغة بروتوكول بحثي وتحديد استراتيجية MeSH'}
+                  {studentSubmission?.assignmentTitle || (curriculum.modules.flatMap(m => m.assignments || [])[0]?.title) || 'لم يتم نشر تكليف بعد'}
                 </h2>
               </div>
               <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
@@ -1413,7 +1559,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               <CheckCircle2 size={52} color="#10b981" style={{ margin: '0 auto 0.75rem' }} />
               <h3 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '0.5rem', color: 'var(--text-main)' }}>تم رصد وتسليم محاولة الاختبار بنجاح</h3>
               <p style={{ fontSize: '0.95rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
-                الدرجة الرسمية المحسوبة: <strong style={{ color: 'var(--accent-emerald)', fontSize: '1.2rem' }}>{examCalculatedScore} / 30 درجة</strong>
+                الدرجة الرسمية المحسوبة: <strong style={{ color: 'var(--accent-emerald)', fontSize: '1.2rem' }}>{examCalculatedScore} / {examMaxScoreVal} درجة</strong>
               </p>
               <div className="alert-box alert-box-success" style={{ maxWidth: '420px', margin: '0 auto 1.25rem', fontSize: '0.85rem', fontWeight: 600 }}>
                 🎉 تم فتح المحاضرة والدرس التالي لك في الكورس فوراً!
@@ -1438,69 +1584,45 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                   <PlayCircle size={16} />
                   <span>الانتقال للمحاضرة التالية المفتوحة الآن ←</span>
                 </button>
-                <button onClick={() => setExamSubmitted(false)} className="btn btn-outline" style={{ fontSize: '0.82rem' }}>
-                  <RotateCcw size={14} />
-                  <span>إعادة المحاولة التدريبية</span>
-                </button>
               </div>
             </div>
           ) : (
             <div>
+              {examQuestions.length > 0 ? (
+              <>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginBottom: '1.5rem' }}>
-                {/* السؤال 1 */}
-                <div style={{ padding: '1rem', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                  <h4 style={{ fontSize: '0.95rem', fontWeight: 800, marginBottom: '0.75rem', color: 'var(--text-main)' }}>
-                    السؤال 1: أي من التصاميم المنهجية يعتبر المعيار الذهبي لتقييم كفاءة الأدوية والتدخلات السريرية؟ (10 درجات)
-                  </h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.55rem 0.85rem', borderRadius: 'var(--radius-sm)', background: selectedAnswers.q1 === 'A' ? 'rgba(37, 99, 235, 0.12)' : 'var(--bg-card)', border: selectedAnswers.q1 === 'A' ? '1px solid var(--primary-600)' : '1px solid var(--border-color)', cursor: 'pointer' }}>
-                      <input type="radio" name="q1" checked={selectedAnswers.q1 === 'A'} onChange={() => setSelectedAnswers({ ...selectedAnswers, q1: 'A' })} />
-                      <span style={{ fontSize: '0.88rem' }}>أ) التجارب السريرية العشوائية المزدوجة التعمية (RCTs)</span>
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.55rem 0.85rem', borderRadius: 'var(--radius-sm)', background: selectedAnswers.q1 === 'B' ? 'rgba(37, 99, 235, 0.12)' : 'var(--bg-card)', border: selectedAnswers.q1 === 'B' ? '1px solid var(--primary-600)' : '1px solid var(--border-color)', cursor: 'pointer' }}>
-                      <input type="radio" name="q1" checked={selectedAnswers.q1 === 'B'} onChange={() => setSelectedAnswers({ ...selectedAnswers, q1: 'B' })} />
-                      <span style={{ fontSize: '0.88rem' }}>ب) دراسة الحالات والشواهد بأثر رجعي (Case-Control)</span>
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.55rem 0.85rem', borderRadius: 'var(--radius-sm)', background: selectedAnswers.q1 === 'C' ? 'rgba(37, 99, 235, 0.12)' : 'var(--bg-card)', border: selectedAnswers.q1 === 'C' ? '1px solid var(--primary-600)' : '1px solid var(--border-color)', cursor: 'pointer' }}>
-                      <input type="radio" name="q1" checked={selectedAnswers.q1 === 'C'} onChange={() => setSelectedAnswers({ ...selectedAnswers, q1: 'C' })} />
-                      <span style={{ fontSize: '0.88rem' }}>ج) سلسلة الحالات الوصفية (Case Series)</span>
-                    </label>
-                  </div>
-                </div>
-
-                {/* السؤال 2 */}
-                <div style={{ padding: '1rem', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                  <h4 style={{ fontSize: '0.95rem', fontWeight: 800, marginBottom: '0.75rem', color: 'var(--text-main)' }}>
-                    السؤال 2: ما هو الدليل الإرشادي المعتمد عالمياً لإعداد وكتابة بروتوكولات المراجعات المنهجية؟ (10 درجات)
-                  </h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.55rem 0.85rem', borderRadius: 'var(--radius-sm)', background: selectedAnswers.q2 === 'A' ? 'rgba(37, 99, 235, 0.12)' : 'var(--bg-card)', border: selectedAnswers.q2 === 'A' ? '1px solid var(--primary-600)' : '1px solid var(--border-color)', cursor: 'pointer' }}>
-                      <input type="radio" name="q2" checked={selectedAnswers.q2 === 'A'} onChange={() => setSelectedAnswers({ ...selectedAnswers, q2: 'A' })} />
-                      <span style={{ fontSize: '0.88rem' }}>أ) دليل PRISMA-P 2020 لبروتوكولات المراجعة</span>
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.55rem 0.85rem', borderRadius: 'var(--radius-sm)', background: selectedAnswers.q2 === 'B' ? 'rgba(37, 99, 235, 0.12)' : 'var(--bg-card)', border: selectedAnswers.q2 === 'B' ? '1px solid var(--primary-600)' : '1px solid var(--border-color)', cursor: 'pointer' }}>
-                      <input type="radio" name="q2" checked={selectedAnswers.q2 === 'B'} onChange={() => setSelectedAnswers({ ...selectedAnswers, q2: 'B' })} />
-                      <span style={{ fontSize: '0.88rem' }}>ب) بيان STROBE للدراسات الرصدية</span>
-                    </label>
-                  </div>
-                </div>
-
-                {/* السؤال 3 */}
-                <div style={{ padding: '1rem', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                  <h4 style={{ fontSize: '0.95rem', fontWeight: 800, marginBottom: '0.75rem', color: 'var(--text-main)' }}>
-                    السؤال 3: متى يجب على الباحث تسجيل بروتوكول المراجعة في منصة PROSPERO الدولية؟ (10 درجات)
-                  </h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.55rem 0.85rem', borderRadius: 'var(--radius-sm)', background: selectedAnswers.q3 === 'A' ? 'rgba(37, 99, 235, 0.12)' : 'var(--bg-card)', border: selectedAnswers.q3 === 'A' ? '1px solid var(--primary-600)' : '1px solid var(--border-color)', cursor: 'pointer' }}>
-                      <input type="radio" name="q3" checked={selectedAnswers.q3 === 'A'} onChange={() => setSelectedAnswers({ ...selectedAnswers, q3: 'A' })} />
-                      <span style={{ fontSize: '0.88rem' }}>أ) قبل بدء استخلاص البيانات وتصفية النتائج الأولية</span>
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.55rem 0.85rem', borderRadius: 'var(--radius-sm)', background: selectedAnswers.q3 === 'B' ? 'rgba(37, 99, 235, 0.12)' : 'var(--bg-card)', border: selectedAnswers.q3 === 'B' ? '1px solid var(--primary-600)' : '1px solid var(--border-color)', cursor: 'pointer' }}>
-                      <input type="radio" name="q3" checked={selectedAnswers.q3 === 'B'} onChange={() => setSelectedAnswers({ ...selectedAnswers, q3: 'B' })} />
-                      <span style={{ fontSize: '0.88rem' }}>ب) بعد الانتهاء من كتابة المسودة الكاملة وقبل إرسالها للمجلة</span>
-                    </label>
-                  </div>
-                </div>
+                {examQuestions.map((q, qIdx) => {
+                  const optLabels = ['أ', 'ب', 'ج', 'د'];
+                  return (
+                    <div key={q.id} style={{ padding: '1rem', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                      <h4 style={{ fontSize: '0.95rem', fontWeight: 800, marginBottom: '0.75rem', color: 'var(--text-main)' }}>
+                        السؤال {qIdx + 1}: {q.text} ({q.points} درجات)
+                      </h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                        {q.options.map((opt, optIdx) => (
+                          <label
+                            key={optIdx}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '0.6rem',
+                              padding: '0.55rem 0.85rem', borderRadius: 'var(--radius-sm)',
+                              background: selectedAnswers[q.id] === String(optIdx) ? 'rgba(37, 99, 235, 0.12)' : 'var(--bg-card)',
+                              border: selectedAnswers[q.id] === String(optIdx) ? '1px solid var(--primary-600)' : '1px solid var(--border-color)',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <input
+                              type="radio"
+                              name={`exam-q-${q.id}`}
+                              checked={selectedAnswers[q.id] === String(optIdx)}
+                              onChange={() => setSelectedAnswers({ ...selectedAnswers, [q.id]: String(optIdx) })}
+                            />
+                            <span style={{ fontSize: '0.88rem' }}>{optLabels[optIdx] || String(optIdx + 1)}) {opt}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
@@ -1509,6 +1631,18 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                   <span>تسليم الإجابات واعتماد الدرجة فوراً</span>
                 </button>
               </div>
+              </>
+              ) : (
+              <div style={{ padding: '2.5rem', textAlign: 'center', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-color)' }}>
+                <AlertCircle size={40} color="var(--accent-gold)" style={{ margin: '0 auto 0.75rem' }} />
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '0.5rem' }}>
+                  لم يتم نشر أسئلة الاختبار بعد
+                </h3>
+                <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', maxWidth: '450px', margin: '0 auto', lineHeight: '1.7' }}>
+                  لم يقم المشرف الأكاديمي بإضافة أسئلة اختبار لهذا المقرر بعد. يرجى الانتظار أو التواصل مع المشرف الأكاديمي لإضافة الأسئلة.
+                </p>
+              </div>
+              )}
             </div>
           )}
         </div>
@@ -1526,8 +1660,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                 الكورس: <strong>{currentCourse?.title}</strong> ({currentCourse?.code})
               </p>
             </div>
-            <span className="badge badge-emerald" style={{ fontSize: '0.9rem', padding: '0.4rem 0.85rem' }}>
-              المعدل التراكمي: {totalScore}% (ناجح مع مرتبة الشرف)
+            <span className={`badge ${totalScore >= (currentCourse?.passingScore || 70) ? 'badge-emerald' : 'badge-gold'}`} style={{ fontSize: '0.9rem', padding: '0.4rem 0.85rem' }}>
+              المعدل التراكمي: {totalScore}% ({totalScore >= (currentCourse?.passingScore || 70) ? (totalScore >= 90 ? 'ناجح مع مرتبة الشرف' : 'ناجح') : 'غير مكتمل'})
             </span>
           </div>
 
@@ -1545,26 +1679,26 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                 <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
                   <td style={{ padding: '0.75rem' }}>التكليف العملي (Assignment)</td>
                   <td style={{ padding: '0.75rem', fontWeight: 800 }}>{assignmentScore}</td>
-                  <td style={{ padding: '0.75rem' }}>20</td>
-                  <td style={{ padding: '0.75rem' }}><span className="badge badge-emerald">معتمد</span></td>
+                  <td style={{ padding: '0.75rem' }}>{studentSubmission?.maxScore || curriculum.modules.flatMap(m => m.assignments || [])[0]?.maxScore || 20}</td>
+                  <td style={{ padding: '0.75rem' }}>{assignmentScore > 0 ? <span className="badge badge-emerald">معتمد</span> : <span className="badge badge-subtle">لم يُرصد</span>}</td>
                 </tr>
                 <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
                   <td style={{ padding: '0.75rem' }}>اختبار منتصف المسار النظري</td>
                   <td style={{ padding: '0.75rem', fontWeight: 800 }}>{examScore}</td>
-                  <td style={{ padding: '0.75rem' }}>30</td>
-                  <td style={{ padding: '0.75rem' }}><span className="badge badge-emerald">معتمد</span></td>
+                  <td style={{ padding: '0.75rem' }}>{examMaxScoreVal || dynamicMaxScore}</td>
+                  <td style={{ padding: '0.75rem' }}>{examSubmitted ? <span className="badge badge-emerald">معتمد</span> : <span className="badge badge-subtle">لم يُرصد</span>}</td>
                 </tr>
                 <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
                   <td style={{ padding: '0.75rem' }}>الامتحان العملي الحضوري</td>
                   <td style={{ padding: '0.75rem', fontWeight: 800 }}>{practicalScore}</td>
                   <td style={{ padding: '0.75rem' }}>50</td>
-                  <td style={{ padding: '0.75rem' }}><span className="badge badge-emerald">تم الرصد</span></td>
+                  <td style={{ padding: '0.75rem' }}>{practicalScore > 0 ? <span className="badge badge-emerald">تم الرصد</span> : <span className="badge badge-subtle">لم يُرصد</span>}</td>
                 </tr>
                 <tr style={{ background: 'var(--bg-subtle)', fontWeight: 800 }}>
                   <td style={{ padding: '0.75rem' }}>المجموع التراكمي النهائي</td>
-                  <td style={{ padding: '0.75rem', color: 'var(--accent-emerald)', fontSize: '1.2rem' }}>{totalScore}%</td>
+                  <td style={{ padding: '0.75rem', color: totalScore >= (currentCourse?.passingScore || 70) ? 'var(--accent-emerald)' : '#ef4444', fontSize: '1.2rem' }}>{totalScore}%</td>
                   <td style={{ padding: '0.75rem' }}>100%</td>
-                  <td style={{ padding: '0.75rem' }}><span className="badge badge-emerald">مؤهل لإصدار الشهادة الأكاديمية</span></td>
+                  <td style={{ padding: '0.75rem' }}>{totalScore >= (currentCourse?.passingScore || 70) ? <span className="badge badge-emerald">مؤهل لإصدار الشهادة الأكاديمية</span> : <span className="badge badge-gold">غير مكتمل بعد</span>}</td>
                 </tr>
               </tbody>
             </table>
