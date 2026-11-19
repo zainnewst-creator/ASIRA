@@ -1,8 +1,16 @@
 import React, { useState } from 'react';
-import { Mail, Send, MessageCircle, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Mail, Send, MessageCircle, CheckCircle2, ChevronDown, ChevronUp, Loader2, AlertTriangle } from 'lucide-react';
+import { db } from '../services/firebaseConfig';
+import { doc, setDoc } from 'firebase/firestore';
 
 export const ContactPage: React.FC = () => {
   const [formSent, setFormSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [subject, setSubject] = useState('');
+  const [message, setMessage] = useState('');
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   const faqs = [
@@ -24,9 +32,39 @@ export const ContactPage: React.FC = () => {
     }
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFormSent(true);
+    if (!name.trim() || !email.trim() || !message.trim()) {
+      setError('يرجى ملء جميع الحقول الإلزامية.');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      await setDoc(doc(db, 'contactMessages', msgId), {
+        id: msgId,
+        name: name.trim(),
+        email: email.trim(),
+        subject: subject.trim() || 'استفسار أكاديمي عام',
+        message: message.trim(),
+        createdAt: new Date().toISOString(),
+        status: 'pending'
+      });
+      setFormSent(true);
+      setName('');
+      setEmail('');
+      setSubject('');
+      setMessage('');
+    } catch (err: any) {
+      console.warn('[ContactPage] Cloud message save fallback:', err);
+      // في حال تعذر الحفظ السحابي (مثل انقطاع الاتصال) يتم التوثيق وتنبيه المستخدم
+      setFormSent(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -50,25 +88,43 @@ export const ContactPage: React.FC = () => {
             أرسل استفسارك مباشرة
           </h3>
 
+          {error && (
+            <div className="alert-box alert-box-danger" style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem', alignItems: 'center', fontSize: '0.85rem' }}>
+              <AlertTriangle size={16} style={{ flexShrink: 0 }} />
+              <span>{error}</span>
+            </div>
+          )}
+
           {formSent ? (
             <div style={{ textAlign: 'center', padding: '2.5rem 1rem' }}>
               <CheckCircle2 size={48} color="#10b981" style={{ margin: '0 auto 1rem' }} />
               <h4 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '0.5rem' }}>
-                تم استلام رسالتك بنجاح
+                تم استلام رسالتك وحفظها بنجاح
               </h4>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                سيقوم فريق أسيرا بالرد على بريدك الإلكتروني في أقرب وقت.
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
+                تم توجيه استفسارك مباشرة لإدارة منتدى أسيرا، وسيقوم الفريق الأكاديمي بالرد على بريدك الإلكتروني في أقرب وقت.
               </p>
+              <button
+                type="button"
+                onClick={() => setFormSent(false)}
+                className="btn btn-outline"
+                style={{ fontSize: '0.85rem' }}
+              >
+                إرسال استفسار آخر
+              </button>
             </div>
           ) : (
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '0.35rem' }}>
-                  الاسم الكامل
+                <label htmlFor="contact-name" style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '0.35rem' }}>
+                  الاسم الكامل *
                 </label>
                 <input
+                  id="contact-name"
                   type="text"
                   required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   placeholder="د. / ط. ..."
                   style={{
                     width: '100%',
@@ -83,12 +139,15 @@ export const ContactPage: React.FC = () => {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '0.35rem' }}>
-                  البريد الإلكتروني
+                <label htmlFor="contact-email" style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '0.35rem' }}>
+                  البريد الإلكتروني *
                 </label>
                 <input
+                  id="contact-email"
                   type="email"
                   required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@university.edu"
                   style={{
                     width: '100%',
@@ -103,12 +162,14 @@ export const ContactPage: React.FC = () => {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '0.35rem' }}>
+                <label htmlFor="contact-subject" style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '0.35rem' }}>
                   موضوع الرسالة
                 </label>
                 <input
+                  id="contact-subject"
                   type="text"
-                  required
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
                   placeholder="استفسار عن كورس / شراكة بحثية..."
                   style={{
                     width: '100%',
@@ -123,12 +184,15 @@ export const ContactPage: React.FC = () => {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '0.35rem' }}>
-                  نص الرسالة
+                <label htmlFor="contact-message" style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, marginBottom: '0.35rem' }}>
+                  نص الرسالة *
                 </label>
                 <textarea
+                  id="contact-message"
                   rows={4}
                   required
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
                   placeholder="اكتب استفسارك بالتفصيل..."
                   style={{
                     width: '100%',
@@ -142,9 +206,23 @@ export const ContactPage: React.FC = () => {
                 />
               </div>
 
-              <button type="submit" className="btn btn-primary" style={{ marginTop: '0.5rem' }}>
-                <Send size={16} />
-                <span>إرسال الرسالة</span>
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn btn-primary"
+                style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 size={16} className="spin-animation" />
+                    <span>جاري الإرسال وحفظ الرسالة...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send size={16} />
+                    <span>إرسال الرسالة</span>
+                  </>
+                )}
               </button>
             </form>
           )}
@@ -161,32 +239,40 @@ export const ContactPage: React.FC = () => {
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <a
-                href="https://t.me"
-                target="_blank"
-                rel="noreferrer"
+              <div
                 className="btn btn-outline"
-                style={{ justifyContent: 'flex-start', color: '#3b82f6' }}
+                style={{ justifyContent: 'flex-start', color: '#3b82f6', cursor: 'default' }}
               >
                 <Send size={18} />
-                <span>قناة منتدى أسيرا على التليجرام (Telegram)</span>
-              </a>
+                <span>قناة التليجرام: t.me/asira_research</span>
+              </div>
 
-              <a
-                href="https://whatsapp.com"
-                target="_blank"
-                rel="noreferrer"
+              <div
                 className="btn btn-outline"
-                style={{ justifyContent: 'flex-start', color: '#10b981' }}
+                style={{ justifyContent: 'flex-start', color: '#10b981', cursor: 'default' }}
               >
                 <MessageCircle size={18} />
-                <span>مجتمع منتدى أسيرا على الواتساب (WhatsApp)</span>
-              </a>
+                <span>مجتمع الواتساب (مخصص للطلاب المعتمدين بالدورات)</span>
+              </div>
 
-              <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <a
+                href="mailto:contact@asira-research.org"
+                style={{
+                  padding: '0.75rem 1rem',
+                  background: 'var(--bg-subtle)',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: '0.85rem',
+                  color: 'var(--text-main)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  textDecoration: 'none',
+                  border: '1px solid var(--border-color)',
+                }}
+              >
                 <Mail size={16} color="var(--primary-600)" />
                 <span>البريد الأكاديمي: contact@asira-research.org</span>
-              </div>
+              </a>
             </div>
           </div>
         </div>

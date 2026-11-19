@@ -92,17 +92,14 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               انضم لمجتمعاتنا التفاعلية لمتابعة الأوركيد والمشاريع البحثية الجديدة:
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1.5rem' }}>
-              <a 
-                href="https://t.me" 
-                target="_blank" 
-                rel="noreferrer"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: '#60a5fa' }}
+              <div 
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: '#60a5fa', fontSize: '0.9rem' }}
               >
-                <Send size={15} /> قناة التليجرام الرسمية للمنتدى
-              </a>
+                <Send size={15} /> قناة التليجرام: t.me/asira_research
+              </div>
               <a 
                 href="mailto:contact@asira-research.org" 
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: '#34d399' }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: '#34d399', textDecoration: 'none', fontSize: '0.9rem' }}
               >
                 <Mail size={15} /> البريد: contact@asira-research.org
               </a>
