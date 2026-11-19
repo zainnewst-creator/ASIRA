@@ -21,7 +21,10 @@ import {
   Users,
   BarChart2,
   Clock,
-  UserCheck
+  UserCheck,
+  Archive,
+  Check,
+  X
 } from 'lucide-react';
 import { 
   INITIAL_COURSES,
@@ -58,6 +61,11 @@ export interface InstructorDashboardProps {
   practicalGrades?: Record<string, { score: number; notes: string }>;
   onUpdatePracticalGrade?: (studentId: string, score: number, notes: string) => void;
   enrollments?: MockPendingEnrollment[];
+  onApproveEnrollment?: (id: string) => void;
+  onRejectEnrollment?: (id: string) => void;
+  onArchiveEnrollment?: (id: string) => void;
+  onDeleteEnrollment?: (id: string) => void;
+  onArchiveAllProcessed?: (courseId?: string) => void;
   onLogAudit?: (action: string, details: string) => void;
 }
 
@@ -78,9 +86,15 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
   practicalGrades: propPracticalGrades,
   onUpdatePracticalGrade,
   enrollments = [],
+  onApproveEnrollment,
+  onRejectEnrollment,
+  onArchiveEnrollment,
+  onDeleteEnrollment,
+  onArchiveAllProcessed,
   onLogAudit,
 }) => {
-  const [activeTab, setActiveTab] = useState<'curriculum' | 'exams' | 'assignments' | 'practical' | 'progress'>('curriculum');
+  const [activeTab, setActiveTab] = useState<'curriculum' | 'exams' | 'assignments' | 'practical' | 'progress' | 'enrollments'>('curriculum');
+  const [enrollFilter, setEnrollFilter] = useState<'active' | 'pending' | 'approved' | 'rejected' | 'archived' | 'all'>('active');
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(propActiveCourseId || null);
 
   // الكورس النشط حالياً عند الدخول لإدارته
@@ -598,6 +612,20 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
     (e) => e.courseId === currentCourse?.id && e.status === 'approved'
   );
 
+  // طلبات التسجيل الخاصة بهذا الكورس وفلترتها
+  const courseEnrollments = (enrollments || []).filter(
+    (e) => e.courseId === currentCourse?.id
+  );
+
+  const filteredCourseEnrollments = courseEnrollments.filter((enr) => {
+    if (enrollFilter === 'active') return enr.status !== 'archived';
+    if (enrollFilter === 'pending') return enr.status === 'pending';
+    if (enrollFilter === 'approved') return enr.status === 'approved';
+    if (enrollFilter === 'rejected') return enr.status === 'rejected';
+    if (enrollFilter === 'archived') return enr.status === 'archived';
+    return true;
+  });
+
   // تصفية التكليفات والاختبارات المرتبطة بالكورس أو طلابه
   const courseSubmissions = submissions.filter((sub) => 
     courseApprovedStudents.length === 0 || courseApprovedStudents.some(s => s.studentUid === sub.studentUid || s.studentName === sub.studentName)
@@ -893,6 +921,14 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
             >
               <Award size={16} />
               <span>متابعة تقدم الطلاب ({courseApprovedStudents.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('enrollments')}
+              className={`btn lms-tab-btn ${activeTab === 'enrollments' ? 'btn-primary' : 'btn-ghost'}`}
+            >
+              <Users size={16} />
+              <span>طلبات التسجيل ({courseEnrollments.filter((e) => e.status !== 'archived').length})</span>
             </button>
           </div>
 
@@ -2284,6 +2320,258 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* 6. تبويب: إدارة طلبات التسجيل في هذا الكورس */}
+      {activeTab === 'enrollments' && (
+        <div className="card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <h2 style={{ fontSize: '1.3rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>
+                طلبات التسجيل في المقرر: {currentCourse?.title}
+              </h2>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                متابعة واعتماد طلبات الطلاب المتقدمين لهذا الكورس، مع إمكانية أرشفة أو حذف الطلبات المنتهية لتنظيم القوائم.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <span className="badge badge-gold">
+                {courseEnrollments.filter((e) => e.status === 'pending').length} بانتظار القبول
+              </span>
+              {onArchiveAllProcessed && currentCourse && (
+                <button
+                  onClick={() => {
+                    if (window.confirm('هل تريد أرشفة كافة طلبات الكورس المنتهية (المقبولة والمرفوضة) ونقلها إلى سجل الأرشيف؟')) {
+                      onArchiveAllProcessed(currentCourse.id);
+                    }
+                  }}
+                  className="btn btn-outline"
+                  style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                >
+                  <Archive size={14} />
+                  <span>أرشفة طلبات الكورس المنتهية</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* فلاتر تصنيف الطلبات */}
+          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
+            <button
+              onClick={() => setEnrollFilter('active')}
+              className={`btn ${enrollFilter === 'active' ? 'btn-primary' : 'btn-outline'}`}
+              style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
+            >
+              الطلبات النشطة ({courseEnrollments.filter((e) => e.status !== 'archived').length})
+            </button>
+            <button
+              onClick={() => setEnrollFilter('pending')}
+              className={`btn ${enrollFilter === 'pending' ? 'btn-primary' : 'btn-outline'}`}
+              style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
+            >
+              قيد المراجعة ({courseEnrollments.filter((e) => e.status === 'pending').length})
+            </button>
+            <button
+              onClick={() => setEnrollFilter('approved')}
+              className={`btn ${enrollFilter === 'approved' ? 'btn-primary' : 'btn-outline'}`}
+              style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
+            >
+              المقبولون ({courseEnrollments.filter((e) => e.status === 'approved').length})
+            </button>
+            <button
+              onClick={() => setEnrollFilter('rejected')}
+              className={`btn ${enrollFilter === 'rejected' ? 'btn-primary' : 'btn-outline'}`}
+              style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
+            >
+              المرفوضون ({courseEnrollments.filter((e) => e.status === 'rejected').length})
+            </button>
+            <button
+              onClick={() => setEnrollFilter('archived')}
+              className={`btn ${enrollFilter === 'archived' ? 'btn-primary' : 'btn-outline'}`}
+              style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
+            >
+              الأرشيف ({courseEnrollments.filter((e) => e.status === 'archived').length})
+            </button>
+            <button
+              onClick={() => setEnrollFilter('all')}
+              className={`btn ${enrollFilter === 'all' ? 'btn-primary' : 'btn-outline'}`}
+              style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
+            >
+              الكل ({courseEnrollments.length})
+            </button>
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: '0.9rem' }}>
+              <thead>
+                <tr style={{ background: 'var(--bg-subtle)', borderBottom: '2px solid var(--border-color)' }}>
+                  <th style={{ padding: '0.85rem' }}>اسم الطالب</th>
+                  <th style={{ padding: '0.85rem' }}>الجامعة والتخصص</th>
+                  <th style={{ padding: '0.85rem' }}>المستوى</th>
+                  <th style={{ padding: '0.85rem' }}>تاريخ الطلب</th>
+                  <th style={{ padding: '0.85rem' }}>الحالة</th>
+                  <th style={{ padding: '0.85rem' }}>الإجراءات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCourseEnrollments.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
+                      لا توجد طلبات تسجيل مطابقة لهذا الفلتر في هذا المقرر
+                    </td>
+                  </tr>
+                ) : (
+                  filteredCourseEnrollments.map((enr) => (
+                    <tr key={enr.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '0.85rem' }}>
+                        <strong style={{ display: 'block', color: 'var(--text-main)' }}>{enr.studentName}</strong>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{enr.studentEmail}</span>
+                      </td>
+                      <td style={{ padding: '0.85rem' }}>
+                        <strong style={{ display: 'block' }}>{enr.university}</strong>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{enr.specialty}</span>
+                      </td>
+                      <td style={{ padding: '0.85rem', fontSize: '0.85rem' }}>
+                        {enr.academicLevel}
+                      </td>
+                      <td style={{ padding: '0.85rem', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                        {enr.requestedAt}
+                      </td>
+                      <td style={{ padding: '0.85rem' }}>
+                        {enr.status === 'approved' && <span className="badge badge-emerald">مقبول ومسجل ✓</span>}
+                        {enr.status === 'rejected' && <span className="badge" style={{ background: '#fee2e2', color: '#b91c1c' }}>مرفوض</span>}
+                        {enr.status === 'pending' && <span className="badge badge-gold">معلق (Pending)</span>}
+                        {enr.status === 'archived' && <span className="badge" style={{ background: '#f1f5f9', color: '#64748b' }}>مؤرشف 📦</span>}
+                      </td>
+                      <td style={{ padding: '0.85rem' }}>
+                        {enr.status === 'pending' ? (
+                          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                            {onApproveEnrollment && (
+                              <button
+                                onClick={() => {
+                                  onApproveEnrollment(enr.id);
+                                  if (onLogAudit) onLogAudit('قبول طالب', `تم قبول التحاق الطالب (${enr.studentName}) في المقرر`);
+                                }}
+                                className="btn btn-accent"
+                                style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }}
+                              >
+                                <Check size={14} />
+                                <span>قبول</span>
+                              </button>
+                            )}
+                            {onRejectEnrollment && (
+                              <button
+                                onClick={() => {
+                                  onRejectEnrollment(enr.id);
+                                  if (onLogAudit) onLogAudit('رفض طالب', `تم رفض التحاق الطالب (${enr.studentName}) في المقرر`);
+                                }}
+                                className="btn btn-outline"
+                                style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', color: '#ef4444' }}
+                              >
+                                <X size={14} />
+                                <span>رفض</span>
+                              </button>
+                            )}
+                            {onDeleteEnrollment && (
+                              <button
+                                onClick={() => {
+                                  if (window.confirm('هل أنت متأكد من حذف هذا الطلب نهائياً؟')) {
+                                    onDeleteEnrollment(enr.id);
+                                  }
+                                }}
+                                className="btn btn-ghost"
+                                style={{ padding: '0.35rem', color: '#ef4444' }}
+                                title="حذف الطلب نهائياً"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            )}
+                          </div>
+                        ) : enr.status === 'archived' ? (
+                          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                            {onApproveEnrollment && (
+                              <button
+                                onClick={() => onApproveEnrollment(enr.id)}
+                                className="btn btn-outline"
+                                style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem' }}
+                                title="استعادة للنشط"
+                              >
+                                <RotateCcw size={13} />
+                                <span>استعادة</span>
+                              </button>
+                            )}
+                            {onDeleteEnrollment && (
+                              <button
+                                onClick={() => {
+                                  if (window.confirm('هل أنت متأكد من حذف هذا الطلب نهائياً من الأرشيف؟')) {
+                                    onDeleteEnrollment(enr.id);
+                                  }
+                                }}
+                                className="btn btn-ghost"
+                                style={{ padding: '0.3rem', color: '#ef4444' }}
+                                title="حذف نهائي"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                            {enr.status === 'rejected' && onApproveEnrollment ? (
+                              <button
+                                onClick={() => onApproveEnrollment(enr.id)}
+                                className="btn btn-outline"
+                                style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem', color: 'var(--accent-emerald)', borderColor: 'var(--accent-emerald)' }}
+                                title="إعادة قبول الطالب"
+                              >
+                                <Check size={13} />
+                                <span>إعادة قبول</span>
+                              </button>
+                            ) : onRejectEnrollment ? (
+                              <button
+                                onClick={() => onRejectEnrollment(enr.id)}
+                                className="btn btn-ghost"
+                                style={{ padding: '0.2rem 0.45rem', fontSize: '0.75rem', color: '#ef4444' }}
+                                title="إلغاء الاعتماد وتحويله لمرفوض"
+                              >
+                                إلغاء
+                              </button>
+                            ) : null}
+                            {onArchiveEnrollment && (
+                              <button
+                                onClick={() => onArchiveEnrollment(enr.id)}
+                                className="btn btn-ghost"
+                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}
+                                title="أرشفة الطلب"
+                              >
+                                <Archive size={13} />
+                                <span>أرشفة</span>
+                              </button>
+                            )}
+                            {onDeleteEnrollment && (
+                              <button
+                                onClick={() => {
+                                  if (window.confirm('هل أنت متأكد من حذف هذا الطلب نهائياً؟')) {
+                                    onDeleteEnrollment(enr.id);
+                                  }
+                                }}
+                                className="btn btn-ghost"
+                                style={{ padding: '0.25rem', color: '#ef4444' }}
+                                title="حذف الطلب نهائياً"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
         </>

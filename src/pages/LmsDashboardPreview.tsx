@@ -44,6 +44,22 @@ interface LmsDashboardPreviewProps {
   enrollments?: MockPendingEnrollment[];
   onApproveEnrollment?: (id: string) => void;
   onRejectEnrollment?: (id: string) => void;
+  onArchiveEnrollment?: (id: string) => void;
+  onDeleteEnrollment?: (id: string) => void;
+  onArchiveAllProcessed?: (courseId?: string) => void;
+  certRequests?: MockCertificateRequest[];
+  onRequestCertificate?: (courseId: string, totalScore?: number) => void;
+  onUpdateCertificate?: (
+    id: string,
+    status: 'pending' | 'processing' | 'issued' | 'rejected',
+    code?: string,
+    pdfUrl?: string,
+    notes?: string
+  ) => void;
+  onIssueCertificate?: (id: string, code: string, pdfUrl: string) => void;
+  usersList?: Array<{ uid: string; name: string; email: string; university: string; role: UserRole; status: 'active' | 'suspended' }>;
+  onUpdateUserRole?: (uid: string, nextRole: UserRole) => void;
+  onToggleUserStatus?: (uid: string) => void;
   onNavigateTab?: (tab: string) => void;
   onLogout: () => void;
   onBackToPortal: () => void;
@@ -66,6 +82,16 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
   enrollments: propEnrollments,
   onApproveEnrollment: propOnApproveEnrollment,
   onRejectEnrollment: propOnRejectEnrollment,
+  onArchiveEnrollment: propOnArchiveEnrollment,
+  onDeleteEnrollment: propOnDeleteEnrollment,
+  onArchiveAllProcessed: propOnArchiveAllProcessed,
+  certRequests: propCertRequests,
+  onRequestCertificate: propOnRequestCertificate,
+  onUpdateCertificate: propOnUpdateCertificate,
+  onIssueCertificate: propOnIssueCertificate,
+  usersList: propUsersList,
+  onUpdateUserRole,
+  onToggleUserStatus,
   onNavigateTab,
   onLogout,
   onBackToPortal,
@@ -86,7 +112,15 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
 
   const [localEnrollments, setLocalEnrollments] = useState<MockPendingEnrollment[]>([]);
   const enrollments = propEnrollments || localEnrollments;
-  const [certRequests, setCertRequests] = useState<MockCertificateRequest[]>([]);
+  const [localCertRequests, setLocalCertRequests] = useState<MockCertificateRequest[]>(() => {
+    try {
+      const saved = localStorage.getItem('asira_cert_requests');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const certRequests = propCertRequests || localCertRequests;
   const [auditLogs, setAuditLogs] = useState<MockAuditLogItem[]>([]);
   const [practicalGrades, setPracticalGrades] = useState<Record<string, { score: number; notes: string }>>({});
 
@@ -155,26 +189,66 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
     }));
   };
 
-  // 6. قبول طلب التحاق من قبل المدير
+  // 6. قبول طلب التحاق من قبل المدير أو المشرف
   const handleApproveEnrollment = (id: string) => {
     if (propOnApproveEnrollment) {
       propOnApproveEnrollment(id);
     } else {
-      setLocalEnrollments((prev) => prev.map((e) => e.id === id ? { ...e, status: 'approved' } : e));
+      setLocalEnrollments((prev) => prev.map((e) => (e.id === id ? { ...e, status: 'approved' } : e)));
     }
   };
 
-  // 7. رفض طلب التحاق من قبل المدير
+  // 7. رفض طلب التحاق من قبل المدير أو المشرف
   const handleRejectEnrollment = (id: string) => {
     if (propOnRejectEnrollment) {
       propOnRejectEnrollment(id);
     } else {
-      setLocalEnrollments((prev) => prev.map((e) => e.id === id ? { ...e, status: 'rejected' } : e));
+      setLocalEnrollments((prev) => prev.map((e) => (e.id === id ? { ...e, status: 'rejected' } : e)));
+    }
+  };
+
+  // 7.1 أرشفة طلب التحاق منتهي
+  const handleArchiveEnrollment = (id: string) => {
+    if (propOnArchiveEnrollment) {
+      propOnArchiveEnrollment(id);
+    } else {
+      setLocalEnrollments((prev) =>
+        prev.map((e) => (e.id === id ? { ...e, status: 'archived', archivedAt: new Date().toISOString() } : e))
+      );
+    }
+  };
+
+  // 7.2 حذف طلب التحاق نهائياً
+  const handleDeleteEnrollment = (id: string) => {
+    if (propOnDeleteEnrollment) {
+      propOnDeleteEnrollment(id);
+    } else {
+      setLocalEnrollments((prev) => prev.filter((e) => e.id !== id));
+    }
+  };
+
+  // 7.3 أرشفة كافة الطلبات المنتهية (المقبولة والمرفوضة)
+  const handleArchiveAllProcessed = (courseId?: string) => {
+    if (propOnArchiveAllProcessed) {
+      propOnArchiveAllProcessed(courseId);
+    } else {
+      setLocalEnrollments((prev) =>
+        prev.map((e) => {
+          if (courseId && e.courseId !== courseId) return e;
+          if (e.status === 'approved' || e.status === 'rejected') {
+            return { ...e, status: 'archived', archivedAt: new Date().toISOString() };
+          }
+          return e;
+        })
+      );
     }
   };
 
   // 8. تقديم طلب شهادة أكاديمية من قبل الطالب
-  const handleRequestCertificate = (courseId: string) => {
+  const handleRequestCertificate = (courseId: string, scoreParam?: number) => {
+    if (propOnRequestCertificate) {
+      propOnRequestCertificate(courseId, scoreParam);
+    }
     const course = courses.find((c) => c.id === courseId);
     const currentStudentUid = userUid || 'student-current';
     const existing = certRequests.find(
@@ -190,13 +264,19 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
       courseId: courseId,
       courseTitle: course?.title || 'منهجية وأساسيات البحث العلمي والنشر الدولي',
       courseCode: course?.code || 'RES-101',
-      totalScore: 86,
+      totalScore: scoreParam || 86,
       requestedAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
       status: 'pending',
       verificationCode: `ASIRA-2026-${Math.floor(1000 + Math.random() * 9000)}`,
     };
 
-    setCertRequests((prev) => [newReq, ...prev]);
+    setLocalCertRequests((prev) => {
+      const next = [newReq, ...prev];
+      try {
+        localStorage.setItem('asira_cert_requests', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
     appendAuditLog(
       'تقديم طلب شهادة أكاديمية',
       `قام الطالب (${initialName}) بطلب إصدار شهادة معتمدة لكورس: ${course?.title || courseId}`
@@ -211,8 +291,11 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
     pdfUrl?: string,
     notes?: string
   ) => {
-    setCertRequests((prev) =>
-      prev.map((c) =>
+    if (propOnUpdateCertificate) {
+      propOnUpdateCertificate(id, status, code, pdfUrl, notes);
+    }
+    setLocalCertRequests((prev) => {
+      const next = prev.map((c) =>
         c.id === id
           ? {
               ...c,
@@ -223,12 +306,19 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
               issuedAt: status === 'issued' ? new Date().toISOString().split('T')[0] : c.issuedAt,
             }
           : c
-      )
-    );
+      );
+      try {
+        localStorage.setItem('asira_cert_requests', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
   };
 
   // 10. إصدار وتوقيع شهادة من قبل المدير (توافق خلفي)
   const handleIssueCertificate = (id: string, code: string, pdfUrl: string) => {
+    if (propOnIssueCertificate) {
+      propOnIssueCertificate(id, code, pdfUrl);
+    }
     handleUpdateCertificate(id, 'issued', code, pdfUrl, 'تم توقيع الشهادة ورفع النسخة المعتمدة');
   };
 
@@ -374,6 +464,11 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
             practicalGrades={practicalGrades}
             onUpdatePracticalGrade={handleUpdatePracticalGrade}
             enrollments={enrollments}
+            onApproveEnrollment={handleApproveEnrollment}
+            onRejectEnrollment={handleRejectEnrollment}
+            onArchiveEnrollment={handleArchiveEnrollment}
+            onDeleteEnrollment={handleDeleteEnrollment}
+            onArchiveAllProcessed={handleArchiveAllProcessed}
             onLogAudit={appendAuditLog}
           />
         )}
@@ -383,9 +478,15 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
             enrollments={enrollments}
             onApproveEnrollment={handleApproveEnrollment}
             onRejectEnrollment={handleRejectEnrollment}
+            onArchiveEnrollment={handleArchiveEnrollment}
+            onDeleteEnrollment={handleDeleteEnrollment}
+            onArchiveAllProcessed={handleArchiveAllProcessed}
             certRequests={certRequests}
             onUpdateCertificate={handleUpdateCertificate}
             onIssueCertificate={handleIssueCertificate}
+            usersList={propUsersList}
+            onUpdateUserRole={onUpdateUserRole}
+            onToggleUserStatus={onToggleUserStatus}
             researches={_researches}
             onAddResearch={onAddResearch}
             onUpdateResearch={onUpdateResearch}

@@ -113,6 +113,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
           createdAt: new Date().toISOString(),
         });
 
+        // حفظ المستخدم محلياً لضمان ظهوره في لوحة تحكم الإدارة
+        try {
+          const raw = localStorage.getItem('asira_users');
+          const list: any[] = raw ? JSON.parse(raw) : [];
+          const idx = list.findIndex((u) => u.uid === uid || (u.email && u.email.toLowerCase() === email.trim().toLowerCase()));
+          const userObj = { uid, name: name.trim(), email: email.trim(), university: 'طالب مسجل بالمنصة', role: 'student' as UserRole, status: 'active' as const };
+          if (idx >= 0) list[idx] = { ...list[idx], ...userObj };
+          else list.push(userObj);
+          localStorage.setItem('asira_users', JSON.stringify(list));
+        } catch {}
+
         if (rememberMe) {
           try {
             localStorage.setItem('asira_remember_email', email.trim());
@@ -162,6 +173,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
         } catch {
           console.info('[Auth] Could not fetch user profile from Firestore, using default student role.');
         }
+
+        // مزامنة المستخدم إلى قائمة المستخدمين في المتصفح
+        try {
+          const raw = localStorage.getItem('asira_users');
+          const list: any[] = raw ? JSON.parse(raw) : [];
+          const idx = list.findIndex((u) => u.uid === uid || (u.email && u.email.toLowerCase() === email.trim().toLowerCase()));
+          const userObj = { uid, name: displayName, email: email.trim(), university: 'مسجل بالمنصة', role, status: 'active' as const };
+          if (idx >= 0) list[idx] = { ...list[idx], ...userObj };
+          else list.push(userObj);
+          localStorage.setItem('asira_users', JSON.stringify(list));
+        } catch {}
 
         onLogin({
           uid,
@@ -225,6 +247,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
       } catch (docErr) {
         console.info('[Auth] Could not sync user doc on Google sign-in:', docErr);
       }
+
+      // مزامنة مستخدم Google إلى قائمة المستخدمين في المتصفح
+      try {
+        const raw = localStorage.getItem('asira_users');
+        const list: any[] = raw ? JSON.parse(raw) : [];
+        const targetEmail = user.email || '';
+        const idx = list.findIndex((u) => u.uid === uid || (u.email && targetEmail && u.email.toLowerCase() === targetEmail.toLowerCase()));
+        const userObj = { uid, name: displayName, email: targetEmail, university: 'مسجل عبر Google', role, status: 'active' as const };
+        if (idx >= 0) list[idx] = { ...list[idx], ...userObj };
+        else list.push(userObj);
+        localStorage.setItem('asira_users', JSON.stringify(list));
+      } catch {}
 
       onLogin({
         uid,

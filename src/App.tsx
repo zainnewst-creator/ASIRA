@@ -11,11 +11,11 @@ import { PoliciesPage } from './pages/PoliciesPage';
 import { LmsDashboardPreview } from './pages/LmsDashboardPreview';
 import { AuthModal } from './components/AuthModal';
 import { Course, ResearchPaper, UserRole } from './types';
-import { INITIAL_COURSES, INITIAL_RESEARCHES, INITIAL_CURRICULA, MockCourseCurriculum, MockPendingEnrollment } from './data/mockData';
+import { INITIAL_COURSES, INITIAL_RESEARCHES, INITIAL_CURRICULA, MockCourseCurriculum, MockPendingEnrollment, MockCertificateRequest } from './data/mockData';
 import { CheckCircle2, ShieldAlert } from 'lucide-react';
 import { auth, db } from './services/firebaseConfig';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, updateDoc } from 'firebase/firestore';
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<string>('home');
@@ -74,6 +74,192 @@ export const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
+  // الحالة المركزية لمستخدمي المنصة وتوزيع الصلاحيات (Role-Based Access)
+  const [usersList, setUsersList] = useState<Array<{ uid: string; name: string; email: string; university: string; role: UserRole; status: 'active' | 'suspended' }>>(() => {
+    try {
+      const saved = localStorage.getItem('asira_users');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // مزامنة المستخدمين من Firestore وقاعدة البيانات السحابية
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'users'));
+        if (!snap.empty) {
+          const loaded: Array<{ uid: string; name: string; email: string; university: string; role: UserRole; status: 'active' | 'suspended' }> = [];
+          snap.forEach((docSnap) => {
+            const d = docSnap.data();
+            loaded.push({
+              uid: docSnap.id,
+              name: d.displayName || d.name || d.email || 'مستخدم',
+              email: d.email || '',
+              university: d.university || 'مسجل بالمنصة',
+              role: (d.role as UserRole) || 'student',
+              status: d.accountStatus || 'active',
+            });
+          });
+          setUsersList((prev) => {
+            const map = new Map();
+            prev.forEach((u) => map.set(u.uid, u));
+            loaded.forEach((u) => map.set(u.uid, { ...map.get(u.uid), ...u }));
+            const merged = Array.from(map.values());
+            try {
+              localStorage.setItem('asira_users', JSON.stringify(merged));
+            } catch {}
+            return merged;
+          });
+        }
+      } catch (err) {
+        console.info('[Users] Firestore sync fallback to localStorage:', err);
+      }
+    };
+    fetchUsers();
+  }, []);
+
+  // ضمان إدراج المستخدم الحالي دائماً في قائمة المستخدمين
+  useEffect(() => {
+    if (currentUser && currentUser.uid) {
+      setUsersList((prev) => {
+        const idx = prev.findIndex((u) => u.uid === currentUser.uid);
+        const currentObj = {
+          uid: currentUser.uid!,
+          name: currentUser.name,
+          email: currentUser.email,
+          university: 'المستخدم الحالي',
+          role: currentUser.role,
+          status: 'active' as const,
+        };
+        let updated: typeof prev;
+        if (idx >= 0) {
+          updated = prev.map((u) => u.uid === currentUser.uid ? { ...u, role: currentUser.role, name: currentUser.name } : u);
+        } else {
+          updated = [currentObj, ...prev];
+        }
+        try {
+          localStorage.setItem('asira_users', JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+    }
+  }, [currentUser]);
+
+  const handleUpdateUserRole = async (uid: string, nextRole: UserRole) => {
+    setUsersList((prev) => {
+      const updated = prev.map((u) => (u.uid === uid ? { ...u, role: nextRole } : u));
+      try {
+        localStorage.setItem('asira_users', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    if (currentUser && currentUser.uid === uid) {
+      setCurrentUser((prev) => (prev ? { ...prev, role: nextRole } : null));
+    }
+
+    try {
+      await updateDoc(doc(db, 'users', uid), { role: nextRole });
+    } catch (err) {
+      console.warn('[Users] Cloud role update warning:', err);
+    }
+  };
+
+  const handleToggleUserStatus = async (uid: string) => {
+    let nextStatus: 'active' | 'suspended' = 'active';
+    setUsersList((prev) => {
+      const updated = prev.map((u) => {
+        if (u.uid === uid) {
+          nextStatus = u.status === 'active' ? 'suspended' : 'active';
+          return { ...u, status: nextStatus };
+        }
+        return u;
+      });
+      try {
+        localStorage.setItem('asira_users', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    try {
+      await updateDoc(doc(db, 'users', uid), { accountStatus: nextStatus });
+    } catch {}
+  };
+
+  // الحالة المركزية لطلبات الشهادات الأكاديمية الموقعة (Dean Signed Certificates)
+  const [certRequests, setCertRequests] = useState<MockCertificateRequest[]>(() => {
+    try {
+      const saved = localStorage.getItem('asira_cert_requests');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const handleRequestCertificate = (courseId: string, totalScore: number = 85) => {
+    const course = courses.find((c) => c.id === courseId);
+    const studentUid = currentUser?.uid || 'student-current';
+    const studentName = currentUser?.name || 'طالب أسيرا';
+
+    setCertRequests((prev) => {
+      const existing = prev.find(
+        (c) => c.studentUid === studentUid && (c.courseId === courseId || c.courseTitle === course?.title)
+      );
+      if (existing) return prev;
+
+      const newReq: MockCertificateRequest = {
+        id: `cert-req-${Date.now()}`,
+        studentUid,
+        studentName,
+        university: 'طالب مسجل بالمنصة',
+        courseId,
+        courseTitle: course?.title || 'كورس بحثي معتمد',
+        courseCode: course?.code || 'RES-100',
+        totalScore,
+        requestedAt: new Date().toISOString().split('T')[0],
+        status: 'pending',
+      };
+      const next = [newReq, ...prev];
+      try {
+        localStorage.setItem('asira_cert_requests', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const handleUpdateCertificate = (
+    id: string,
+    status: 'pending' | 'processing' | 'issued' | 'rejected',
+    code?: string,
+    pdfUrl?: string,
+    notes?: string
+  ) => {
+    setCertRequests((prev) => {
+      const next = prev.map((c) =>
+        c.id === id
+          ? {
+              ...c,
+              status,
+              verificationCode: code || c.verificationCode,
+              signedPdfUrl: pdfUrl || c.signedPdfUrl,
+              adminNotes: notes !== undefined ? notes : c.adminNotes,
+              issuedAt: status === 'issued' ? new Date().toISOString().split('T')[0] : c.issuedAt,
+            }
+          : c
+      );
+      try {
+        localStorage.setItem('asira_cert_requests', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const handleIssueCertificate = (id: string, code: string, pdfUrl: string) => {
+    handleUpdateCertificate(id, 'issued', code, pdfUrl);
+  };
+
   // الحالة المركزية لطلبات الالتحاق (Enrollments)
   const [enrollments, setEnrollments] = useState<MockPendingEnrollment[]>(() => {
     try {
@@ -86,7 +272,7 @@ export const App: React.FC = () => {
 
   const handleApproveEnrollment = (id: string) => {
     setEnrollments((prev) => {
-      const updated = prev.map((e) => e.id === id ? { ...e, status: 'approved' as const } : e);
+      const updated = prev.map((e) => (e.id === id ? { ...e, status: 'approved' as const } : e));
       localStorage.setItem('asira_enrollments', JSON.stringify(updated));
       return updated;
     });
@@ -94,7 +280,39 @@ export const App: React.FC = () => {
 
   const handleRejectEnrollment = (id: string) => {
     setEnrollments((prev) => {
-      const updated = prev.map((e) => e.id === id ? { ...e, status: 'rejected' as const } : e);
+      const updated = prev.map((e) => (e.id === id ? { ...e, status: 'rejected' as const } : e));
+      localStorage.setItem('asira_enrollments', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const handleArchiveEnrollment = (id: string) => {
+    setEnrollments((prev) => {
+      const updated = prev.map((e) =>
+        e.id === id ? { ...e, status: 'archived' as const, archivedAt: new Date().toISOString() } : e
+      );
+      localStorage.setItem('asira_enrollments', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const handleDeleteEnrollment = (id: string) => {
+    setEnrollments((prev) => {
+      const updated = prev.filter((e) => e.id !== id);
+      localStorage.setItem('asira_enrollments', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const handleArchiveAllProcessed = (courseId?: string) => {
+    setEnrollments((prev) => {
+      const updated = prev.map((e) => {
+        if (courseId && e.courseId !== courseId) return e;
+        if (e.status === 'approved' || e.status === 'rejected') {
+          return { ...e, status: 'archived' as const, archivedAt: new Date().toISOString() };
+        }
+        return e;
+      });
       localStorage.setItem('asira_enrollments', JSON.stringify(updated));
       return updated;
     });
@@ -427,6 +645,16 @@ export const App: React.FC = () => {
             enrollments={enrollments}
             onApproveEnrollment={handleApproveEnrollment}
             onRejectEnrollment={handleRejectEnrollment}
+            onArchiveEnrollment={handleArchiveEnrollment}
+            onDeleteEnrollment={handleDeleteEnrollment}
+            onArchiveAllProcessed={handleArchiveAllProcessed}
+            certRequests={certRequests}
+            onRequestCertificate={handleRequestCertificate}
+            onUpdateCertificate={handleUpdateCertificate}
+            onIssueCertificate={handleIssueCertificate}
+            usersList={usersList}
+            onUpdateUserRole={handleUpdateUserRole}
+            onToggleUserStatus={handleToggleUserStatus}
             onNavigateTab={(tab) => setCurrentTab(tab)}
             onLogout={async () => {
               try {

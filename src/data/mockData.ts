@@ -158,7 +158,8 @@ export interface MockPendingEnrollment {
   courseId: string;
   courseTitle: string;
   requestedAt: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'archived';
+  archivedAt?: string;
 }
 
 export const INITIAL_PENDING_ENROLLMENTS: MockPendingEnrollment[] = [];

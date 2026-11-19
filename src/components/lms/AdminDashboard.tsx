@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ShieldAlert, 
   Users, 
@@ -16,7 +16,9 @@ import {
   FileText,
   Plus,
   Edit,
-  Trash2
+  Trash2,
+  Archive,
+  RotateCcw
 } from 'lucide-react';
 import { 
   MockPendingEnrollment, 
@@ -28,11 +30,16 @@ import { sanitizeUrl } from '../../utils/security';
 import { exportPlatformData, validateRestorePackage } from '../../services/backupService';
 import { AddResearchModal } from '../AddResearchModal';
 import { EditResearchModal } from '../EditResearchModal';
+import { db } from '../../services/firebaseConfig';
+import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
 
 export interface AdminDashboardProps {
   enrollments?: MockPendingEnrollment[];
   onApproveEnrollment?: (id: string) => void;
   onRejectEnrollment?: (id: string) => void;
+  onArchiveEnrollment?: (id: string) => void;
+  onDeleteEnrollment?: (id: string) => void;
+  onArchiveAllProcessed?: () => void;
   certRequests?: MockCertificateRequest[];
   onUpdateCertificate?: (
     id: string,
@@ -48,12 +55,18 @@ export interface AdminDashboardProps {
   onDeleteResearch?: (id: string) => void;
   auditLogs?: MockAuditLogItem[];
   onLogAudit?: (action: string, details: string) => void;
+  usersList?: Array<{ uid: string; name: string; email: string; university: string; role: UserRole; status: 'active' | 'suspended' }>;
+  onUpdateUserRole?: (uid: string, nextRole: UserRole) => void;
+  onToggleUserStatus?: (uid: string) => void;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   enrollments: propEnrollments,
   onApproveEnrollment,
   onRejectEnrollment,
+  onArchiveEnrollment,
+  onDeleteEnrollment,
+  onArchiveAllProcessed,
   certRequests: propCertRequests,
   onUpdateCertificate,
   onIssueCertificate,
@@ -63,6 +76,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onDeleteResearch,
   auditLogs: propAuditLogs,
   onLogAudit,
+  usersList: propUsersList,
+  onUpdateUserRole,
+  onToggleUserStatus,
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'enrollments' | 'users' | 'certificates' | 'researches' | 'audit_logs' | 'backup'>('enrollments');
 
@@ -81,9 +97,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return matchesField && matchesSearch;
   });
 
-  // بيانات طلبات الالتحاق
+  // بيانات وفلاتر طلبات الالتحاق
   const [localEnrollments, setLocalEnrollments] = useState<MockPendingEnrollment[]>([]);
   const enrollments = propEnrollments || localEnrollments;
+  const [enrollFilter, setEnrollFilter] = useState<'all' | 'active' | 'pending' | 'approved' | 'rejected' | 'archived'>('active');
+
+  const filteredEnrollments = enrollments.filter((enr) => {
+    if (enrollFilter === 'active') return enr.status !== 'archived';
+    if (enrollFilter === 'pending') return enr.status === 'pending';
+    if (enrollFilter === 'approved') return enr.status === 'approved';
+    if (enrollFilter === 'rejected') return enr.status === 'rejected';
+    if (enrollFilter === 'archived') return enr.status === 'archived';
+    return true; // 'all'
+  });
 
   // بيانات سجل التدقيق
   const [localAuditLogs] = useState<MockAuditLogItem[]>([]);
@@ -101,8 +127,101 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [certPdfUrlInput, setCertPdfUrlInput] = useState('');
   const [certNotesInput, setCertNotesInput] = useState('');
 
-  // إدارة المستخدمين
-  const [usersList, setUsersList] = useState<Array<{ uid: string; name: string; email: string; university: string; role: UserRole; status: 'active' | 'suspended' }>>([]);
+  // إدارة المستخدمين والصلاحيات
+  const [localUsersList, setLocalUsersList] = useState<Array<{ uid: string; name: string; email: string; university: string; role: UserRole; status: 'active' | 'suspended' }>>(() => {
+    try {
+      const saved = localStorage.getItem('asira_users');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'users'));
+        if (!snap.empty) {
+          const loaded: Array<{ uid: string; name: string; email: string; university: string; role: UserRole; status: 'active' | 'suspended' }> = [];
+          snap.forEach((docSnap) => {
+            const d = docSnap.data();
+            loaded.push({
+              uid: docSnap.id,
+              name: d.displayName || d.name || d.email || 'مستخدم',
+              email: d.email || '',
+              university: d.university || 'مسجل بالمنصة',
+              role: (d.role as UserRole) || 'student',
+              status: d.accountStatus || 'active',
+            });
+          });
+          setLocalUsersList((prev) => {
+            const map = new Map();
+            prev.forEach((u) => map.set(u.uid, u));
+            loaded.forEach((u) => map.set(u.uid, { ...map.get(u.uid), ...u }));
+            const merged = Array.from(map.values());
+            try {
+              localStorage.setItem('asira_users', JSON.stringify(merged));
+            } catch {}
+            return merged;
+          });
+        }
+      } catch (err) {
+        console.info('[AdminDashboard] Firestore sync fallback to localStorage:', err);
+      }
+    };
+    fetchUsers();
+  }, []);
+
+  const usersList = propUsersList && propUsersList.length > 0 ? propUsersList : localUsersList;
+
+  // أرشفة طلب التحاق
+  const handleArchive = (id: string) => {
+    if (onArchiveEnrollment) {
+      onArchiveEnrollment(id);
+    } else {
+      setLocalEnrollments((prev) =>
+        prev.map((e) => (e.id === id ? { ...e, status: 'archived', archivedAt: new Date().toISOString() } : e))
+      );
+    }
+    const target = enrollments.find((e) => e.id === id);
+    if (onLogAudit && target) {
+      onLogAudit('أرشفة طلب التحاق', `تم أرشفة طلب الطالب (${target.studentName}) لكورس: ${target.courseTitle}`);
+    }
+  };
+
+  // حذف طلب التحاق نهائياً
+  const handleDelete = (id: string) => {
+    if (!window.confirm('هل أنت متأكد من حذف هذا الطلب نهائياً؟')) return;
+    if (onDeleteEnrollment) {
+      onDeleteEnrollment(id);
+    } else {
+      setLocalEnrollments((prev) => prev.filter((e) => e.id !== id));
+    }
+    const target = enrollments.find((e) => e.id === id);
+    if (onLogAudit && target) {
+      onLogAudit('حذف طلب التحاق', `تم حذف طلب الطالب (${target.studentName}) نهائياً`);
+    }
+  };
+
+  // أرشفة كافة الطلبات المنتهية (المقبولة والمرفوضة)
+  const handleArchiveAll = () => {
+    if (!window.confirm('هل تريد أرشفة كافة الطلبات المنتهية (المقبولة والمرفوضة) ونقلها إلى سجل الأرشيف؟')) return;
+    if (onArchiveAllProcessed) {
+      onArchiveAllProcessed();
+    } else {
+      setLocalEnrollments((prev) =>
+        prev.map((e) => {
+          if (e.status === 'approved' || e.status === 'rejected') {
+            return { ...e, status: 'archived', archivedAt: new Date().toISOString() };
+          }
+          return e;
+        })
+      );
+    }
+    if (onLogAudit) {
+      onLogAudit('أرشفة مجمعة', 'تم أرشفة جميع طلبات الالتحاق المعالجة بنجاح');
+    }
+  };
 
   // الموافقة على طلب الالتحاق
   const handleApprove = (id: string) => {
@@ -233,10 +352,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
 
   // تغيير دور المستخدم
-  const handleRoleChange = (uid: string, nextRole: UserRole) => {
-    setUsersList((prev) =>
-      prev.map((u) => u.uid === uid ? { ...u, role: nextRole } : u)
-    );
+  const handleRoleChange = async (uid: string, nextRole: UserRole) => {
+    if (onUpdateUserRole) {
+      onUpdateUserRole(uid, nextRole);
+    }
+    setLocalUsersList((prev) => {
+      const next = prev.map((u) => (u.uid === uid ? { ...u, role: nextRole } : u));
+      try {
+        localStorage.setItem('asira_users', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    try {
+      await updateDoc(doc(db, 'users', uid), { role: nextRole });
+    } catch {}
+
     const target = usersList.find((u) => u.uid === uid);
     if (onLogAudit && target) {
       onLogAudit('تعديل صلاحية مستخدم', `تم تغيير دور المستخدم (${target.name}) من ${target.role} إلى ${nextRole}`);
@@ -244,14 +375,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   // تجميد/تنشيط الحساب
-  const toggleUserStatus = (uid: string) => {
-    setUsersList((prev) =>
-      prev.map((u) => u.uid === uid ? { ...u, status: u.status === 'active' ? 'suspended' : 'active' } : u)
-    );
+  const toggleUserStatus = async (uid: string) => {
+    let nextStatus: 'active' | 'suspended' = 'active';
+    if (onToggleUserStatus) {
+      onToggleUserStatus(uid);
+    }
+    setLocalUsersList((prev) => {
+      const next = prev.map((u) => {
+        if (u.uid === uid) {
+          nextStatus = u.status === 'active' ? 'suspended' : 'active';
+          return { ...u, status: nextStatus };
+        }
+        return u;
+      });
+      try {
+        localStorage.setItem('asira_users', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    try {
+      await updateDoc(doc(db, 'users', uid), { accountStatus: nextStatus });
+    } catch {}
+
     const target = usersList.find((u) => u.uid === uid);
     if (onLogAudit && target) {
-      const nextStatus = target.status === 'active' ? 'مجمّد' : 'نشط';
-      onLogAudit('تعديل حالة حساب مستخدم', `تم تغيير حالة حساب (${target.name}) إلى ${nextStatus}`);
+      onLogAudit('تعديل حالة حساب مستخدم', `تم تغيير حالة حساب (${target.name}) إلى ${nextStatus === 'active' ? 'نشط' : 'مجمّد'}`);
     }
   };
 
@@ -394,18 +543,75 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* 2. تبويب: إدارة طلبات الالتحاق المعلقة بالكورسات */}
       {activeTab === 'enrollments' && (
         <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
             <div>
               <h2 style={{ fontSize: '1.3rem', fontWeight: 800, margin: 0 }}>
                 طلبات الالتحاق بالكورسات الأكاديمية
               </h2>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                راجع بيانات الطالب والجامعة والتخصص، وقم بالموافقة لتفعيل صلاحية الوصول لكافة الدروس والتكليفات، أو الرفض مع حفظ السبب.
+                راجع طلبات الطلاب للالتحاق بالكورسات، اعتمد القبول أو الرفض، وقم بأرشفة أو حذف الطلبات المعالجة للحفاظ على ترتيب السجلات.
               </p>
             </div>
-            <span className="badge badge-gold">
-              {pendingCount} طلبات بانتظار الاعتماد
-            </span>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <span className="badge badge-gold">
+                {pendingCount} طلبات بانتظار الاعتماد
+              </span>
+              <button
+                onClick={handleArchiveAll}
+                className="btn btn-outline"
+                style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                title="أرشفة كافة الطلبات المقبولة والمرفوضة لعدم شغل الجدول"
+              >
+                <Archive size={14} />
+                <span>أرشفة الطلبات المعالجة</span>
+              </button>
+            </div>
+          </div>
+
+          {/* فلاتر تصنيف الطلبات */}
+          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
+            <button
+              onClick={() => setEnrollFilter('active')}
+              className={`btn ${enrollFilter === 'active' ? 'btn-primary' : 'btn-outline'}`}
+              style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
+            >
+              الطلبات النشطة ({enrollments.filter((e) => e.status !== 'archived').length})
+            </button>
+            <button
+              onClick={() => setEnrollFilter('pending')}
+              className={`btn ${enrollFilter === 'pending' ? 'btn-primary' : 'btn-outline'}`}
+              style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
+            >
+              قيد المراجعة ({enrollments.filter((e) => e.status === 'pending').length})
+            </button>
+            <button
+              onClick={() => setEnrollFilter('approved')}
+              className={`btn ${enrollFilter === 'approved' ? 'btn-primary' : 'btn-outline'}`}
+              style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
+            >
+              المقبولون ({enrollments.filter((e) => e.status === 'approved').length})
+            </button>
+            <button
+              onClick={() => setEnrollFilter('rejected')}
+              className={`btn ${enrollFilter === 'rejected' ? 'btn-primary' : 'btn-outline'}`}
+              style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
+            >
+              المرفوضون ({enrollments.filter((e) => e.status === 'rejected').length})
+            </button>
+            <button
+              onClick={() => setEnrollFilter('archived')}
+              className={`btn ${enrollFilter === 'archived' ? 'btn-primary' : 'btn-outline'}`}
+              style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
+            >
+              الأرشيف ({enrollments.filter((e) => e.status === 'archived').length})
+            </button>
+            <button
+              onClick={() => setEnrollFilter('all')}
+              className={`btn ${enrollFilter === 'all' ? 'btn-primary' : 'btn-outline'}`}
+              style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
+            >
+              الكل ({enrollments.length})
+            </button>
           </div>
 
           <div style={{ overflowX: 'auto' }}>
@@ -418,18 +624,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <th style={{ padding: '0.85rem' }}>الكورس المطلوب</th>
                   <th style={{ padding: '0.85rem' }}>تاريخ الطلب</th>
                   <th style={{ padding: '0.85rem' }}>الحالة</th>
-                  <th style={{ padding: '0.85rem' }}>قرار الإدارة</th>
+                  <th style={{ padding: '0.85rem' }}>الإجراءات</th>
                 </tr>
               </thead>
               <tbody>
-                {enrollments.length === 0 ? (
+                {filteredEnrollments.length === 0 ? (
                   <tr>
                     <td colSpan={7} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
-                      لا توجد طلبات التحاق مسجلة حالياً
+                      لا توجد طلبات مطابقة لهذا الفلتر حالياً
                     </td>
                   </tr>
                 ) : (
-                  enrollments.map((enr) => (
+                  filteredEnrollments.map((enr) => (
                     <tr key={enr.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                       <td style={{ padding: '0.85rem' }}>
                         <strong style={{ display: 'block', color: 'var(--text-main)' }}>{enr.studentName}</strong>
@@ -452,14 +658,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         {enr.status === 'approved' && <span className="badge badge-emerald">مقبول (Approved)</span>}
                         {enr.status === 'rejected' && <span className="badge" style={{ background: '#fee2e2', color: '#b91c1c' }}>مرفوض</span>}
                         {enr.status === 'pending' && <span className="badge badge-gold">معلق (Pending)</span>}
+                        {enr.status === 'archived' && <span className="badge" style={{ background: '#f1f5f9', color: '#64748b' }}>مؤرشف 📦</span>}
                       </td>
                       <td style={{ padding: '0.85rem' }}>
                         {enr.status === 'pending' ? (
-                          <div style={{ display: 'flex', gap: '0.4rem' }}>
+                          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                             <button
                               onClick={() => handleApprove(enr.id)}
                               className="btn btn-accent"
-                              style={{ padding: '0.4rem 0.75rem', fontSize: '0.82rem' }}
+                              style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }}
                             >
                               <Check size={14} />
                               <span>قبول</span>
@@ -467,32 +674,78 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <button
                               onClick={() => handleReject(enr.id)}
                               className="btn btn-outline"
-                              style={{ padding: '0.4rem 0.75rem', fontSize: '0.82rem', color: '#ef4444' }}
+                              style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', color: '#ef4444' }}
                             >
                               <X size={14} />
                               <span>رفض</span>
                             </button>
-                          </div>
-                        ) : enr.status === 'rejected' ? (
-                          <button
-                            onClick={() => handleApprove(enr.id)}
-                            className="btn btn-outline"
-                            style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', color: 'var(--accent-emerald)', borderColor: 'var(--accent-emerald)' }}
-                            title="التراجع عن الرفض وقبول الطالب في المقرر"
-                          >
-                            <Check size={14} />
-                            <span>إعادة قبول واعتماد</span>
-                          </button>
-                        ) : (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                            <span style={{ fontSize: '0.82rem', color: 'var(--accent-emerald)', fontWeight: 700 }}>معتمد ✓</span>
                             <button
-                              onClick={() => handleReject(enr.id)}
+                              onClick={() => handleDelete(enr.id)}
                               className="btn btn-ghost"
-                              style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', color: '#ef4444' }}
-                              title="إلغاء الاعتماد وتحويله لمرفوض"
+                              style={{ padding: '0.35rem', color: '#ef4444' }}
+                              title="حذف الطلب نهائياً"
                             >
-                              إلغاء القبول
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        ) : enr.status === 'archived' ? (
+                          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                            <button
+                              onClick={() => handleApprove(enr.id)}
+                              className="btn btn-outline"
+                              style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem' }}
+                              title="استعادة واعتماد"
+                            >
+                              <RotateCcw size={13} />
+                              <span>استعادة</span>
+                            </button>
+                            <button
+                              onClick={() => handleDelete(enr.id)}
+                              className="btn btn-ghost"
+                              style={{ padding: '0.3rem', color: '#ef4444' }}
+                              title="حذف نهائي من الأرشيف"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                            {enr.status === 'rejected' ? (
+                              <button
+                                onClick={() => handleApprove(enr.id)}
+                                className="btn btn-outline"
+                                style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem', color: 'var(--accent-emerald)', borderColor: 'var(--accent-emerald)' }}
+                                title="إعادة قبول واعتماد الطالب في المقرر"
+                              >
+                                <Check size={13} />
+                                <span>إعادة قبول</span>
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleReject(enr.id)}
+                                className="btn btn-ghost"
+                                style={{ padding: '0.2rem 0.45rem', fontSize: '0.75rem', color: '#ef4444' }}
+                                title="إلغاء الاعتماد وتحويله لمرفوض"
+                              >
+                                إلغاء
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleArchive(enr.id)}
+                              className="btn btn-ghost"
+                              style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}
+                              title="أرشفة الطلب"
+                            >
+                              <Archive size={13} />
+                              <span>أرشفة</span>
+                            </button>
+                            <button
+                              onClick={() => handleDelete(enr.id)}
+                              className="btn btn-ghost"
+                              style={{ padding: '0.25rem', color: '#ef4444' }}
+                              title="حذف الطلب نهائياً"
+                            >
+                              <Trash2 size={14} />
                             </button>
                           </div>
                         )}
