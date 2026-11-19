@@ -98,15 +98,16 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
 }) => {
   // الدور النشط
   const [activeRole, setActiveRole] = useState<UserRole>(initialRole);
-  const [selectedCourseId, setSelectedCourseId] = useState<string>(courses[0]?.id || 'course-1');
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
 
   // الحالة المركزية المشتركة بين الأدوار (Clean Slate for Production)
   const [submissions, setSubmissions] = useState<MockStudentSubmission[]>([]);
   const [examAttempts, setExamAttempts] = useState<MockExamAttemptForInstructor[]>([]);
   const [localCurricula, setLocalCurricula] = useState<Record<string, MockCourseCurriculum>>(propCurricula || INITIAL_CURRICULA);
   const activeCurricula = propCurricula || localCurricula;
-  const currentCurriculum = activeCurricula[selectedCourseId] || {
-    courseId: selectedCourseId,
+  const activeCourseId = selectedCourseId || courses[0]?.id || '';
+  const currentCurriculum = (activeCourseId && activeCurricula[activeCourseId]) || {
+    courseId: activeCourseId,
     modules: []
   };
 
@@ -429,8 +430,8 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
             <StudentDashboard
               courses={studentEnrolledCourses}
               pendingEnrollments={studentPendingEnrollments}
-              activeCourseId={selectedCourseId}
-              onSelectCourseId={setSelectedCourseId}
+              activeCourseId={selectedCourseId || courses[0]?.id || ''}
+              onSelectCourseId={(id) => setSelectedCourseId(id)}
               studentName={initialName}
               studentUid={currentStudentUid}
               submissions={submissions}
@@ -449,8 +450,8 @@ export const LmsDashboardPreview: React.FC<LmsDashboardPreviewProps> = ({
         {activeRole === 'instructor' && (
           <InstructorDashboard
             courses={courses}
-            activeCourseId={selectedCourseId}
-            onSelectCourseId={setSelectedCourseId}
+            activeCourseId={selectedCourseId || undefined}
+            onSelectCourseId={(id) => setSelectedCourseId(id || null)}
             onAddCourse={onAddCourse}
             onUpdateCourse={onUpdateCourse}
             onDeleteCourse={onDeleteCourse}

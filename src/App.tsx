@@ -15,7 +15,7 @@ import { INITIAL_COURSES, INITIAL_RESEARCHES, INITIAL_CURRICULA, MockCourseCurri
 import { CheckCircle2, ShieldAlert } from 'lucide-react';
 import { auth, db } from './services/firebaseConfig';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc, collection, getDocs, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, updateDoc, setDoc, onSnapshot } from 'firebase/firestore';
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<string>('home');
@@ -84,41 +84,59 @@ export const App: React.FC = () => {
     }
   });
 
-  // مزامنة المستخدمين من Firestore وقاعدة البيانات السحابية
+  // مزامنة حية ومستمرة لمستخدمي المنصة من Firestore فور تسجيل الدخول أو استعادة الجلسة
   useEffect(() => {
-    const fetchUsers = async () => {
+    let unsubscribeSnapshot: (() => void) | null = null;
+
+    const syncUsers = () => {
       try {
-        const snap = await getDocs(collection(db, 'users'));
-        if (!snap.empty) {
-          const loaded: Array<{ uid: string; name: string; email: string; university: string; role: UserRole; status: 'active' | 'suspended' }> = [];
-          snap.forEach((docSnap) => {
-            const d = docSnap.data();
-            loaded.push({
-              uid: docSnap.id,
-              name: d.displayName || d.name || d.email || 'مستخدم',
-              email: d.email || '',
-              university: d.university || 'مسجل بالمنصة',
-              role: (d.role as UserRole) || 'student',
-              status: d.accountStatus || 'active',
-            });
-          });
-          setUsersList((prev) => {
-            const map = new Map();
-            prev.forEach((u) => map.set(u.uid, u));
-            loaded.forEach((u) => map.set(u.uid, { ...map.get(u.uid), ...u }));
-            const merged = Array.from(map.values());
-            try {
-              localStorage.setItem('asira_users', JSON.stringify(merged));
-            } catch {}
-            return merged;
-          });
-        }
+        unsubscribeSnapshot = onSnapshot(
+          collection(db, 'users'),
+          (snap) => {
+            if (!snap.empty) {
+              const loaded: Array<{ uid: string; name: string; email: string; university: string; role: UserRole; status: 'active' | 'suspended' }> = [];
+              snap.forEach((docSnap) => {
+                const d = docSnap.data();
+                loaded.push({
+                  uid: docSnap.id,
+                  name: d.displayName || d.name || d.email || 'مستخدم',
+                  email: d.email || '',
+                  university: d.university || 'مسجل بالمنصة',
+                  role: (d.role as UserRole) || 'student',
+                  status: d.accountStatus || 'active',
+                });
+              });
+              setUsersList((prev) => {
+                const map = new Map<string, typeof loaded[0]>();
+                prev.forEach((u) => map.set(u.uid, u));
+                loaded.forEach((u) => map.set(u.uid, { ...map.get(u.uid), ...u }));
+                const merged = Array.from(map.values());
+                try {
+                  localStorage.setItem('asira_users', JSON.stringify(merged));
+                } catch {}
+                return merged;
+              });
+            }
+          },
+          (err) => {
+            console.info('[Users] Realtime listener info:', err.message);
+          }
+        );
       } catch (err) {
-        console.info('[Users] Firestore sync fallback to localStorage:', err);
+        console.info('[Users] Snapshot initialization fallback:', err);
       }
     };
-    fetchUsers();
-  }, []);
+
+    if (currentUser) {
+      syncUsers();
+    }
+
+    return () => {
+      if (unsubscribeSnapshot) {
+        unsubscribeSnapshot();
+      }
+    };
+  }, [currentUser?.uid, currentUser?.role]);
 
   // ضمان إدراج المستخدم الحالي دائماً في قائمة المستخدمين
   useEffect(() => {
@@ -157,11 +175,19 @@ export const App: React.FC = () => {
     });
 
     if (currentUser && currentUser.uid === uid) {
-      setCurrentUser((prev) => (prev ? { ...prev, role: nextRole } : null));
+      const nextUser = { ...currentUser, role: nextRole };
+      setCurrentUser(nextUser);
+      try {
+        localStorage.setItem('asira_current_user', JSON.stringify(nextUser));
+      } catch {}
     }
 
     try {
-      await updateDoc(doc(db, 'users', uid), { role: nextRole });
+      await setDoc(
+        doc(db, 'users', uid),
+        { role: nextRole, updatedAt: new Date().toISOString() },
+        { merge: true }
+      );
     } catch (err) {
       console.warn('[Users] Cloud role update warning:', err);
     }
@@ -184,8 +210,14 @@ export const App: React.FC = () => {
     });
 
     try {
-      await updateDoc(doc(db, 'users', uid), { accountStatus: nextStatus });
-    } catch {}
+      await setDoc(
+        doc(db, 'users', uid),
+        { accountStatus: nextStatus, updatedAt: new Date().toISOString() },
+        { merge: true }
+      );
+    } catch (err) {
+      console.warn('[Users] Cloud status update warning:', err);
+    }
   };
 
   // الحالة المركزية لطلبات الشهادات الأكاديمية الموقعة (Dean Signed Certificates)

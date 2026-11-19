@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   CheckCircle2, 
   ExternalLink, 
@@ -95,14 +95,52 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'curriculum' | 'exams' | 'assignments' | 'practical' | 'progress' | 'enrollments'>('curriculum');
   const [enrollFilter, setEnrollFilter] = useState<'active' | 'pending' | 'approved' | 'rejected' | 'archived' | 'all'>('active');
-  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(propActiveCourseId || null);
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(() => {
+    if (propActiveCourseId && courses.some((c) => c.id === propActiveCourseId)) {
+      return propActiveCourseId;
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    if (propActiveCourseId && courses.some((c) => c.id === propActiveCourseId)) {
+      setSelectedCourseId(propActiveCourseId);
+    } else if (!propActiveCourseId || (selectedCourseId && !courses.some((c) => c.id === selectedCourseId))) {
+      setSelectedCourseId(null);
+    }
+  }, [propActiveCourseId, courses]);
 
   // الكورس النشط حالياً عند الدخول لإدارته
-  const currentCourse = selectedCourseId ? (courses.find((c) => c.id === selectedCourseId) || courses[0]) : null;
+  const currentCourse = selectedCourseId ? (courses.find((c) => c.id === selectedCourseId) || null) : null;
+  const isLevel1 = !selectedCourseId || !currentCourse;
+
+  // طلبات التسجيل الخاصة بهذا الكورس
+  const courseEnrollments = (enrollments || []).filter(
+    (e) => e.courseId === currentCourse?.id
+  );
+
+  // الطلاب المعتمدون في الكورس المحدد
+  const courseApprovedStudents = courseEnrollments.filter(
+    (e) => e.status === 'approved'
+  );
+
+  const filteredCourseEnrollments = courseEnrollments.filter((enr) => {
+    if (enrollFilter === 'active') return enr.status !== 'archived';
+    if (enrollFilter === 'pending') return enr.status === 'pending';
+    if (enrollFilter === 'approved') return enr.status === 'approved';
+    if (enrollFilter === 'rejected') return enr.status === 'rejected';
+    if (enrollFilter === 'archived') return enr.status === 'archived';
+    return true;
+  });
 
   // بيانات التكليفات
   const [localSubmissions, setLocalSubmissions] = useState<MockStudentSubmission[]>(propSubmissions || []);
   const submissions = propSubmissions || localSubmissions;
+
+  // تصفية التكليفات الخاصة بطلاب هذا الكورس
+  const courseSubmissions = submissions.filter((sub) =>
+    courseApprovedStudents.some((s) => s.studentUid === sub.studentUid || (s.studentName && s.studentName === sub.studentName))
+  );
 
   const [selectedSubmission, setSelectedSubmission] = useState<MockStudentSubmission | null>(null);
   const [gradeInput, setGradeInput] = useState<number>(0);
@@ -113,6 +151,11 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
   // بيانات الاختبارات
   const [localExamAttempts, setLocalExamAttempts] = useState<MockExamAttemptForInstructor[]>(propExamAttempts || []);
   const examAttempts = propExamAttempts || localExamAttempts;
+
+  // تصفية الاختبارات الخاصة بطلاب هذا الكورس
+  const courseExamAttempts = examAttempts.filter((att) =>
+    courseApprovedStudents.some((s) => s.studentUid === att.studentUid || (s.studentName && s.studentName === att.studentName))
+  );
 
   const [selectedAttempt, setSelectedAttempt] = useState<MockExamAttemptForInstructor | null>(null);
   const [overrideScoreInput, setOverrideScoreInput] = useState<number>(0);
@@ -125,7 +168,7 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
   const [examSearch, setExamSearch] = useState('');
   const [examFilter, setExamFilter] = useState<'all' | 'approved' | 'pending'>('all');
 
-  const filteredSubmissions = submissions.filter((sub) => {
+  const filteredSubmissions = courseSubmissions.filter((sub) => {
     const matchesStatus = submissionFilter === 'all' || sub.status === submissionFilter;
     const matchesSearch = sub.studentName.toLowerCase().includes(submissionSearch.toLowerCase()) ||
       sub.university.toLowerCase().includes(submissionSearch.toLowerCase()) ||
@@ -133,7 +176,7 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
     return matchesStatus && matchesSearch;
   });
 
-  const filteredExamAttempts = examAttempts.filter((att) => {
+  const filteredExamAttempts = courseExamAttempts.filter((att) => {
     const matchesStatus = examFilter === 'all' || 
       (examFilter === 'approved' ? att.status === 'approved' : att.status !== 'approved');
     const matchesSearch = att.studentName.toLowerCase().includes(examSearch.toLowerCase()) ||
@@ -220,6 +263,12 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
   const handleSelectCourse = (id: string) => {
     setSelectedCourseId(id);
     if (onSelectCourseId) onSelectCourseId(id);
+  };
+
+  // العودة لقائمة الكورسات
+  const handleBackToCourses = () => {
+    setSelectedCourseId(null);
+    if (onSelectCourseId) onSelectCourseId('');
   };
 
   // حفظ تصحيح وتعديل درجة التكليف
@@ -607,38 +656,10 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
     }
   };
 
-  // الطلاب المعتمدون في الكورس المحدد
-  const courseApprovedStudents = (enrollments || []).filter(
-    (e) => e.courseId === currentCourse?.id && e.status === 'approved'
-  );
-
-  // طلبات التسجيل الخاصة بهذا الكورس وفلترتها
-  const courseEnrollments = (enrollments || []).filter(
-    (e) => e.courseId === currentCourse?.id
-  );
-
-  const filteredCourseEnrollments = courseEnrollments.filter((enr) => {
-    if (enrollFilter === 'active') return enr.status !== 'archived';
-    if (enrollFilter === 'pending') return enr.status === 'pending';
-    if (enrollFilter === 'approved') return enr.status === 'approved';
-    if (enrollFilter === 'rejected') return enr.status === 'rejected';
-    if (enrollFilter === 'archived') return enr.status === 'archived';
-    return true;
-  });
-
-  // تصفية التكليفات والاختبارات المرتبطة بالكورس أو طلابه
-  const courseSubmissions = submissions.filter((sub) => 
-    courseApprovedStudents.length === 0 || courseApprovedStudents.some(s => s.studentUid === sub.studentUid || s.studentName === sub.studentName)
-  );
-
-  const courseExamAttempts = examAttempts.filter((att) => 
-    courseApprovedStudents.length === 0 || courseApprovedStudents.some(s => s.studentUid === att.studentUid || s.studentName === att.studentName)
-  );
-
   return (
     <div>
       {/* المستوى الأول: قائمة الكورسات الحالية (عند عدم اختيار كورس محدد) */}
-      {!selectedCourseId && (
+      {isLevel1 && (
         <div style={{ marginBottom: '2rem' }}>
           <div style={{
             display: 'flex',
@@ -690,129 +711,157 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
             </div>
           </div>
 
-          {/* شبكة بطاقات الكورسات */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-            gap: '1.25rem',
-          }}>
-            {courses.map((course) => {
-              const enrolledInCourse = (enrollments || []).filter((e) => e.courseId === course.id && e.status === 'approved');
-              const pendingInCourse = (enrollments || []).filter((e) => e.courseId === course.id && e.status === 'pending');
-              return (
-                <div
-                  key={course.id}
-                  className="card"
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    transition: 'transform 0.2s, box-shadow 0.2s',
-                    cursor: 'pointer',
-                    border: '1px solid var(--border-color)',
-                    padding: '1.35rem',
-                  }}
-                  onClick={() => handleSelectCourse(course.id)}
+          {/* شبكة بطاقات الكورسات أو رسالة الحالة الفارغة */}
+          {courses.length === 0 ? (
+            <div className="card" style={{
+              textAlign: 'center',
+              padding: '3.5rem 1.5rem',
+              borderRadius: 'var(--radius-lg)',
+              border: '2px dashed var(--border-color)',
+              background: 'var(--bg-card)',
+            }}>
+              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📚</div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '0.5rem' }}>
+                لا توجد كورسات مضافة حالياً في المنصة
+              </h3>
+              <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', maxWidth: '480px', margin: '0 auto 1.5rem', lineHeight: 1.6 }}>
+                ابدأ بإضافة أول كورس أكاديمي لمنتدى أسيرا لتتمكن من بناء المنهج، وضع الاختبارات والتكليفات، ومتابعة الطلاب المسجلين فيه.
+              </p>
+              {onAddCourse && (
+                <button
+                  onClick={() => setIsAddCourseModalOpen(true)}
+                  className="btn btn-primary"
+                  style={{ fontSize: '0.9rem', padding: '0.6rem 1.4rem' }}
                 >
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                      <span className="badge badge-emerald" style={{ fontWeight: 800 }}>
-                        {course.code}
-                      </span>
-                      <span className="badge badge-subtle" style={{ fontSize: '0.78rem' }}>
-                        درجة النجاح: {course.passingScore}%
-                      </span>
+                  <Plus size={16} />
+                  <span>إضافة أول كورس أكاديمي الآن</span>
+                </button>
+              )}
+            </div>
+          ) : (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+              gap: '1.25rem',
+            }}>
+              {courses.map((course) => {
+                const enrolledInCourse = (enrollments || []).filter((e) => e.courseId === course.id && e.status === 'approved');
+                const pendingInCourse = (enrollments || []).filter((e) => e.courseId === course.id && e.status === 'pending');
+                return (
+                  <div
+                    key={course.id}
+                    className="card"
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      transition: 'transform 0.2s, box-shadow 0.2s',
+                      cursor: 'pointer',
+                      border: '1px solid var(--border-color)',
+                      padding: '1.35rem',
+                    }}
+                    onClick={() => handleSelectCourse(course.id)}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                        <span className="badge badge-emerald" style={{ fontWeight: 800 }}>
+                          {course.code}
+                        </span>
+                        <span className="badge badge-subtle" style={{ fontSize: '0.78rem' }}>
+                          درجة النجاح: {course.passingScore}%
+                        </span>
+                      </div>
+
+                      <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '0.5rem', lineHeight: 1.4 }}>
+                        {course.title}
+                      </h3>
+
+                      <p style={{
+                        fontSize: '0.84rem',
+                        color: 'var(--text-muted)',
+                        lineHeight: 1.5,
+                        marginBottom: '1rem',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden'
+                      }}>
+                        {course.summary || course.description}
+                      </p>
+
+                      <div style={{
+                        fontSize: '0.8rem',
+                        color: 'var(--text-muted)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        marginBottom: '0.85rem'
+                      }}>
+                        <Users size={14} />
+                        <span>المشرفون: <strong>{course.instructorNames?.join('، ') || 'المشرف الأكاديمي'}</strong></span>
+                      </div>
                     </div>
-
-                    <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '0.5rem', lineHeight: 1.4 }}>
-                      {course.title}
-                    </h3>
-
-                    <p style={{
-                      fontSize: '0.84rem',
-                      color: 'var(--text-muted)',
-                      lineHeight: 1.5,
-                      marginBottom: '1rem',
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden'
-                    }}>
-                      {course.summary || course.description}
-                    </p>
 
                     <div style={{
-                      fontSize: '0.8rem',
-                      color: 'var(--text-muted)',
+                      paddingTop: '0.85rem',
+                      borderTop: '1px solid var(--border-color)',
                       display: 'flex',
+                      justifyContent: 'space-between',
                       alignItems: 'center',
-                      gap: '0.4rem',
-                      marginBottom: '0.85rem'
+                      marginTop: '0.5rem'
                     }}>
-                      <Users size={14} />
-                      <span>المشرفون: <strong>{course.instructorNames?.join('، ') || 'المشرف الأكاديمي'}</strong></span>
-                    </div>
-                  </div>
-
-                  <div style={{
-                    paddingTop: '0.85rem',
-                    borderTop: '1px solid var(--border-color)',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginTop: '0.5rem'
-                  }}>
-                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                      <span className="badge badge-primary" style={{ fontSize: '0.78rem' }}>
-                        👥 {enrolledInCourse.length} طلاب مسجلون
-                      </span>
-                      {pendingInCourse.length > 0 && (
-                        <span className="badge badge-gold" style={{ fontSize: '0.74rem' }}>
-                          ⏳ {pendingInCourse.length} بانتظار القبول
+                      <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                        <span className="badge badge-primary" style={{ fontSize: '0.78rem' }}>
+                          👥 {enrolledInCourse.length} طلاب مسجلون
                         </span>
-                      )}
-                    </div>
+                        {pendingInCourse.length > 0 && (
+                          <span className="badge badge-gold" style={{ fontSize: '0.74rem' }}>
+                            ⏳ {pendingInCourse.length} بانتظار القبول
+                          </span>
+                        )}
+                      </div>
 
-                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSelectCourse(course.id);
-                        }}
-                        className="btn btn-primary"
-                        style={{ fontSize: '0.82rem', padding: '0.35rem 0.85rem' }}
-                      >
-                        <span>إدارة الكورس ←</span>
-                      </button>
-                      {onDeleteCourse && (
+                      <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (window.confirm(`هل أنت متأكد من حذف المقرر (${course.code}: ${course.title}) نهائياً من المنصة؟`)) {
-                              onDeleteCourse(course.id);
-                              if (onLogAudit) {
-                                onLogAudit('حذف كورس', `تم حذف الكورس ${course.code} من قائمة الكورسات`);
-                              }
-                            }
+                            handleSelectCourse(course.id);
                           }}
-                          className="btn btn-ghost"
-                          style={{ padding: '0.35rem 0.6rem', color: '#ef4444' }}
-                          title="حذف هذا المقرر نهائياً"
+                          className="btn btn-primary"
+                          style={{ fontSize: '0.82rem', padding: '0.35rem 0.85rem' }}
                         >
-                          <Trash2 size={15} />
+                          <span>إدارة الكورس ←</span>
                         </button>
-                      )}
+                        {onDeleteCourse && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (window.confirm(`هل أنت متأكد من حذف المقرر (${course.code}: ${course.title}) نهائياً من المنصة؟`)) {
+                                onDeleteCourse(course.id);
+                                if (onLogAudit) {
+                                  onLogAudit('حذف كورس', `تم حذف الكورس ${course.code} من قائمة الكورسات`);
+                                }
+                              }
+                            }}
+                            className="btn btn-ghost"
+                            style={{ padding: '0.35rem 0.6rem', color: '#ef4444' }}
+                            title="حذف هذا المقرر نهائياً"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
       {/* المستوى الثاني: نافذة إدارة الكورس المختار */}
-      {selectedCourseId && currentCourse && (
+      {!isLevel1 && currentCourse && (
         <>
           {/* شريط رأس الكورس والعودة لقائمة الكورسات */}
           <div style={{
@@ -829,7 +878,7 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
               <button
-                onClick={() => setSelectedCourseId(null)}
+                onClick={handleBackToCourses}
                 className="btn btn-outline"
                 style={{ fontSize: '0.85rem', padding: '0.4rem 0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                 title="العودة إلى قائمة الكورسات"
@@ -3053,6 +3102,7 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
             }
             setIsEditCourseModalOpen(false);
             setSelectedCourseId(null);
+            if (onSelectCourseId) onSelectCourseId('');
           }}
         />
       )}

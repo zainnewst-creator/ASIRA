@@ -31,7 +31,7 @@ import { exportPlatformData, validateRestorePackage } from '../../services/backu
 import { AddResearchModal } from '../AddResearchModal';
 import { EditResearchModal } from '../EditResearchModal';
 import { db } from '../../services/firebaseConfig';
-import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, setDoc, doc } from 'firebase/firestore';
 
 export interface AdminDashboardProps {
   enrollments?: MockPendingEnrollment[];
@@ -171,6 +171,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     };
     fetchUsers();
   }, []);
+
+  useEffect(() => {
+    if (propUsersList && propUsersList.length > 0) {
+      setLocalUsersList(propUsersList);
+    }
+  }, [propUsersList]);
 
   const usersList = propUsersList && propUsersList.length > 0 ? propUsersList : localUsersList;
 
@@ -355,7 +361,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleRoleChange = async (uid: string, nextRole: UserRole) => {
     if (onUpdateUserRole) {
       onUpdateUserRole(uid, nextRole);
+    } else {
+      try {
+        await setDoc(
+          doc(db, 'users', uid),
+          { role: nextRole, updatedAt: new Date().toISOString() },
+          { merge: true }
+        );
+      } catch (err) {
+        console.warn('[AdminDashboard] Cloud role update failed:', err);
+      }
     }
+
     setLocalUsersList((prev) => {
       const next = prev.map((u) => (u.uid === uid ? { ...u, role: nextRole } : u));
       try {
@@ -363,10 +380,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       } catch {}
       return next;
     });
-
-    try {
-      await updateDoc(doc(db, 'users', uid), { role: nextRole });
-    } catch {}
 
     const target = usersList.find((u) => u.uid === uid);
     if (onLogAudit && target) {
@@ -379,7 +392,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     let nextStatus: 'active' | 'suspended' = 'active';
     if (onToggleUserStatus) {
       onToggleUserStatus(uid);
+    } else {
+      try {
+        await setDoc(
+          doc(db, 'users', uid),
+          { accountStatus: nextStatus, updatedAt: new Date().toISOString() },
+          { merge: true }
+        );
+      } catch {}
     }
+
     setLocalUsersList((prev) => {
       const next = prev.map((u) => {
         if (u.uid === uid) {
@@ -393,10 +415,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       } catch {}
       return next;
     });
-
-    try {
-      await updateDoc(doc(db, 'users', uid), { accountStatus: nextStatus });
-    } catch {}
 
     const target = usersList.find((u) => u.uid === uid);
     if (onLogAudit && target) {
