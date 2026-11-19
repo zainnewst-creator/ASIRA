@@ -42,7 +42,7 @@ import { Course, ResearchPaper } from '../../types';
 import { AddCourseModal } from '../AddCourseModal';
 import { AddResearchModal } from '../AddResearchModal';
 import { EditCourseModal } from '../EditCourseModal';
-import { sanitizeUrl } from '../../utils/security';
+import { sanitizeUrl, extractYoutubeId } from '../../utils/security';
 import {
   loadAllStudentDataForCourse,
   saveSubmission as fbSaveSubmission,
@@ -539,7 +539,7 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
       id: `les-${Date.now()}`,
       title: newLessonTitle.trim(),
       mediaType: lessonMediaType,
-      youtubeId: lessonMediaType === 'video' ? (newLessonYoutube.trim() || 'dQw4w9WgXcQ') : undefined,
+      youtubeId: lessonMediaType === 'video' ? (extractYoutubeId(newLessonYoutube) || 'dQw4w9WgXcQ') : undefined,
       driveAudioUrl: lessonMediaType === 'audio' ? newLessonAudio.trim() : undefined,
       audioUrl: lessonMediaType === 'audio' ? newLessonAudio.trim() : undefined,
       durationMinutes: 45,
@@ -1299,8 +1299,10 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
 
                 {/* خيار طلب إعادة التسليم والتعديل */}
                 <div style={{ padding: '0.85rem', background: requestRevisionToggle ? 'rgba(239, 68, 68, 0.08)' : 'var(--bg-subtle)', border: requestRevisionToggle ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', marginBottom: '1.25rem' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.88rem' }}>
+                  <label htmlFor="revision-toggle" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.88rem' }}>
                     <input
+                      id="revision-toggle"
+                      name="revisionToggle"
                       type="checkbox"
                       checked={requestRevisionToggle}
                       onChange={(e) => setRequestRevisionToggle(e.target.checked)}
@@ -1311,6 +1313,8 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                   {requestRevisionToggle && (
                     <div style={{ marginTop: '0.65rem' }}>
                       <input
+                        id="revision-notes-input"
+                        name="revisionNotesInput"
                         type="text"
                         value={revisionNotesInput}
                         onChange={(e) => setRevisionNotesInput(e.target.value)}
@@ -1324,31 +1328,35 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                 {/* حقل رصد وتعديل الدرجة */}
                 {!requestRevisionToggle && (
                   <div style={{ marginBottom: '1.25rem' }}>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                    <label htmlFor="assignment-grade-input" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>
                       الدرجة المرصودة (من {selectedSubmission.maxScore}):
                     </label>
                     <input
+                      id="assignment-grade-input"
+                      name="assignmentGradeInput"
                       type="number"
                       min={0}
                       max={selectedSubmission.maxScore}
                       value={gradeInput}
                       onChange={(e) => setGradeInput(Number(e.target.value))}
-                      style={{ width: '120px', padding: '0.55rem', borderRadius: 'var(--radius-md)', border: '2px solid var(--primary-600)', fontSize: '1.15rem', fontWeight: 800, textAlign: 'center' }}
+                      style={{ width: '120px', padding: '0.55rem', borderRadius: 'var(--radius-md)', border: '2px solid var(--primary-600)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '1.15rem', fontWeight: 800, textAlign: 'center' }}
                     />
                   </div>
                 )}
 
                 {/* مربع كتابة تعليق وملاحظات المدرس للطالب */}
                 <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                  <label htmlFor="assignment-feedback-input" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>
                     تعليق وملاحظات المدرس للطالب (Feedback) — ستظهر للطالب فوراً:
                   </label>
                   <textarea
+                    id="assignment-feedback-input"
+                    name="assignmentFeedbackInput"
                     rows={3}
                     value={feedbackInput}
                     onChange={(e) => setFeedbackInput(e.target.value)}
                     placeholder="اكتب تعليقك الأكاديمي ونقاط القوة والتحسين..."
-                    style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', fontFamily: 'var(--font-arabic)', fontSize: '0.88rem' }}
+                    style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)', fontFamily: 'var(--font-arabic)', fontSize: '0.88rem' }}
                   />
                 </div>
 
@@ -1536,28 +1544,32 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                 <div style={{ padding: '1rem', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', marginBottom: '1.25rem' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '1rem', alignItems: 'center' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.25rem' }}>
+                      <label htmlFor="override-score-input" style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.25rem' }}>
                         الدرجة المعتمدة:
                       </label>
                       <input
+                        id="override-score-input"
+                        name="overrideScoreInput"
                         type="number"
                         min={0}
                         max={selectedAttempt.maxScore}
                         value={overrideScoreInput}
                         onChange={(e) => setOverrideScoreInput(Number(e.target.value))}
-                        style={{ width: '100%', padding: '0.55rem', borderRadius: 'var(--radius-md)', border: '2px solid var(--primary-600)', fontSize: '1.15rem', fontWeight: 800, textAlign: 'center' }}
+                        style={{ width: '100%', padding: '0.55rem', borderRadius: 'var(--radius-md)', border: '2px solid var(--primary-600)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '1.15rem', fontWeight: 800, textAlign: 'center' }}
                       />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.25rem' }}>
+                      <label htmlFor="override-reason-input" style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.25rem' }}>
                         ملاحظات الاعتماد أو سبب التعديل:
                       </label>
                       <input
+                        id="override-reason-input"
+                        name="overrideReasonInput"
                         type="text"
                         value={overrideReasonInput}
                         onChange={(e) => setOverrideReasonInput(e.target.value)}
                         placeholder="سبب تعديل الدرجة..."
-                        style={{ width: '100%', padding: '0.55rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-card)' }}
+                        style={{ width: '100%', padding: '0.55rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-main)' }}
                       />
                     </div>
                   </div>
@@ -2146,28 +2158,32 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                 </p>
 
                 <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                  <label htmlFor="edit-practical-score" style={{ display: 'block', fontSize: '0.88rem', fontWeight: 700, marginBottom: '0.35rem' }}>
                     الدرجة المرصودة (من 50):
                   </label>
                   <input
+                    id="edit-practical-score"
+                    name="editPracticalScore"
                     type="number"
                     min={0}
                     max={50}
                     value={selectedPracticalStudent.score}
                     onChange={(e) => setSelectedPracticalStudent({ ...selectedPracticalStudent, score: Number(e.target.value) })}
-                    style={{ width: '130px', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '2px solid var(--primary-600)', fontSize: '1.2rem', fontWeight: 800, textAlign: 'center' }}
+                    style={{ width: '130px', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '2px solid var(--primary-600)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '1.2rem', fontWeight: 800, textAlign: 'center' }}
                   />
                 </div>
 
                 <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                  <label htmlFor="edit-practical-notes" style={{ display: 'block', fontSize: '0.88rem', fontWeight: 700, marginBottom: '0.35rem' }}>
                     الملاحظات الأكاديمية على أداء الطالب:
                   </label>
                   <input
+                    id="edit-practical-notes"
+                    name="editPracticalNotes"
                     type="text"
                     value={selectedPracticalStudent.notes}
                     onChange={(e) => setSelectedPracticalStudent({ ...selectedPracticalStudent, notes: e.target.value })}
-                    style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }}
+                    style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
                   />
                 </div>
 
@@ -2232,13 +2248,15 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                 </p>
 
                 <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                  <label htmlFor="select-practical-student" style={{ display: 'block', fontSize: '0.88rem', fontWeight: 700, marginBottom: '0.35rem' }}>
                     اختر الطالب:
                   </label>
                   <select
+                    id="select-practical-student"
+                    name="practicalStudentUid"
                     value={newPracticalStudentUid}
                     onChange={(e) => setNewPracticalStudentUid(e.target.value)}
-                    style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }}
+                    style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
                   >
                     {courseApprovedStudents.map((st) => (
                       <option key={st.studentUid} value={st.studentUid}>
@@ -2249,29 +2267,33 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                 </div>
 
                 <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                  <label htmlFor="new-practical-score" style={{ display: 'block', fontSize: '0.88rem', fontWeight: 700, marginBottom: '0.35rem' }}>
                     الدرجة المرصودة (من 50):
                   </label>
                   <input
+                    id="new-practical-score"
+                    name="newPracticalScore"
                     type="number"
                     min={0}
                     max={50}
                     value={newPracticalScore}
                     onChange={(e) => setNewPracticalScore(Number(e.target.value))}
-                    style={{ width: '130px', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '2px solid var(--primary-600)', fontSize: '1.2rem', fontWeight: 800, textAlign: 'center' }}
+                    style={{ width: '130px', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '2px solid var(--primary-600)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '1.2rem', fontWeight: 800, textAlign: 'center' }}
                   />
                 </div>
 
                 <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                  <label htmlFor="new-practical-notes" style={{ display: 'block', fontSize: '0.88rem', fontWeight: 700, marginBottom: '0.35rem' }}>
                     الملاحظات الأكاديمية:
                   </label>
                   <input
+                    id="new-practical-notes"
+                    name="newPracticalNotes"
                     type="text"
                     value={newPracticalNotes}
                     onChange={(e) => setNewPracticalNotes(e.target.value)}
                     placeholder="مثال: أداء ممتاز، دقة في تطبيق منهجية البحث"
-                    style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }}
+                    style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
                   />
                 </div>
 
@@ -2780,10 +2802,12 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
 
             <form onSubmit={handleAddModule} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                <label htmlFor="new-module-title" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>
                   اسم الوحدة الدراسية *
                 </label>
                 <input
+                  id="new-module-title"
+                  name="newModuleTitle"
                   type="text"
                   required
                   value={newModuleTitle}
@@ -2802,10 +2826,12 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                <label htmlFor="new-module-desc" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>
                   وصف مختصر لأهداف ومحاور الوحدة
                 </label>
                 <textarea
+                  id="new-module-desc"
+                  name="newModuleDesc"
                   rows={3}
                   value={newModuleDesc}
                   onChange={(e) => setNewModuleDesc(e.target.value)}
@@ -2823,10 +2849,12 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                <label htmlFor="new-module-status" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>
                   حالة نشر الوحدة التعليمية
                 </label>
                 <select
+                  id="new-module-status"
+                  name="newModuleStatus"
                   value={newModuleStatus}
                   onChange={(e) => setNewModuleStatus(e.target.value as any)}
                   style={{
@@ -2887,10 +2915,12 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
 
             <form onSubmit={handleSaveEditModule} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                <label htmlFor="edit-module-title" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>
                   اسم الوحدة الدراسية *
                 </label>
                 <input
+                  id="edit-module-title"
+                  name="editModuleTitle"
                   type="text"
                   required
                   value={editModuleTitle}
@@ -2908,10 +2938,12 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                <label htmlFor="edit-module-desc" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>
                   وصف الوحدة
                 </label>
                 <textarea
+                  id="edit-module-desc"
+                  name="editModuleDesc"
                   rows={3}
                   value={editModuleDesc}
                   onChange={(e) => setEditModuleDesc(e.target.value)}
@@ -2928,10 +2960,12 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                <label htmlFor="edit-module-status" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.35rem' }}>
                   حالة نشر الوحدة التعليمية
                 </label>
                 <select
+                  id="edit-module-status"
+                  name="editModuleStatus"
                   value={editModuleStatus}
                   onChange={(e) => setEditModuleStatus(e.target.value as any)}
                   style={{
