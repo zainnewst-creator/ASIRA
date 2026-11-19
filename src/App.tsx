@@ -752,6 +752,19 @@ export const App: React.FC = () => {
     setCurrentTab('courses');
   };
 
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.warn('[Auth] Sign out error:', err);
+    }
+    setCurrentUser(null);
+    try {
+      localStorage.removeItem('asira_current_user');
+    } catch {}
+    setCurrentTab('home');
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       {/* الهيدر العلوي */}
@@ -762,6 +775,7 @@ export const App: React.FC = () => {
         toggleTheme={toggleTheme}
         onOpenAuth={() => setIsAuthOpen(true)}
         currentUser={currentUser}
+        onLogout={handleLogout}
       />
 
       {/* محتوى الصفحة النشطة */}
@@ -834,16 +848,7 @@ export const App: React.FC = () => {
             onUpdateUserRole={handleUpdateUserRole}
             onToggleUserStatus={handleToggleUserStatus}
             onNavigateTab={(tab) => setCurrentTab(tab)}
-            onLogout={async () => {
-              try {
-                await signOut(auth);
-              } catch {}
-              setCurrentUser(null);
-              try {
-                localStorage.removeItem('asira_current_user');
-              } catch {}
-              setCurrentTab('home');
-            }}
+            onLogout={handleLogout}
             onBackToPortal={() => setCurrentTab('home')}
           />
         )}

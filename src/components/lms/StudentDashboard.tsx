@@ -33,7 +33,7 @@ import {
 import { Course } from '../../types';
 import { AcademicCertificateModal } from './AcademicCertificateModal';
 import { AudioLessonPlayer } from './AudioLessonPlayer';
-import { sanitizeUrl, sanitizeExamForStudent, isTrustedStorageUrl } from '../../utils/security';
+import { sanitizeUrl, sanitizeExamForStudent, isTrustedStorageUrl, extractYoutubeId } from '../../utils/security';
 import {
   saveExamAttempt,
   loadExamAttempts,
@@ -993,7 +993,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               }}>
                 {currentLesson?.youtubeId ? (
                   <iframe
-                    src={`https://www.youtube-nocookie.com/embed/${currentLesson.youtubeId}?rel=0&modestbranding=1`}
+                    src={`https://www.youtube-nocookie.com/embed/${extractYoutubeId(currentLesson.youtubeId)}?rel=0&modestbranding=1`}
                     title={currentLesson.title}
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen

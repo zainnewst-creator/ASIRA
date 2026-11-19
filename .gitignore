@@ -11,7 +11,12 @@ node_modules
 dist
 dist-ssr
 *.local
-*.png
+
+# Environment variables (Firebase credentials)
+.env
+.env.local
+.env.production
+.env.staging
 
 # Editor directories and files
 .vscode/*

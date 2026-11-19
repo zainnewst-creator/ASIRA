@@ -140,6 +140,38 @@ body {
   transition: background-color var(--transition-normal), color var(--transition-normal);
 }
 
+/* تنسيق الحقول والنماذج الشامل لمنع اختفاء النصوص في الوضعين الفاتح والداكن */
+input,
+select,
+textarea {
+  color: var(--text-main);
+  background-color: var(--bg-main);
+  border: 1px solid var(--border-color);
+  font-family: var(--font-arabic);
+  font-size: 0.9rem;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), color var(--transition-fast), background-color var(--transition-fast);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-subtle);
+  opacity: 0.9;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 2px rgba(59, 107, 214, 0.25);
+  color: var(--text-main);
+}
+
+select option {
+  background-color: var(--bg-card);
+  color: var(--text-main);
+}
+
 /* شريط التمرير المخصص الأنيق والناعم */
 ::-webkit-scrollbar {
   width: 6px;

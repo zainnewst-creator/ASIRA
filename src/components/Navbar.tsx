@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookOpen, Moon, Sun, UserCircle2, ArrowLeft, Menu, X } from 'lucide-react';
+import { BookOpen, Moon, Sun, UserCircle2, ArrowLeft, Menu, X, LogOut } from 'lucide-react';
 
 interface NavbarProps {
   currentTab: string;
@@ -8,6 +8,7 @@ interface NavbarProps {
   toggleTheme: () => void;
   onOpenAuth: () => void;
   currentUser?: { name: string; role: string } | null;
+  onLogout?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -17,6 +18,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   toggleTheme,
   onOpenAuth,
   currentUser,
+  onLogout,
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -122,17 +124,34 @@ export const Navbar: React.FC<NavbarProps> = ({
             {isDark ? <Sun size={19} color="#f59e0b" /> : <Moon size={19} color="#475569" />}
           </button>
 
-          <div className="desktop-portal-btn">
+          <div className="desktop-portal-btn" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             {currentUser ? (
-              <button
-                onClick={() => handleNavClick('lms_dashboard')}
-                className="btn btn-primary"
-                id="user-portal-btn"
-                style={{ fontSize: '0.85rem' }}
-              >
-                <UserCircle2 size={17} />
-                <span>لوحة التحكم ({currentUser.name})</span>
-              </button>
+              <>
+                <button
+                  onClick={() => handleNavClick('lms_dashboard')}
+                  className="btn btn-primary"
+                  id="user-portal-btn"
+                  style={{ fontSize: '0.85rem' }}
+                >
+                  <UserCircle2 size={17} />
+                  <span>لوحة التحكم ({currentUser.name})</span>
+                </button>
+                {onLogout && (
+                  <button
+                    onClick={onLogout}
+                    className="btn btn-ghost"
+                    id="navbar-logout-btn"
+                    title="تسجيل الخروج من المنصة"
+                    style={{
+                      padding: '0.45rem',
+                      borderRadius: 'var(--radius-full)',
+                      color: '#ef4444',
+                    }}
+                  >
+                    <LogOut size={18} />
+                  </button>
+                )}
+              </>
             ) : (
               <button
                 onClick={onOpenAuth}
@@ -218,14 +237,38 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
             {currentUser ? (
-              <button
-                onClick={() => handleNavClick('lms_dashboard')}
-                className="btn btn-primary"
-                style={{ width: '100%', justifyContent: 'center', padding: '0.75rem' }}
-              >
-                <UserCircle2 size={18} />
-                <span>الدخول للوحة التعليم ({currentUser.name})</span>
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <button
+                  onClick={() => handleNavClick('lms_dashboard')}
+                  className="btn btn-primary"
+                  style={{ width: '100%', justifyContent: 'center', padding: '0.75rem' }}
+                >
+                  <UserCircle2 size={18} />
+                  <span>الدخول للوحة التعليم ({currentUser.name})</span>
+                </button>
+                {onLogout && (
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      onLogout();
+                    }}
+                    className="btn btn-outline"
+                    style={{
+                      width: '100%',
+                      justifyContent: 'center',
+                      padding: '0.6rem',
+                      color: '#ef4444',
+                      borderColor: 'rgba(239, 68, 68, 0.4)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <LogOut size={16} />
+                    <span>تسجيل الخروج</span>
+                  </button>
+                )}
+              </div>
             ) : (
               <button
                 onClick={() => {

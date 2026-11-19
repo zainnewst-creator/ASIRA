@@ -6,15 +6,25 @@ import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 // الإعدادات الرسمية لمشروع Firebase (asira-79469)
+// ⚠️ يجب تعريف المتغيرات في ملف .env (لا تُكتب مباشرة في الكود)
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyCf637G-vYKaejPd66P6p-iZz6Uzd_af3g",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "asira-79469.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "asira-79469",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "asira-79469.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "699835643004",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:699835643004:web:32422ff935838dfb7885f9",
-  measurementId: "G-JP6V6JCJFE"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
+
+// التحقق من وجود الإعدادات الأساسية
+if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+  console.error(
+    '[Firebase] ⚠️ إعدادات Firebase غير موجودة! تأكد من إنشاء ملف .env يحتوي على:\n' +
+    'VITE_FIREBASE_API_KEY=...\nVITE_FIREBASE_PROJECT_ID=...\n' +
+    'راجع .env.example للتفاصيل.'
+  );
+}
 
 // تهيئة التطبيق
 export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);

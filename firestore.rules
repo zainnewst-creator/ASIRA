@@ -21,8 +21,7 @@ service cloud.firestore {
         request.auth.token.admin == true ||
         request.auth.token.role == 'admin' ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' &&
-         request.auth.token.email_verified == true)
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
       );
     }
 
@@ -72,6 +71,32 @@ service cloud.firestore {
 
       // الحذف المباشر محظور لحماية النزاهة وسجلات التدقيق
       allow delete: if false;
+
+      // أ. تقدم الدروس الأكاديمية للطالب
+      match /progress/{courseId} {
+        allow read: if isOwner(uid) || isInstructor() || isAdmin();
+        allow write: if isOwner(uid) || isAdmin();
+      }
+
+      // ب. تسليمات التكليفات والواجبات
+      match /submissions/{subId} {
+        allow read: if isOwner(uid) || isInstructor() || isAdmin();
+        allow create, update: if isOwner(uid) || isInstructor() || isAdmin();
+        allow delete: if isAdmin();
+      }
+
+      // ج. محاولات الاختبارات النظرية والنهائية
+      match /examAttempts/{attemptId} {
+        allow read: if isOwner(uid) || isInstructor() || isAdmin();
+        allow create, update: if isOwner(uid) || isInstructor() || isAdmin();
+        allow delete: if isAdmin();
+      }
+
+      // د. درجات التقييم العملي الحضوري
+      match /practicalGrades/{gradeId} {
+        allow read: if isOwner(uid) || isInstructor() || isAdmin();
+        allow write: if isInstructor() || isAdmin();
+      }
     }
 
     // ==========================================
@@ -270,7 +295,46 @@ service cloud.firestore {
     }
 
     // ==========================================
-    // 5. سجل العمليات والتدقيق (Audit Logs) - منع التزوير والانتحال
+    // 5. المناهج والطلبات العامة (Curricula, Enrollments, CertRequests)
+    // ==========================================
+    match /curricula/{courseId} {
+      allow read: if true;
+      allow write: if isInstructor() || isAdmin();
+    }
+
+    match /enrollments/{enrollmentId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isInstructor() || isAdmin();
+    }
+
+    match /certRequests/{reqId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    // ==========================================
+    // 6. استعلامات المجموعات المشتركة (CollectionGroup Queries)
+    // ==========================================
+    match /{path=**}/submissions/{subId} {
+      allow read: if isInstructor() || isAdmin();
+    }
+
+    match /{path=**}/examAttempts/{attemptId} {
+      allow read: if isInstructor() || isAdmin();
+    }
+
+    match /{path=**}/practicalGrades/{gradeId} {
+      allow read: if isInstructor() || isAdmin();
+    }
+
+    match /{path=**}/progress/{progId} {
+      allow read: if isInstructor() || isAdmin();
+    }
+
+    // ==========================================
+    // 7. سجل العمليات والتدقيق (Audit Logs) - منع التزوير والانتحال
     // ==========================================
     match /auditLogs/{logId} {
       allow read: if isAdmin();

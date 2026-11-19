@@ -60,3 +60,21 @@ export const sanitizeExamForStudent = <T extends { questions?: Array<any> }>(exa
     }),
   };
 };
+
+/**
+ * استخراج معرف فيديو YouTube بأمان من الروابط المختلفة أو من المعرف المباشر
+ */
+export const extractYoutubeId = (urlOrId?: string | null): string => {
+  if (!urlOrId || typeof urlOrId !== 'string') return '';
+  const trimmed = urlOrId.trim();
+  // إذا كان المعرف نقياً بطول 11 حرفاً (معرف يوتيوب القياسي)
+  if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) {
+    return trimmed;
+  }
+  // إذا كان رابطاً مثل youtu.be أو watch?v= أو embed
+  const match = trimmed.match(/(?:youtu\.be\/|youtube(?:-nocookie)?\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+  if (match && match[1]) {
+    return match[1];
+  }
+  return trimmed;
+};
